@@ -2,6 +2,8 @@ package com.woody.backend.infraestructure.entity;
 
 import java.time.LocalDate;
 
+import com.woody.backend.infraestructure.entity.embeddedIds.UserFollowsId;
+
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;

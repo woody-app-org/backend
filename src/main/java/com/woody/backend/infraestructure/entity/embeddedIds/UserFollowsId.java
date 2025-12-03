@@ -1,4 +1,4 @@
-package com.woody.backend.infraestructure.entity;
+package com.woody.backend.infraestructure.entity.embeddedIds;
 
 import java.util.Objects;
 

@@ -7,9 +7,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
+import com.woody.backend.infraestructure.entity.enums.UserRoles;
+
 @Entity
 public class UserEntity {
-    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
@@ -32,10 +33,12 @@ public class UserEntity {
 
     private LocalDate created_at;
 
+    private UserRoles role;
+
     public UserEntity(){}
 
     public UserEntity(String cpf, String email, String name, String username, String password, LocalDate dateOfBirth,
-            boolean is_active, LocalDate updated_at, LocalDate created_at) {
+            boolean is_active, LocalDate updated_at, LocalDate created_at, UserRoles role) {
         this.cpf = cpf;
         this.email = email;
         this.name = name;
@@ -45,6 +48,15 @@ public class UserEntity {
         this.is_active = is_active;
         this.updated_at = updated_at;
         this.created_at = created_at;
+        this.role = role;
+    }
+
+    public UserRoles getRole() {
+        return role;
+    }
+
+    public void setRole(UserRoles role) {
+        this.role = role;
     }
 
     public long getId() {
