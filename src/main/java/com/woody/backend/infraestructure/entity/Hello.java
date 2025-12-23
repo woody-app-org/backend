@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 
 @Entity
 public class Hello {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long Id;
