@@ -32,4 +32,6 @@ jobs:
         run: mvn test
       - name: Verify Checkstyle
         run: mvn checkstyle:check
+      - name: Verify SpotBugs
+        run: mvn spotbugs:check
 
