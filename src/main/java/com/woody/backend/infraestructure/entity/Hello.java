@@ -10,7 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 public class Hello {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long Id;
+    private long id;
     
     @NotBlank(message = "This field cannot be null")
     private String hello;
@@ -24,15 +24,15 @@ public class Hello {
     }
 
     public long getId() {
-        return Id;
+        return id;
     }
 
     public void setId(long id) {
-        Id = id;
+        this.id = id;
     }
 
     public Hello(long id, @NotBlank(message = "This field cannot be null") String hello) {
-        Id = id;
+        this.id = id;
         this.hello = hello;
     }
 
@@ -40,5 +40,5 @@ public class Hello {
         this.hello = hello;
     }
 
-    public Hello(){}
+    public Hello() {}
 }

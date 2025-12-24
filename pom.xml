@@ -6,7 +6,7 @@
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>3.5.6</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<relativePath/>
 	</parent>
 	<groupId>com.woody</groupId>
 	<artifactId>backend</artifactId>
@@ -98,7 +98,6 @@
 				</dependencies>
 				<configuration>
 					<configLocation>checkstyle.xml</configLocation>
-					<encoding>UTF-8</encoding>
 					<consoleOutput>true</consoleOutput>
 					<failsOnError>true</failsOnError>
 					<linkXRef>false</linkXRef>
@@ -110,6 +109,33 @@
 					<goals>
 						<goal>check</goal>
 					</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>4.8.5.0</version>
+				<dependencies>
+					<dependency>
+					<groupId>com.github.spotbugs</groupId>
+						<artifactId>spotbugs</artifactId>
+					<version>4.8.5</version>
+					</dependency>
+				</dependencies>
+				 <configuration>
+					<threshold>Low</threshold>
+					<effort>Max</effort>
+					<failOnError>true</failOnError>
+					<excludeFilterFile>excludeFilter.xml</excludeFilterFile>
+				</configuration>
+				<executions>
+					<execution>
+						<id>spotbugs-check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>
