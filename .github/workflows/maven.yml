@@ -21,7 +21,8 @@ jobs:
       - name: Build + Test
         run: mvn -B verify
   notify-failure:
-    if: failure() == true
+    needs: build
+    if: failure()
     runs-on: ubuntu-latest
     steps:
       - name: Send failure notification to Discord
