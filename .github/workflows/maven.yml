@@ -1,18 +1,6 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
+name: Java CI
 
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Java CI with Maven
-
-on:
-  push:
-    branches: ["develop", "main"]
-  pull_request:
-    branches: ["develop", "main"]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -26,7 +14,45 @@ jobs:
           java-version: "21"
           distribution: "temurin"
           cache: maven
-      - name: Build with Maven
-        run: mvn -B package --file pom.xml
-      - name: Test with Maven
-        run: mvn test
+      - name: Verify Checkstyle
+        run: mvn checkstyle:check
+      - name: Verify SpotBugs
+        run: mvn spotbugs:check
+      - name: Build + Test
+        run: mvn -B verify
+  notify-failure:
+    needs: build
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL_CI }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          WORKFLOW: ${{ github.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CONCLUSION: failure
+        run: |
+          payload=$(jq -n \
+            --arg repo "$REPO" \
+            --arg workflow "$WORKFLOW" \
+            --arg actor "$ACTOR" \
+            --arg url "$RUN_URL" \
+            --arg conclusion "$CONCLUSION" \
+            '{
+              content: "**Pipeline failed :((** <@&1453490417264754749><@&1453490988923224148>",
+              embeds: [
+                {
+                  title: "\($workflow) – \($conclusion)",
+                  url: $url,
+                  description: "**Repo:** \($repo)\n**Thrown by:** \($actor)",
+                  color: 15158332
+                }
+              ]
+            }')
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$WEBHOOK"
+
