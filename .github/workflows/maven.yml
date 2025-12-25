@@ -20,4 +20,38 @@ jobs:
         run: mvn spotbugs:check
       - name: Build + Test
         run: mvn -B verify
+  notify-failure:
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL_CI }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          WORKFLOW: ${{ github.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CONCLUSION: failure
+        run: |
+          payload=$(jq -n \
+            --arg repo "$REPO" \
+            --arg workflow "$WORKFLOW" \
+            --arg actor "$ACTOR" \
+            --arg url "$RUN_URL" \
+            --arg conclusion "$CONCLUSION" \
+            '{
+              content: "**Pipeline failed** :(( <@&1453490417264754749><@&1453490988923224148>",
+              embeds: [
+                {
+                  title: "\($workflow) – \($conclusion)",
+                  url: $url,
+                  description: "**Repo:** \($repo)\n**Thrown by:** \($actor)",
+                  color: 15158332
+                }
+              ]
+            }')
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$WEBHOOK"
 
