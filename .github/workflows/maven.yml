@@ -41,7 +41,7 @@ jobs:
             --arg url "$RUN_URL" \
             --arg conclusion "$CONCLUSION" \
             '{
-              content: "**Pipeline failed** :(( <@&1453490417264754749><@&1453490988923224148>",
+              content: "**Pipeline failed :((** <@&1453490417264754749><@&1453490988923224148>",
               embeds: [
                 {
                   title: "\($workflow) – \($conclusion)",

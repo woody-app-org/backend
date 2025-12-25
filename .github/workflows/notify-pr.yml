@@ -20,12 +20,13 @@ jobs:
             --arg url "$PR_URL" \
             --arg author "$PR_AUTHOR" \
             '{
-              content: "<@&1453490417264754749><@&1453490988923224148> **\($repo)** PR opened! :)",
+              content: "**PR opened! :)**<@&1453490417264754749><@&1453490988923224148>",
               embeds: [
                 {
                   title: $title,
                   url: $url,
-                  description: "Autor: \($author)"
+                  description: "**Repo:** \($repo)\n**Author:** \($author)",
+                  color: 3066993
                 }
               ]
             }')

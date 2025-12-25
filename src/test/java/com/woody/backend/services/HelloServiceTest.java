@@ -27,7 +27,7 @@ public class HelloServiceTest {
     @Test
     public void GetHelloShouldReturnTheSame(){
         var hello = this.helloService.getHello().get(0);
-        var shouldBeEqual = new HelloDto("Hello "); // Hello Test! this is going to force an error
+        var shouldBeEqual = new HelloDto("Hello Test!");
 
         assertEquals(hello, shouldBeEqual);
     }
