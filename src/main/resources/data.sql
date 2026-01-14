@@ -1,1 +1,0 @@
-INSERT INTO HELLO(HELLO) VALUES ('Hello World!')
