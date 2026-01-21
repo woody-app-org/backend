@@ -9,7 +9,7 @@ namespace Woody.Infrastructure.Persistence.Configuration
 {
     public class WoodyDbConfiguration
     {
-        private readonly static string schema = "woody";
+        private readonly static string schema = "public";
         internal static string ConnectionString;
 
         public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
