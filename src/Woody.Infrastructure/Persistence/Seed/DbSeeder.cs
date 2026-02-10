@@ -1,31 +1,142 @@
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
 
-namespace Woody.Infrastructure.Persistence.Seed
+namespace Woody.Infrastructure.Persistence.Seed;
+
+public static class DbSeeder
 {
-    public class DbSeeder
+    public static void Seed(WoodyDbContext context)
     {
-        public static void Seed(WoodyDbContext context)
+        SeedUsers(context);
+        SeedPosts(context);
+        SeedComments(context);
+        SeedFollows(context);
+        SeedLikes(context);
+    }
+
+    private static void SeedUsers(WoodyDbContext context)
+    {
+        if (context.Users.Any())
+            return;
+
+        var users = new List<User>
         {
-            string[] usernames = { "admin", "user1", "user2", "user3", "user4", "user5", "user6", "user7", "user8", "user9", "user10" };
-            string[] emails = { "admin@example.com", "user1@example.com", "user2@example.com", "user3@example.com", "user4@example.com", "user5@example.com", "user6@example.com", "user7@example.com", "user8@example.com", "user9@example.com", "user10@example.com" };
-            for (int i = 0; i < usernames.Length; i++)
+            new() { Username = "admin", Email = "admin@example.com", Password = "hashed", Role = "Admin" },
+            new() { Username = "user1", Email = "user1@example.com", Password = "hashed", Role = "User" },
+            new() { Username = "user2", Email = "user2@example.com", Password = "hashed", Role = "User" },
+            new() { Username = "user3", Email = "user3@example.com", Password = "hashed", Role = "User" },
+            new() { Username = "user4", Email = "user4@example.com", Password = "hashed", Role = "User" }
+        };
+
+        users.ForEach(u =>
+        {
+            u.CreatedAt = DateTime.UtcNow;
+            u.UpdatedAt = DateTime.UtcNow;
+        });
+
+        context.Users.AddRange(users);
+        context.SaveChanges();
+    }
+
+    private static void SeedPosts(WoodyDbContext context)
+    {
+        if (context.Posts.Any())
+            return;
+
+        var users = context.Users.ToList();
+
+        var posts = users.Select((u, i) => new Post
+        {
+            UserId = u.Id,
+            Content = $"Post inicial do {u.Username}",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-i * 5)
+        }).ToList();
+
+        context.Posts.AddRange(posts);
+        context.SaveChanges();
+    }
+
+    private static void SeedComments(WoodyDbContext context)
+    {
+        if (context.Comments.Any())
+            return;
+
+        var post = context.Posts.First();
+        var users = context.Users.ToList();
+
+        var comment1 = new Comment
+        {
+            PostId = post.Id,
+            AuthorId = users[1].Id,
+            Content = "Primeiro comentário",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Comments.Add(comment1);
+        context.SaveChanges();
+
+        var reply = new Comment
+        {
+            PostId = post.Id,
+            AuthorId = users[2].Id,
+            ParentCommentId = comment1.Id,
+            Content = "Resposta ao comentário",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Comments.Add(reply);
+        context.SaveChanges();
+    }
+
+    private static void SeedFollows(WoodyDbContext context)
+    {
+        if (context.Follows.Any())
+            return;
+
+        var users = context.Users.ToList();
+
+        var follows = new List<Follow>
+        {
+            new() { FollowingUserId = users[1].Id, FollowedUserId = users[0].Id },
+            new() { FollowingUserId = users[2].Id, FollowedUserId = users[0].Id },
+            new() { FollowingUserId = users[3].Id, FollowedUserId = users[1].Id }
+        };
+
+        follows.ForEach(f => f.CreatedAt = DateTime.UtcNow);
+
+        context.Follows.AddRange(follows);
+        context.SaveChanges();
+    }
+
+    private static void SeedLikes(WoodyDbContext context)
+    {
+        if (context.Likes.Any())
+            return;
+
+        var users = context.Users.ToList();
+        var post = context.Posts.First();
+        var comment = context.Comments.First();
+
+        var likes = new List<Like>
+        {
+            new()
             {
-                if (!context.Users.Any(u => u.Username == usernames[i]))
-                {
-                    var user = new User
-                    {
-                        Id = Guid.NewGuid(),
-                        Username = usernames[i],
-                        Email = emails[i],
-                        PasswordHash = "hashed_password",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    context.Users.Add(user);
-                }
+                UserId = users[1].Id,
+                TargetType = LikeTargetType.Post,
+                TargetId = post.Id,
+                CreatedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                UserId = users[2].Id,
+                TargetType = LikeTargetType.Comment,
+                TargetId = comment.Id,
+                CreatedAt = DateTime.UtcNow
             }
-            context.SaveChanges();
-        }
+        };
+
+        context.Likes.AddRange(likes);
+        context.SaveChanges();
     }
 }

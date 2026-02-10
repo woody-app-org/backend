@@ -16,7 +16,7 @@ namespace Woody.Infrastructure.Persistence
                 $"Database=woody_db;" +
                 $"Username={Environment.GetEnvironmentVariable("DB_USERNAME")};" +
                 $"Password={Environment.GetEnvironmentVariable("DB_PASS")};" +
-                $"SearchPath=woody";
+                $"SearchPath=public";
 
             var optionsBuilder = new DbContextOptionsBuilder<WoodyDbContext>();
             optionsBuilder
