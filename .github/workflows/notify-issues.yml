@@ -28,7 +28,7 @@ jobs:
                   title: $title,
                   url: $url,
                   description: "**Repo:** \($repo)\n**Author:** \($author)",
-                  color: 15158332
+                  color: 8913151
                 }
               ]
             }')
