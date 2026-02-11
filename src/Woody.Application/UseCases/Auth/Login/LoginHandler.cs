@@ -21,7 +21,7 @@ namespace Woody.Application.UseCases.Auth.Login
         {
             var user = await _userRepository.GetByEmailAsync(request.Email);
             if (user == null || !_passwordHasher.VerifyPassword(user.Password, request.Password))
-                throw new UnauthorizedAccessException("Invalid email or password.");
+                throw new UnauthorizedAccessException();
 
             var token = _jwtTokenService.GenerateToken(user);
 

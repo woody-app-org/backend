@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Woody.Api.Configuration;
+using Woody.Api.Middlewares;
 using Woody.Infrastructure.Persistence.Configuration;
 using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
@@ -56,6 +57,8 @@ if (!app.Environment.EnvironmentName.Equals("Prod", StringComparison.OrdinalIgno
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
