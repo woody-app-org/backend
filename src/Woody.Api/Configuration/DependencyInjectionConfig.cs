@@ -12,6 +12,7 @@ namespace Woody.Api.Configuration
         {
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+            builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
             builder.Services.AddScoped<LoginHandler>();
 
         }

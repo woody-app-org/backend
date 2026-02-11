@@ -1,6 +1,7 @@
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
+using Woody.Infrastructure.Security;
 
 namespace Woody.Infrastructure.Persistence.Seed;
 
@@ -20,13 +21,15 @@ public static class DbSeeder
         if (context.Users.Any())
             return;
 
+        PasswordHasher hasher = new();
+
         var users = new List<User>
         {
-            new() { Username = "admin", Email = "admin@example.com", Password = "hashed", Role = "Admin" },
-            new() { Username = "user1", Email = "user1@example.com", Password = "hashed", Role = "User" },
-            new() { Username = "user2", Email = "user2@example.com", Password = "hashed", Role = "User" },
-            new() { Username = "user3", Email = "user3@example.com", Password = "hashed", Role = "User" },
-            new() { Username = "user4", Email = "user4@example.com", Password = "hashed", Role = "User" }
+            new() { Username = "admin", Email = "admin@example.com", Password = hasher.HashPassword("admin123"), Role = "Admin" },
+            new() { Username = "user1", Email = "user1@example.com", Password = hasher.HashPassword("user123"), Role = "User" },
+            new() { Username = "user2", Email = "user2@example.com", Password = hasher.HashPassword("user234"), Role = "User" },
+            new() { Username = "user3", Email = "user3@example.com", Password = hasher.HashPassword("user345"), Role = "User" },
+            new() { Username = "user4", Email = "user4@example.com", Password = hasher.HashPassword("user456"), Role = "User" }
         };
 
         users.ForEach(u =>

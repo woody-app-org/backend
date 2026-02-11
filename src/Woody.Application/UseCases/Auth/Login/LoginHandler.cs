@@ -9,16 +9,18 @@ namespace Woody.Application.UseCases.Auth.Login
     {
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IUserRepository _userRepository;
-        public LoginHandler(IUserRepository userRepository, IJwtTokenService jwtTokenService)
+        private readonly IPasswordHasher _passwordHasher;
+        public LoginHandler(IUserRepository userRepository, IJwtTokenService jwtTokenService, IPasswordHasher passwordHasher)
         {
             _userRepository = userRepository;
             _jwtTokenService = jwtTokenService;
+            _passwordHasher = passwordHasher;
         }
 
         public async Task<LoginResultDTO?> HandleAsync(LoginRequestDTO request)
         {
             var user = await _userRepository.GetByEmailAsync(request.Email);
-            if (user == null || user.Password != request.Password) // hash passwords
+            if (user == null || !_passwordHasher.VerifyPassword(user.Password, request.Password))
                 throw new UnauthorizedAccessException("Invalid email or password.");
 
             var token = _jwtTokenService.GenerateToken(user);
