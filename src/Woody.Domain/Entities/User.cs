@@ -23,5 +23,7 @@ namespace Woody.Domain.Entities
 
         public ICollection<Follow> Following { get; set; } = new List<Follow>();
         public ICollection<Follow> Followers { get; set; } = new List<Follow>();
+
+        public ICollection<UserTopic> UserTopics { get; set; } = new List<UserTopic>();
     }
 }

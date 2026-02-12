@@ -14,6 +14,8 @@ public static class DbSeeder
         SeedComments(context);
         SeedFollows(context);
         SeedLikes(context);
+        SeedTopics(context);
+        SeedTopicRelations(context);
     }
 
     private static void SeedUsers(WoodyDbContext context)
@@ -25,11 +27,11 @@ public static class DbSeeder
 
         var users = new List<User>
         {
-            new() { Username = "admin", Email = "admin@example.com", Password = hasher.HashPassword("admin123"), Role = "Admin" },
-            new() { Username = "user1", Email = "user1@example.com", Password = hasher.HashPassword("user123"), Role = "User" },
-            new() { Username = "user2", Email = "user2@example.com", Password = hasher.HashPassword("user234"), Role = "User" },
-            new() { Username = "user3", Email = "user3@example.com", Password = hasher.HashPassword("user345"), Role = "User" },
-            new() { Username = "user4", Email = "user4@example.com", Password = hasher.HashPassword("user456"), Role = "User" }
+            new() { Username = "nicholau", Email = "nicholau@dev.com", Password = hasher.HashPassword("dev123"), Role = "Admin", Bio = "Backend developer focused on .NET and architecture." },
+            new() { Username = "mariana", Email = "mariana@design.com", Password = hasher.HashPassword("design123"), Role = "User", Bio = "UI/UX designer apaixonada por produtos digitais." },
+            new() { Username = "carlos", Email = "carlos@data.com", Password = hasher.HashPassword("data123"), Role = "User", Bio = "Data enthusiast e curioso por sistemas distribuídos." },
+            new() { Username = "ana", Email = "ana@frontend.com", Password = hasher.HashPassword("front123"), Role = "User", Bio = "Frontend engineer e fã de React." },
+            new() { Username = "lucas", Email = "lucas@mobile.com", Password = hasher.HashPassword("mobile123"), Role = "User", Bio = "Desenvolvedor mobile e criador de apps indie." }
         };
 
         users.ForEach(u =>
@@ -42,6 +44,25 @@ public static class DbSeeder
         context.SaveChanges();
     }
 
+    private static void SeedTopics(WoodyDbContext context)
+    {
+        if (context.Topics.Any())
+            return;
+
+        var topics = new List<Topic>
+        {
+            new() { Name = "dotnet" },
+            new() { Name = "architecture" },
+            new() { Name = "frontend" },
+            new() { Name = "mobile" },
+            new() { Name = "design" },
+            new() { Name = "data" }
+        };
+
+        context.Topics.AddRange(topics);
+        context.SaveChanges();
+    }
+
     private static void SeedPosts(WoodyDbContext context)
     {
         if (context.Posts.Any())
@@ -49,12 +70,34 @@ public static class DbSeeder
 
         var users = context.Users.ToList();
 
-        var posts = users.Select((u, i) => new Post
+        var posts = new List<Post>
         {
-            UserId = u.Id,
-            Content = $"Post inicial do {u.Username}",
-            CreatedAt = DateTime.UtcNow.AddMinutes(-i * 5)
-        }).ToList();
+            new() {
+                UserId = users[0].Id,
+                Content = "Estou estudando Clean Architecture em .NET e a diferença na organização do código é absurda.",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-30)
+            },
+            new() {
+                UserId = users[1].Id,
+                Content = "Design systems bem feitos economizam meses de retrabalho.",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-25)
+            },
+            new() {
+                UserId = users[2].Id,
+                Content = "Alguém aqui já trabalhou com processamento de dados em larga escala?",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-20)
+            },
+            new() {
+                UserId = users[3].Id,
+                Content = "React 19 trouxe algumas mudanças interessantes no concurrent rendering.",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-15)
+            },
+            new() {
+                UserId = users[4].Id,
+                Content = "Publicar um app na Play Store é mais complexo do que parece.",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-10)
+            }
+        };
 
         context.Posts.AddRange(posts);
         context.SaveChanges();
@@ -71,8 +114,8 @@ public static class DbSeeder
         var comment1 = new Comment
         {
             PostId = post.Id,
-            AuthorId = users[1].Id,
-            Content = "Primeiro comentário",
+            AuthorId = users[2].Id,
+            Content = "Você está aplicando CQRS também?",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -82,13 +125,55 @@ public static class DbSeeder
         var reply = new Comment
         {
             PostId = post.Id,
-            AuthorId = users[2].Id,
+            AuthorId = users[0].Id,
             ParentCommentId = comment1.Id,
-            Content = "Resposta ao comentário",
+            Content = "Ainda não, mas está no roadmap.",
             CreatedAt = DateTime.UtcNow
         };
 
         context.Comments.Add(reply);
+        context.SaveChanges();
+    }
+
+    private static void SeedTopicRelations(WoodyDbContext context)
+    {
+        if (context.PostTopics.Any() || context.UserTopics.Any())
+            return;
+
+        var users = context.Users.ToList();
+        var posts = context.Posts.ToList();
+        var topics = context.Topics.ToList();
+
+        var postTopics = new List<PostTopic>
+        {
+            new() { PostId = posts[0].Id, TopicId = topics.First(t => t.Name == "dotnet").Id },
+            new() { PostId = posts[0].Id, TopicId = topics.First(t => t.Name == "architecture").Id },
+
+            new() { PostId = posts[1].Id, TopicId = topics.First(t => t.Name == "design").Id },
+
+            new() { PostId = posts[2].Id, TopicId = topics.First(t => t.Name == "data").Id },
+
+            new() { PostId = posts[3].Id, TopicId = topics.First(t => t.Name == "frontend").Id },
+
+            new() { PostId = posts[4].Id, TopicId = topics.First(t => t.Name == "mobile").Id }
+        };
+
+        var userTopics = new List<UserTopic>
+        {
+            new() { UserId = users[0].Id, TopicId = topics.First(t => t.Name == "dotnet").Id },
+            new() { UserId = users[0].Id, TopicId = topics.First(t => t.Name == "architecture").Id },
+
+            new() { UserId = users[1].Id, TopicId = topics.First(t => t.Name == "design").Id },
+
+            new() { UserId = users[2].Id, TopicId = topics.First(t => t.Name == "data").Id },
+
+            new() { UserId = users[3].Id, TopicId = topics.First(t => t.Name == "frontend").Id },
+
+            new() { UserId = users[4].Id, TopicId = topics.First(t => t.Name == "mobile").Id }
+        };
+
+        context.PostTopics.AddRange(postTopics);
+        context.UserTopics.AddRange(userTopics);
         context.SaveChanges();
     }
 

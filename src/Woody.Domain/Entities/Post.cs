@@ -11,5 +11,7 @@ namespace Woody.Domain.Entities
         public DateTime CreatedAt { get; set; }
 
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+
+        public ICollection<PostTopic> PostTopics { get; set; } = new List<PostTopic>();
     }
 }
