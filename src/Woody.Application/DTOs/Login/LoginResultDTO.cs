@@ -1,4 +1,4 @@
-namespace Woody.Application.DTOs
+namespace Woody.Application.DTOs.Login
 {
     public class LoginResultDTO
     {

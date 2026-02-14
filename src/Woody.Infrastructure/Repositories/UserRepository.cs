@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Interfaces;
 using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Repositories

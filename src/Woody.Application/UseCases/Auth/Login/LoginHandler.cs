@@ -1,7 +1,6 @@
-using Woody.Application.DTOs;
-using Woody.Application.Interfaces;
+using Woody.Application.DTOs.Login;
 using Woody.Application.Interfaces.Security;
-using Woody.Domain.Entities;
+using Woody.Domain.Interfaces;
 
 namespace Woody.Application.UseCases.Auth.Login
 {

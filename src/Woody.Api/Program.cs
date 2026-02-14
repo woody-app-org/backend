@@ -5,6 +5,7 @@ using Woody.Api.Middlewares;
 using Woody.Infrastructure.Persistence.Configuration;
 using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
+using Woody.Infrastructure.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 

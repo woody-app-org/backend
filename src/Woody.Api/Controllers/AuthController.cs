@@ -1,13 +1,11 @@
-using System.Runtime.CompilerServices;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Woody.Application.DTOs;
+using Woody.Application.DTOs.Login;
 using Woody.Application.UseCases.Auth.Login;
 
 namespace Woody.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     public class AuthController : ControllerBase
     {
         private readonly LoginHandler _handler;

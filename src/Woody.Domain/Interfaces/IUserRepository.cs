@@ -1,6 +1,6 @@
 using Woody.Domain.Entities;
 
-namespace Woody.Application.Interfaces
+namespace Woody.Domain.Interfaces
 {
     public interface IUserRepository
     {
