@@ -9,10 +9,14 @@ namespace Woody.Domain.Entities
         public string Password { get; set; } = null!;
         public string Role { get; set; } = null!;
 
+        public string? DisplayName { get; set; }
         public string? Bio { get; set; }
         public string? Pronouns { get; set; }
         public string? ProfilePic { get; set; }
         public string? BannerPic { get; set; }
+        public string? Location { get; set; }
+        public string? Cpf { get; set; }
+        public DateOnly? BirthDate { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -23,5 +27,12 @@ namespace Woody.Domain.Entities
 
         public ICollection<Follow> Following { get; set; } = new List<Follow>();
         public ICollection<Follow> Followers { get; set; } = new List<Follow>();
+
+        public ICollection<Community> OwnedCommunities { get; set; } = new List<Community>();
+        public ICollection<CommunityMembership> CommunityMemberships { get; set; } = new List<CommunityMembership>();
+        public ICollection<JoinRequest> JoinRequests { get; set; } = new List<JoinRequest>();
+        public ICollection<UserSocialLink> SocialLinks { get; set; } = new List<UserSocialLink>();
+        public ICollection<UserInterest> Interests { get; set; } = new List<UserInterest>();
+        public ICollection<ContentReport> ContentReports { get; set; } = new List<ContentReport>();
     }
 }

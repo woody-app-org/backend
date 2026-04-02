@@ -10,14 +10,54 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Comment> Comments { get; set; }
         public virtual DbSet<Like> Likes { get; set; }
         public virtual DbSet<Follow> Follows { get; set; }
+        public virtual DbSet<Community> Communities { get; set; }
+        public virtual DbSet<CommunityTag> CommunityTags { get; set; }
+        public virtual DbSet<CommunityMembership> CommunityMemberships { get; set; }
+        public virtual DbSet<JoinRequest> JoinRequests { get; set; }
+        public virtual DbSet<ContentReport> ContentReports { get; set; }
+        public virtual DbSet<UserSocialLink> UserSocialLinks { get; set; }
+        public virtual DbSet<UserInterest> UserInterests { get; set; }
+        public virtual DbSet<PostTag> PostTags { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
-            
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<User>(e =>
+            {
+                e.HasIndex(u => u.Username).IsUnique();
+                e.HasIndex(u => u.Email).IsUnique();
+            });
+
+            modelBuilder.Entity<Community>(e =>
+            {
+                e.HasIndex(c => c.Slug).IsUnique();
+                e.HasOne(c => c.Owner)
+                    .WithMany(u => u.OwnedCommunities)
+                    .HasForeignKey(c => c.OwnerUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<CommunityMembership>(e =>
+            {
+                e.HasIndex(m => new { m.UserId, m.CommunityId }).IsUnique();
+            });
+
+            modelBuilder.Entity<JoinRequest>(e =>
+            {
+                e.HasIndex(j => new { j.CommunityId, j.UserId, j.Status });
+            });
+
+            modelBuilder.Entity<Post>(e =>
+            {
+                e.HasOne(p => p.Community)
+                    .WithMany(c => c.Posts)
+                    .HasForeignKey(p => p.CommunityId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<Follow>()
                 .HasKey(f => new { f.FollowingUserId, f.FollowedUserId });
 
@@ -42,6 +82,22 @@ namespace Woody.Infrastructure.Persistence.Context
             modelBuilder.Entity<Like>()
                 .HasIndex(l => new { l.UserId, l.TargetType, l.TargetId })
                 .IsUnique();
+
+            modelBuilder.Entity<ContentReport>(e =>
+            {
+                e.HasOne(r => r.Reporter)
+                    .WithMany(u => u.ContentReports)
+                    .HasForeignKey(r => r.ReporterUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(r => r.Post)
+                    .WithMany()
+                    .HasForeignKey(r => r.PostId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(r => r.Comment)
+                    .WithMany()
+                    .HasForeignKey(r => r.CommentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             base.OnModelCreating(modelBuilder);
         }

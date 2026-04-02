@@ -1,7 +1,7 @@
-namespace Woody.Application.DTOs
+namespace Woody.Application.DTOs;
+
+public class LoginResultDTO
 {
-    public class LoginResultDTO
-    {
-        public string Token { get; set; } = null!;
-    }
+    public string Token { get; set; } = null!;
+    public AuthUserDto User { get; set; } = null!;
 }
