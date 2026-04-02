@@ -10,6 +10,7 @@ public static class DbSeeder
     public static void Seed(WoodyDbContext context)
     {
         SeedUsers(context);
+        SeedCommunitiesAndMemberships(context);
         SeedPosts(context);
         SeedComments(context);
         SeedFollows(context);
@@ -21,24 +22,109 @@ public static class DbSeeder
         if (context.Users.Any())
             return;
 
-        PasswordHasher hasher = new();
+        var hasher = new PasswordHasher();
 
         var users = new List<User>
         {
-            new() { Username = "admin", Email = "admin@example.com", Password = hasher.HashPassword("admin123"), Role = "Admin" },
-            new() { Username = "user1", Email = "user1@example.com", Password = hasher.HashPassword("user123"), Role = "User" },
-            new() { Username = "user2", Email = "user2@example.com", Password = hasher.HashPassword("user234"), Role = "User" },
-            new() { Username = "user3", Email = "user3@example.com", Password = hasher.HashPassword("user345"), Role = "User" },
-            new() { Username = "user4", Email = "user4@example.com", Password = hasher.HashPassword("user456"), Role = "User" }
+            new()
+            {
+                Username = "admin",
+                Email = "admin@example.com",
+                Password = hasher.HashPassword("admin123"),
+                Role = "Admin",
+                DisplayName = "Admin"
+            },
+            new()
+            {
+                Username = "user1",
+                Email = "user1@example.com",
+                Password = hasher.HashPassword("user123"),
+                Role = "User",
+                DisplayName = "User Um"
+            },
+            new()
+            {
+                Username = "user2",
+                Email = "user2@example.com",
+                Password = hasher.HashPassword("user234"),
+                Role = "User",
+                DisplayName = "User Dois"
+            },
+            new()
+            {
+                Username = "user3",
+                Email = "user3@example.com",
+                Password = hasher.HashPassword("user345"),
+                Role = "User",
+                DisplayName = "User Três"
+            },
+            new()
+            {
+                Username = "user4",
+                Email = "user4@example.com",
+                Password = hasher.HashPassword("user456"),
+                Role = "User",
+                DisplayName = "User Quatro"
+            }
         };
 
-        users.ForEach(u =>
+        foreach (var u in users)
         {
             u.CreatedAt = DateTime.UtcNow;
             u.UpdatedAt = DateTime.UtcNow;
-        });
+        }
 
         context.Users.AddRange(users);
+        context.SaveChanges();
+    }
+
+    private static void SeedCommunitiesAndMemberships(WoodyDbContext context)
+    {
+        var users = context.Users.OrderBy(u => u.Id).ToList();
+        if (users.Count == 0)
+            return;
+
+        var community = context.Communities.FirstOrDefault(c => c.Slug == "geral");
+        if (community == null)
+        {
+            var owner = users[0];
+            community = new Community
+            {
+                Slug = "geral",
+                Name = "Geral",
+                Description = "Espaço geral da plataforma",
+                Category = "outro",
+                Rules = "Seja respeitosa.",
+                Visibility = "public",
+                OwnerUserId = owner.Id,
+                MemberCount = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            context.Communities.Add(community);
+            context.SaveChanges();
+        }
+
+        var existingMemberUserIds = context.CommunityMemberships
+            .Where(m => m.CommunityId == community.Id)
+            .Select(m => m.UserId)
+            .ToHashSet();
+
+        foreach (var u in users.Where(u => !existingMemberUserIds.Contains(u.Id)))
+        {
+            var role = u.Id == community.OwnerUserId ? "owner" : "member";
+            context.CommunityMemberships.Add(new CommunityMembership
+            {
+                UserId = u.Id,
+                CommunityId = community.Id,
+                Role = role,
+                Status = "active",
+                JoinedAt = DateTime.UtcNow
+            });
+        }
+
+        community.MemberCount = context.CommunityMemberships.Count(m => m.CommunityId == community.Id && m.Status == "active");
+        community.UpdatedAt = DateTime.UtcNow;
         context.SaveChanges();
     }
 
@@ -48,10 +134,15 @@ public static class DbSeeder
             return;
 
         var users = context.Users.ToList();
+        var community = context.Communities.OrderBy(c => c.Id).FirstOrDefault();
+        if (community == null)
+            return;
 
         var posts = users.Select((u, i) => new Post
         {
             UserId = u.Id,
+            CommunityId = community.Id,
+            Title = $"Post de {u.Username}",
             Content = $"Post inicial do {u.Username}",
             CreatedAt = DateTime.UtcNow.AddMinutes(-i * 5)
         }).ToList();
@@ -65,8 +156,13 @@ public static class DbSeeder
         if (context.Comments.Any())
             return;
 
-        var post = context.Posts.First();
+        var post = context.Posts.FirstOrDefault();
+        if (post == null)
+            return;
+
         var users = context.Users.ToList();
+        if (users.Count < 3)
+            return;
 
         var comment1 = new Comment
         {
@@ -98,6 +194,8 @@ public static class DbSeeder
             return;
 
         var users = context.Users.ToList();
+        if (users.Count < 4)
+            return;
 
         var follows = new List<Follow>
         {
@@ -106,7 +204,8 @@ public static class DbSeeder
             new() { FollowingUserId = users[3].Id, FollowedUserId = users[1].Id }
         };
 
-        follows.ForEach(f => f.CreatedAt = DateTime.UtcNow);
+        foreach (var f in follows)
+            f.CreatedAt = DateTime.UtcNow;
 
         context.Follows.AddRange(follows);
         context.SaveChanges();
@@ -118,8 +217,10 @@ public static class DbSeeder
             return;
 
         var users = context.Users.ToList();
-        var post = context.Posts.First();
-        var comment = context.Comments.First();
+        var post = context.Posts.FirstOrDefault();
+        var comment = context.Comments.FirstOrDefault();
+        if (post == null || users.Count < 3 || comment == null)
+            return;
 
         var likes = new List<Like>
         {

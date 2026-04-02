@@ -25,6 +25,16 @@ namespace Woody.Api.Middlewares
                 context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                 await WriteError(context, ex.Message);
             }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+                await WriteError(context, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                await WriteError(context, ex.Message);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unhandled exception.");

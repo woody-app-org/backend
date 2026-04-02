@@ -1,8 +1,10 @@
-namespace Woody.Application.DTOs
+namespace Woody.Application.DTOs;
+
+public class LoginRequestDTO
 {
-    public class LoginRequestDTO
-    {
-        public string Email { get; set; } = null!;
-        public string Password { get; set; } = null!;
-    }
+    /// <summary>Nome de utilizador (preferido pelo frontend).</summary>
+    public string? Username { get; set; }
+    /// <summary>Alternativa: email.</summary>
+    public string? Email { get; set; }
+    public string Password { get; set; } = null!;
 }

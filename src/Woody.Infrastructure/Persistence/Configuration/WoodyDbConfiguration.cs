@@ -32,6 +32,6 @@ public static class WoodyDbConfiguration
                 if (environment.IsDevelopment())
                     options.EnableSensitiveDataLogging();
             },
-            ServiceLifetime.Transient);
+            ServiceLifetime.Scoped);
     }
 }
