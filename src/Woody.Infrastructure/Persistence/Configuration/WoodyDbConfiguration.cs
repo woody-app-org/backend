@@ -1,41 +1,37 @@
-using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Woody.Infrastructure.Persistence.Context;
 
-namespace Woody.Infrastructure.Persistence.Configuration
+namespace Woody.Infrastructure.Persistence.Configuration;
+
+public static class WoodyDbConfiguration
 {
-    public class WoodyDbConfiguration
+    private static readonly string Schema = "public";
+
+    public static void ConfigureServices(
+        IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
-        private readonly static string schema = "public";
-        internal static string ConnectionString;
+        var connectionString = DatabaseConnectionResolver.Resolve(configuration);
 
-        public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-        {
-            string connectionString = DbConnectionString(configuration);
-            ConnectionString = connectionString;
-
-            services.AddDbContext<WoodyDbContext>(
-                options => options
+        services.AddDbContext<WoodyDbContext>(
+            (_, options) =>
+            {
+                options
                     .UseSnakeCaseNamingConvention()
-                    .UseNpgsql(connectionString, x => x.MigrationsHistoryTable(HistoryRepository.DefaultTableName, schema)
-                    .MigrationsAssembly("Woody.Infrastructure.Persistence")), ServiceLifetime.Transient);
-        }
+                    .UseNpgsql(
+                        connectionString,
+                        x => x
+                            .MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schema)
+                            .MigrationsAssembly("Woody.Infrastructure"));
 
-        public static string DbConnectionString(IConfiguration configuration)
-        {
-            var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-            var username = Environment.GetEnvironmentVariable("DB_USERNAME");
-            var password = Environment.GetEnvironmentVariable("DB_PASS");
-            var host = Environment.GetEnvironmentVariable("DB_HOST");
-            var port = Environment.GetEnvironmentVariable("DB_PORT");
-
-            Console.WriteLine($"Environment: {env} Username: {username} Host: {host} Port: {port}");
-
-            var connectionString = $"Host={host};Port={port};Pooling=true;Database=woody_db;Username={username};Password={password};SearchPath={schema}";
-            return connectionString;
-        }
+                if (environment.IsDevelopment())
+                    options.EnableSensitiveDataLogging();
+            },
+            ServiceLifetime.Transient);
     }
 }
