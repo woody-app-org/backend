@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
+using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
-using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Api.Controllers;
 
@@ -11,11 +10,18 @@ namespace Woody.Api.Controllers;
 [Route("api/join-requests")]
 public class JoinRequestsController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly IJoinRequestRepository _joinRequests;
+    private readonly ICommunityMembershipRepository _memberships;
+    private readonly ICommunityPermissionService _permission;
 
-    public JoinRequestsController(WoodyDbContext db)
+    public JoinRequestsController(
+        IJoinRequestRepository joinRequests,
+        ICommunityMembershipRepository memberships,
+        ICommunityPermissionService permission)
     {
-        _db = db;
+        _joinRequests = joinRequests;
+        _memberships = memberships;
+        _permission = permission;
     }
 
     [Authorize]
@@ -29,21 +35,19 @@ public class JoinRequestsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var jr = await _db.JoinRequests.Include(j => j.Community).FirstOrDefaultAsync(j => j.Id == jrid, cancellationToken);
+        var jr = await _joinRequests.GetWithCommunityTrackedAsync(jrid, cancellationToken);
         if (jr == null || jr.Status != "pending")
             return NotFound();
 
-        if (!await CanModerateAsync(jr.CommunityId, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(jr.CommunityId, me.Value, cancellationToken))
             return Forbid();
 
         jr.Status = "approved";
 
-        var membership = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            m => m.CommunityId == jr.CommunityId && m.UserId == jr.UserId,
-            cancellationToken);
+        var membership = await _memberships.GetForUserAndCommunityAsync(jr.UserId, jr.CommunityId, cancellationToken);
         if (membership == null)
         {
-            _db.CommunityMemberships.Add(new CommunityMembership
+            _memberships.Add(new CommunityMembership
             {
                 UserId = jr.UserId,
                 CommunityId = jr.CommunityId,
@@ -58,13 +62,10 @@ public class JoinRequestsController : ControllerBase
             membership.JoinedAt ??= DateTime.UtcNow;
         }
 
-        var c = await _db.Communities.FirstAsync(x => x.Id == jr.CommunityId, cancellationToken);
-        c.MemberCount = await _db.CommunityMemberships.CountAsync(
-            m => m.CommunityId == c.Id && m.Status == "active",
-            cancellationToken);
-        c.UpdatedAt = DateTime.UtcNow;
+        jr.Community.MemberCount = await _memberships.CountActiveInCommunityAsync(jr.CommunityId, cancellationToken);
+        jr.Community.UpdatedAt = DateTime.UtcNow;
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _joinRequests.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -79,28 +80,15 @@ public class JoinRequestsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var jr = await _db.JoinRequests.FirstOrDefaultAsync(j => j.Id == jrid, cancellationToken);
+        var jr = await _joinRequests.GetTrackedAsync(jrid, cancellationToken);
         if (jr == null || jr.Status != "pending")
             return NotFound();
 
-        if (!await CanModerateAsync(jr.CommunityId, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(jr.CommunityId, me.Value, cancellationToken))
             return Forbid();
 
         jr.Status = "rejected";
-        await _db.SaveChangesAsync(cancellationToken);
+        await _joinRequests.SaveChangesAsync(cancellationToken);
         return NoContent();
-    }
-
-    private async Task<bool> CanModerateAsync(int communityId, int userId, CancellationToken cancellationToken)
-    {
-        var user = await _db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, cancellationToken);
-        if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var m = await _db.CommunityMemberships.AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.CommunityId == communityId && x.UserId == userId && x.Status == "active",
-                cancellationToken);
-        return m is { Role: "owner" or "admin" };
     }
 }

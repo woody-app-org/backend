@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
+using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
-using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Api.Controllers;
 
@@ -12,11 +11,11 @@ namespace Woody.Api.Controllers;
 [Route("api/reports")]
 public class ReportsController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly IContentReportRepository _reports;
 
-    public ReportsController(WoodyDbContext db)
+    public ReportsController(IContentReportRepository reports)
     {
-        _db = db;
+        _reports = reports;
     }
 
     [Authorize]
@@ -40,7 +39,7 @@ public class ReportsController : ControllerBase
         if (target == "comment" && (commentId == null || postId == null))
             return BadRequest();
 
-        _db.ContentReports.Add(new ContentReport
+        _reports.Add(new ContentReport
         {
             ReporterUserId = me.Value,
             TargetType = target,
@@ -51,7 +50,7 @@ public class ReportsController : ControllerBase
             CreatedAt = DateTime.UtcNow
         });
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _reports.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 }
