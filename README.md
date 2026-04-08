@@ -1,72 +1,140 @@
-# Woody Project
+# Woody — API (backend)
+
+API ASP.NET Core com PostgreSQL. Este repositório contém a solução .NET; o frontend (Vite/React) é um projeto à parte.
 
 ## Pré-requisitos
 
-- [.NET SDK](https://dotnet.microsoft.com/download)
-- [Docker](https://www.docker.com/get-started)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- PowerShell
+- [.NET SDK](https://dotnet.microsoft.com/download) (compatível com a solução `Woody.sln`)
+- [Docker](https://www.docker.com/get-started) (apenas para PostgreSQL local)
+- PowerShell (Windows) ou terminal com suporte a variáveis de ambiente
 
-## Configuração e Execução
+## Arranque rápido (local)
 
-### 1. Inicializar o banco de dados
+### 1. Subir o PostgreSQL
 
-Execute o Docker Compose para provisionar o banco de dados PostgreSQL:
+Na raiz deste repositório (`backend/`):
 
 ```bash
-docker compose up --build
+docker compose up -d
 ```
 
-O banco será configurado com as seguintes credenciais:
-- **Host:** localhost
-- **Porta:** 5432
-- **Usuário:** woody_user
-- **Senha:** woody@123
+Credenciais **de desenvolvimento** (definidas em `docker-compose.yml`):
 
-### 2. Aplicar as migrações
+| Campo    | Valor        |
+|----------|--------------|
+| Host     | `localhost`  |
+| Porta    | `5432`       |
+| Base     | `woody_db`   |
+| Utilizador | `woody_user` |
+| Palavra-passe | `woody@123` |
 
-Navegue até o diretório `src` e execute as migrações do Entity Framework:
+### 2. Configurar variáveis de ambiente
 
-```bash
+1. Copie o exemplo: `copy .env.example .env` (ou equivalente no macOS/Linux).
+
+A API e as ferramentas EF leem a ligação através de:
+
+- **`ConnectionStrings__DefaultConnection`** (Npgsql), ou
+- **`DATABASE_URL`** (formato `postgresql://...`, útil alinhado com Railway/Heroku).
+
+Na `DATABASE_URL`, caracteres especiais na palavra-passe devem estar **codificados em URL** (ex.: `@` → `%40`).
+
+Exemplo equivalente ao Docker Compose local:
+
+```env
+DATABASE_URL=postgresql://woody_user:woody%40123@localhost:5432/woody_db
+```
+
+Ou, em alternativa:
+
+```env
+ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=woody_db;Username=woody_user;Password=woody@123
+```
+
+Defina também `Jwt__Secret` (mínimo ~32 caracteres recomendado fora de dev). Ver comentários em `.env.example`.
+
+### 3. Aplicar migrações (base de dados)
+
+**Opção A — script (recomendado)**  
+Carrega automaticamente o `.env` e corre o EF a partir de `src/`:
+
+```powershell
+.\run-migrations.ps1
+```
+
+**Opção B — comando manual (PowerShell)**  
+Defina a ligação na sessão atual e execute a partir da pasta **`src/`**:
+
+```powershell
 cd src
+$env:DATABASE_URL = "postgresql://woody_user:woody%40123@localhost:5432/woody_db"
+dotnet ef database update --project .\Woody.Infrastructure\
 ```
 
+**Opção C — variáveis já exportadas**  
+Se `DATABASE_URL` ou `ConnectionStrings__DefaultConnection` já estiverem definidas no sistema, basta `dotnet ef database update` com os mesmos `--project` / `--startup-project` acima, a partir de `src/`.
+
+O `WoodyDbContextFactory` (design-time) também carrega `appsettings.json` de `Woody.Api` se encontrar a árvore do repositório; mesmo assim, para migrar costuma ser mais simples usar `.env` + `run-migrations.ps1` ou `DATABASE_URL` na sessão.
+
+### 4. Executar a API
+
+A partir de **`src/`**:
+
 ```powershell
-$env:DB_HOST="localhost"; $env:DB_PORT="5432"; $env:DB_USERNAME="woody_user"; $env:DB_PASS="woody@123"; dotnet ef database update --project .\Woody.Infrastructure\
+dotnet run --project .\Woody.Api\ --launch-profile http
 ```
 
-### 3. Executar a aplicação
+- Perfil **`http`**: `http://localhost:5000` (Swagger em `/swagger`). Alinhado com o frontend em dev (`VITE_API_BASE_URL` → `http://localhost:5000`).
+- Perfil **`https`**: também expõe `http://localhost:5000` em conjunto com HTTPS.
+
+Com `.env` na raiz do backend, pode carregar antes de correr a API:
 
 ```powershell
-dotnet run --project .\Woody.Api\ --launch-profile https
+. .\scripts\Load-DotEnv.ps1
+cd src
+dotnet run --project .\Woody.Api\ --launch-profile http
 ```
 
-A aplicação estará disponível em `https://localhost` (porta exibida no console).
+### 5. Frontend (repositório separado)
 
-## Comandos Adicionais
+No projeto **woody-frontend**:
 
-### Criar nova migração
+1. `npm install`
+2. Copie `.env.example` → `.env.development` (ou use `VITE_API_BASE_URL=http://localhost:5000`).
+3. `npm run dev`
+
+## Seed de desenvolvimento
+
+Com `ASPNETCORE_ENVIRONMENT=Development`, ao iniciar a API pode executar-se o `DbSeeder` (dados fictícios para testes: utilizadoras, comunidades, posts, etc.). Em outros ambientes, só corre se definir `WOODY_ENABLE_DEV_SEED=true`.
+
+Contas de exemplo (ver também `DbSeeder.cs`): `admin` / `admin123`, `user1`…`user4` com as palavras-passe documentadas no código de seed, e `user5`–`user20` com palavra-passe de seed comum.
+
+## Comandos EF úteis
+
+Executar a partir de **`src/`** (com a mesma ligação à BD que nas migrações):
 
 ```powershell
+# Nova migração
 dotnet ef migrations add NomeDaMigracao --project .\Woody.Infrastructure\
+
+# Reverter para uma migração específica
+dotnet ef database update NomeDaMigracaoAnterior --project .\Woody.Infrastructure\
 ```
 
-### Reverter migração
-
-```powershell
-$env:DB_HOST="localhost"; $env:DB_PORT="5432"; $env:DB_USERNAME="woody_user"; $env:DB_PASS="woody@123"; dotnet ef database update MigracaoAnterior --project .\Woody.Infrastructure\
-```
-
-## Estrutura do Projeto
+## Estrutura (resumo)
 
 ```
-src/
-├── Woody.Api/              # Camada de apresentação
-├── Woody.Infrastructure/   # Camada de infraestrutura e persistência
+backend/
+├── Woody.sln
+├── docker-compose.yml      # Postgres local
+├── .env.example            # Modelo (versionado)
+├── .env                    # Local — NÃO commitar
+├── run-migrations.ps1
+├── scripts/
+│   └── Load-DotEnv.ps1
+└── src/
+    ├── Woody.Api/
+    ├── Woody.Application/
+    ├── Woody.Domain/
+    └── Woody.Infrastructure/   # EF Core, migrações, seed
 ```
-
-## Observações
-
-- Certifique-se de que o Docker está em execução antes de aplicar as migrações
-- Todos os comandos devem ser executados a partir do diretório `src/`
-- As variáveis de ambiente são configuradas inline para garantir a conexão correta com o banco de dados
