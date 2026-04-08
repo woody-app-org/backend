@@ -41,6 +41,78 @@ public class UsersController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("me/following")]
+    public async Task<ActionResult<List<UserPublicDto>>> GetMyFollowing(CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var rows = await _db.Follows.AsNoTracking()
+            .Where(f => f.FollowingUserId == me.Value)
+            .Include(f => f.FollowedUser)
+            .OrderBy(f => f.FollowedUser.DisplayName ?? f.FollowedUser.Username)
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows.Select(f => EntityMappers.ToUserPublicDto(f.FollowedUser)).ToList());
+    }
+
+    [Authorize]
+    [HttpGet("me/suggestions")]
+    public async Task<ActionResult<List<UserPublicDto>>> GetSuggestions(
+        [FromQuery] int take = 8,
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        take = Math.Clamp(take, 1, 50);
+
+        var followedIds = await _db.Follows.AsNoTracking()
+            .Where(f => f.FollowingUserId == me.Value)
+            .Select(f => f.FollowedUserId)
+            .ToListAsync(cancellationToken);
+        var exclude = followedIds.ToHashSet();
+        exclude.Add(me.Value);
+
+        var users = await _db.Users.AsNoTracking()
+            .Where(u => !exclude.Contains(u.Id))
+            .OrderBy(u => u.DisplayName ?? u.Username)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return Ok(users.Select(EntityMappers.ToUserPublicDto).ToList());
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{userId}/communities")]
+    public async Task<ActionResult<List<UserCommunityMembershipDto>>> GetUserCommunities(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!int.TryParse(userId, out var uid))
+            return BadRequest();
+
+        var rows = await _db.CommunityMemberships.AsNoTracking()
+            .Where(m => m.UserId == uid && m.Status == "active")
+            .Include(m => m.Community)
+            .ThenInclude(c => c.Tags)
+            .ToListAsync(cancellationToken);
+
+        var list = rows
+            .OrderBy(m => m.Community.Name)
+            .Select(m => new UserCommunityMembershipDto
+            {
+                Community = EntityMappers.ToCommunityDto(m.Community),
+                Role = m.Role
+            })
+            .ToList();
+
+        return Ok(list);
+    }
+
+    [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserProfileDto>> GetMe(CancellationToken cancellationToken)
     {
