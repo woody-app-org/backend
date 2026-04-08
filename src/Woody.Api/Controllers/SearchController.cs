@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Api;
-using Woody.Infrastructure.Mapping;
-using Woody.Infrastructure.Persistence.Context;
+using Woody.Application.Interfaces;
+using Woody.Application.Mapping;
 
 namespace Woody.Api.Controllers;
 
@@ -12,11 +11,21 @@ namespace Woody.Api.Controllers;
 [Route("api/search")]
 public class SearchController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly IUserRepository _users;
+    private readonly ICommunityRepository _communities;
+    private readonly IPostRepository _posts;
+    private readonly IPostEnrichmentService _postEnrichment;
 
-    public SearchController(WoodyDbContext db)
+    public SearchController(
+        IUserRepository users,
+        ICommunityRepository communities,
+        IPostRepository posts,
+        IPostEnrichmentService postEnrichment)
     {
-        _db = db;
+        _users = users;
+        _communities = communities;
+        _posts = posts;
+        _postEnrichment = postEnrichment;
     }
 
     [AllowAnonymous]
@@ -42,34 +51,18 @@ public class SearchController : ControllerBase
 
         if (string.Equals(mode, "people", StringComparison.OrdinalIgnoreCase))
         {
-            var users = await _db.Users.AsNoTracking()
-                .Where(u => u.Username.ToLower().Contains(n)
-                            || (u.DisplayName != null && u.DisplayName.ToLower().Contains(n))
-                            || u.Email.ToLower().Contains(n))
-                .Take(50)
-                .ToListAsync(cancellationToken);
+            var users = await _users.SearchUsersNoTrackingAsync(n, 50, cancellationToken);
             return Ok(new { people = users.Select(EntityMappers.ToUserPublicDto).ToList() });
         }
 
         if (string.Equals(mode, "communities", StringComparison.OrdinalIgnoreCase))
         {
-            var list = await _db.Communities.AsNoTracking()
-                .Include(c => c.Tags)
-                .Where(c => c.Name.ToLower().Contains(n) || c.Slug.ToLower().Contains(n) || c.Description.ToLower().Contains(n))
-                .Take(50)
-                .ToListAsync(cancellationToken);
+            var list = await _communities.SearchWithTagsAsync(n, 50, cancellationToken);
             return Ok(new { communities = list.Select(EntityMappers.ToCommunityDto).ToList() });
         }
 
-        var posts = await _db.Posts.AsNoTracking()
-            .Where(p => p.DeletedAt == null && (p.Title.ToLower().Contains(n) || p.Content.ToLower().Contains(n)))
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags)
-            .Take(80)
-            .ToListAsync(cancellationToken);
-
-        var dtos = await PostEnricher.ToPostDtosAsync(_db, posts, viewerId, cancellationToken);
+        var posts = await _posts.SearchNonDeletedWithNavAsync(n, 80, cancellationToken);
+        var dtos = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
         return Ok(new { posts = dtos });
     }
 }

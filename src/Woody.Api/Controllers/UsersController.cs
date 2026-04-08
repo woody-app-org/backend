@@ -1,14 +1,11 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
-using Woody.Infrastructure.Mapping;
-using Woody.Infrastructure.Persistence.Context;
+using Woody.Application.Mapping;
 
 namespace Woody.Api.Controllers;
 
@@ -16,13 +13,24 @@ namespace Woody.Api.Controllers;
 [Route("api/users")]
 public class UsersController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
     private readonly IUserRepository _users;
+    private readonly ICommunityMembershipRepository _memberships;
+    private readonly IFollowRepository _follows;
+    private readonly IPostRepository _posts;
+    private readonly IPostEnrichmentService _postEnrichment;
 
-    public UsersController(WoodyDbContext db, IUserRepository users)
+    public UsersController(
+        IUserRepository users,
+        ICommunityMembershipRepository memberships,
+        IFollowRepository follows,
+        IPostRepository posts,
+        IPostEnrichmentService postEnrichment)
     {
-        _db = db;
         _users = users;
+        _memberships = memberships;
+        _follows = follows;
+        _posts = posts;
+        _postEnrichment = postEnrichment;
     }
 
     [Authorize]
@@ -33,10 +41,7 @@ public class UsersController : ControllerBase
         if (id == null)
             return Unauthorized();
 
-        var ids = await _db.CommunityMemberships.AsNoTracking()
-            .Where(m => m.UserId == id.Value && m.Status == "active")
-            .Select(m => m.CommunityId.ToString())
-            .ToListAsync(cancellationToken);
+        var ids = await _memberships.GetActiveCommunityIdsAsStringsAsync(id.Value, cancellationToken);
         return Ok(ids);
     }
 
@@ -48,11 +53,7 @@ public class UsersController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var rows = await _db.Follows.AsNoTracking()
-            .Where(f => f.FollowingUserId == me.Value)
-            .Include(f => f.FollowedUser)
-            .OrderBy(f => f.FollowedUser.DisplayName ?? f.FollowedUser.Username)
-            .ToListAsync(cancellationToken);
+        var rows = await _follows.ListFollowingWithFollowedUserAsync(me.Value, cancellationToken);
 
         return Ok(rows.Select(f => EntityMappers.ToUserPublicDto(f.FollowedUser)).ToList());
     }
@@ -69,18 +70,11 @@ public class UsersController : ControllerBase
 
         take = Math.Clamp(take, 1, 50);
 
-        var followedIds = await _db.Follows.AsNoTracking()
-            .Where(f => f.FollowingUserId == me.Value)
-            .Select(f => f.FollowedUserId)
-            .ToListAsync(cancellationToken);
+        var followedIds = await _follows.GetFollowedUserIdsAsync(me.Value, cancellationToken);
         var exclude = followedIds.ToHashSet();
         exclude.Add(me.Value);
 
-        var users = await _db.Users.AsNoTracking()
-            .Where(u => !exclude.Contains(u.Id))
-            .OrderBy(u => u.DisplayName ?? u.Username)
-            .Take(take)
-            .ToListAsync(cancellationToken);
+        var users = await _users.ListUsersForSuggestionsAsync(exclude, take, cancellationToken);
 
         return Ok(users.Select(EntityMappers.ToUserPublicDto).ToList());
     }
@@ -94,11 +88,7 @@ public class UsersController : ControllerBase
         if (!int.TryParse(userId, out var uid))
             return BadRequest();
 
-        var rows = await _db.CommunityMemberships.AsNoTracking()
-            .Where(m => m.UserId == uid && m.Status == "active")
-            .Include(m => m.Community)
-            .ThenInclude(c => c.Tags)
-            .ToListAsync(cancellationToken);
+        var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(uid, cancellationToken);
 
         var list = rows
             .OrderBy(m => m.Community.Name)
@@ -134,7 +124,7 @@ public class UsersController : ControllerBase
         if (id == null)
             return Unauthorized();
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id.Value, cancellationToken);
+        var user = await _users.GetByIdTrackedAsync(id.Value, cancellationToken);
         if (user == null)
             return NotFound();
 
@@ -155,11 +145,11 @@ public class UsersController : ControllerBase
 
         if (body.Interests != null)
         {
-            var existing = await _db.UserInterests.Where(i => i.UserId == user.Id).ToListAsync(cancellationToken);
-            _db.UserInterests.RemoveRange(existing);
+            var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
+            _users.RemoveUserInterests(existing);
             foreach (var i in body.Interests)
             {
-                _db.UserInterests.Add(new UserInterest
+                _users.AddUserInterest(new UserInterest
                 {
                     UserId = user.Id,
                     Label = i.Label.Trim()
@@ -167,7 +157,7 @@ public class UsersController : ControllerBase
             }
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _users.SaveChangesAsync();
 
         var profile = await BuildProfileAsync(user.Id, viewerId: id.Value, cancellationToken);
         return Ok(profile);
@@ -183,15 +173,15 @@ public class UsersController : ControllerBase
         if (id == null)
             return Unauthorized();
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id.Value, cancellationToken);
+        var user = await _users.GetByIdTrackedAsync(id.Value, cancellationToken);
         if (user == null)
             return NotFound();
 
-        var existing = await _db.UserInterests.Where(i => i.UserId == user.Id).ToListAsync(cancellationToken);
-        _db.UserInterests.RemoveRange(existing);
+        var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
+        _users.RemoveUserInterests(existing);
         foreach (var i in body.Interests)
         {
-            _db.UserInterests.Add(new UserInterest
+            _users.AddUserInterest(new UserInterest
             {
                 UserId = user.Id,
                 Label = i.Label.Trim()
@@ -199,7 +189,7 @@ public class UsersController : ControllerBase
         }
 
         user.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _users.SaveChangesAsync();
 
         var profile = await BuildProfileAsync(user.Id, viewerId: id.Value, cancellationToken);
         return Ok(profile);
@@ -232,20 +222,9 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var q = _db.Posts.AsNoTracking()
-            .Where(p => p.UserId == uid && p.DeletedAt == null)
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags);
+        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, page, pageSize, cancellationToken);
 
-        var total = await q.CountAsync(cancellationToken);
-        var posts = await q
-            .OrderByDescending(p => p.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var items = await PostEnricher.ToPostDtosAsync(_db, posts, viewerId, cancellationToken);
+        var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 
         return Ok(new PaginatedResponseDto<PostResponseDto>
         {
@@ -269,16 +248,16 @@ public class UsersController : ControllerBase
         if (me == null || me.Value == targetId)
             return BadRequest();
 
-        if (await _db.Follows.AnyAsync(f => f.FollowingUserId == me.Value && f.FollowedUserId == targetId, cancellationToken))
+        if (await _follows.ExistsAsync(me.Value, targetId, cancellationToken))
             return NoContent();
 
-        _db.Follows.Add(new Follow
+        _follows.Add(new Follow
         {
             FollowingUserId = me.Value,
             FollowedUserId = targetId,
             CreatedAt = DateTime.UtcNow
         });
-        await _db.SaveChangesAsync(cancellationToken);
+        await _follows.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -293,13 +272,11 @@ public class UsersController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var row = await _db.Follows.FirstOrDefaultAsync(
-            f => f.FollowingUserId == me.Value && f.FollowedUserId == targetId,
-            cancellationToken);
+        var row = await _follows.GetAsync(me.Value, targetId, cancellationToken);
         if (row != null)
         {
-            _db.Follows.Remove(row);
-            await _db.SaveChangesAsync(cancellationToken);
+            _follows.Remove(row);
+            await _follows.SaveChangesAsync(cancellationToken);
         }
 
         return NoContent();
@@ -307,19 +284,14 @@ public class UsersController : ControllerBase
 
     private async Task<UserProfileDto?> BuildProfileAsync(int userId, int? viewerId, CancellationToken cancellationToken)
     {
-        var u = await _db.Users.AsNoTracking()
-            .Include(x => x.SocialLinks)
-            .Include(x => x.Interests)
-            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var u = await _users.GetByIdWithSocialLinksAndInterestsNoTrackingAsync(userId, cancellationToken);
         if (u == null)
             return null;
 
         bool? following = null;
         if (viewerId.HasValue && viewerId.Value != userId)
         {
-            following = await _db.Follows.AnyAsync(
-                f => f.FollowingUserId == viewerId.Value && f.FollowedUserId == userId,
-                cancellationToken);
+            following = await _follows.ExistsAsync(viewerId.Value, userId, cancellationToken);
         }
 
         var links = u.SocialLinks.Select(s => new SocialLinkDto

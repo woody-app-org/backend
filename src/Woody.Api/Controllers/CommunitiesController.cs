@@ -1,13 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
+using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
-using Woody.Infrastructure.Mapping;
-using Woody.Infrastructure.Persistence.Context;
-using Woody.Api;
+using Woody.Application.Mapping;
 
 namespace Woody.Api.Controllers;
 
@@ -15,21 +13,34 @@ namespace Woody.Api.Controllers;
 [Route("api/communities")]
 public class CommunitiesController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly ICommunityRepository _communities;
+    private readonly ICommunityMembershipRepository _memberships;
+    private readonly IJoinRequestRepository _joinRequests;
+    private readonly IPostRepository _posts;
+    private readonly IPostEnrichmentService _postEnrichment;
+    private readonly ICommunityPermissionService _permission;
 
-    public CommunitiesController(WoodyDbContext db)
+    public CommunitiesController(
+        ICommunityRepository communities,
+        ICommunityMembershipRepository memberships,
+        IJoinRequestRepository joinRequests,
+        IPostRepository posts,
+        IPostEnrichmentService postEnrichment,
+        ICommunityPermissionService permission)
     {
-        _db = db;
+        _communities = communities;
+        _memberships = memberships;
+        _joinRequests = joinRequests;
+        _posts = posts;
+        _postEnrichment = postEnrichment;
+        _permission = permission;
     }
 
     [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<CommunityResponseDto>>> List(CancellationToken cancellationToken)
     {
-        var list = await _db.Communities.AsNoTracking()
-            .Include(c => c.Tags)
-            .OrderBy(c => c.Name)
-            .ToListAsync(cancellationToken);
+        var list = await _communities.ListWithTagsOrderedByNameAsync(cancellationToken);
         return Ok(list.Select(EntityMappers.ToCommunityDto).ToList());
     }
 
@@ -37,9 +48,7 @@ public class CommunitiesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<CommunityResponseDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var c = await _db.Communities.AsNoTracking()
-            .Include(x => x.Tags)
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var c = await _communities.GetByIdWithTagsNoTrackingAsync(id, cancellationToken);
         return c == null ? NotFound() : Ok(EntityMappers.ToCommunityDto(c));
     }
 
@@ -47,9 +56,7 @@ public class CommunitiesController : ControllerBase
     [HttpGet("by-slug/{slug}")]
     public async Task<ActionResult<CommunityResponseDto>> BySlug(string slug, CancellationToken cancellationToken)
     {
-        var c = await _db.Communities.AsNoTracking()
-            .Include(x => x.Tags)
-            .FirstOrDefaultAsync(x => x.Slug == slug, cancellationToken);
+        var c = await _communities.GetBySlugWithTagsNoTrackingAsync(slug, cancellationToken);
         return c == null ? NotFound() : Ok(EntityMappers.ToCommunityDto(c));
     }
 
@@ -65,20 +72,9 @@ public class CommunitiesController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var q = _db.Posts.AsNoTracking()
-            .Where(p => p.CommunityId == id && p.DeletedAt == null)
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags)
-            .OrderByDescending(p => p.CreatedAt);
+        var (posts, total) = await _posts.ListByCommunityIdPagedAsync(id, page, pageSize, cancellationToken);
 
-        var total = await q.CountAsync(cancellationToken);
-        var posts = await q
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var items = await PostEnricher.ToPostDtosAsync(_db, posts, viewerId, cancellationToken);
+        var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 
         return Ok(new PaginatedResponseDto<PostResponseDto>
         {
@@ -99,14 +95,10 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!await IsAdminOrOwnerAsync(id, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(id, me.Value, cancellationToken))
             return Forbid();
 
-        var rows = await _db.JoinRequests.AsNoTracking()
-            .Where(j => j.CommunityId == id && j.Status == "pending")
-            .Include(j => j.User)
-            .OrderBy(j => j.RequestedAt)
-            .ToListAsync(cancellationToken);
+        var rows = await _joinRequests.ListPendingWithUserForCommunityAsync(id, cancellationToken);
 
         return Ok(rows.Select(j => new
         {
@@ -121,21 +113,52 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{communityId}/members")]
-    public async Task<ActionResult<List<CommunityMemberItemDto>>> Members(string communityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<PaginatedResponseDto<CommunityMemberItemDto>>> Members(
+        string communityId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(communityId, out var cid))
             return BadRequest();
 
-        var rows = await _db.CommunityMemberships.AsNoTracking()
-            .Where(m => m.CommunityId == cid && m.Status == "active")
-            .Include(m => m.User)
-            .ToListAsync(cancellationToken);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
 
-        return Ok(rows.Select(m => new CommunityMemberItemDto
+        var (rows, total) = await _memberships.ListActiveMembersPagedOrderedAsync(cid, page, pageSize, cancellationToken);
+
+        return Ok(new PaginatedResponseDto<CommunityMemberItemDto>
         {
-            User = EntityMappers.ToUserPublicDto(m.User),
-            Role = m.Role
-        }).ToList());
+            Items = rows.Select(m => new CommunityMemberItemDto
+            {
+                User = EntityMappers.ToUserPublicDto(m.User),
+                Role = m.Role
+            }).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total,
+            HasNextPage = page * pageSize < total,
+            HasPreviousPage = page > 1
+        });
+    }
+
+    [Authorize]
+    [HttpGet("{communityId}/members/me")]
+    public async Task<IActionResult> MyMembership(string communityId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var row = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(me.Value, cid, cancellationToken);
+
+        if (row == null)
+            return Ok(new { isMember = false, role = (string?)null });
+
+        return Ok(new { isMember = true, role = row.Role });
     }
 
     [Authorize]
@@ -152,10 +175,10 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!await IsAdminOrOwnerAsync(cid, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(cid, me.Value, cancellationToken))
             return Forbid();
 
-        var c = await _db.Communities.Include(x => x.Tags).FirstOrDefaultAsync(x => x.Id == cid, cancellationToken);
+        var c = await _communities.GetByIdTrackedWithTagsAsync(cid, cancellationToken);
         if (c == null)
             return NotFound();
 
@@ -176,15 +199,16 @@ public class CommunitiesController : ControllerBase
 
         if (body.Tags != null)
         {
-            _db.CommunityTags.RemoveRange(c.Tags);
+            _communities.RemoveCommunityTags(c.Tags);
             foreach (var t in body.Tags.Where(x => !string.IsNullOrWhiteSpace(x)))
-                _db.CommunityTags.Add(new CommunityTag { CommunityId = c.Id, Tag = t.Trim() });
+                _communities.AddCommunityTag(new CommunityTag { CommunityId = c.Id, Tag = t.Trim() });
         }
 
         c.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _communities.SaveChangesAsync(cancellationToken);
 
-        c = await _db.Communities.AsNoTracking().Include(x => x.Tags).FirstAsync(x => x.Id == cid, cancellationToken);
+        c = await _communities.GetByIdWithTagsNoTrackingAsync(cid, cancellationToken)
+            ?? throw new InvalidOperationException("Community not found after update.");
         return Ok(EntityMappers.ToCommunityDto(c));
     }
 
@@ -199,7 +223,7 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var c = await _db.Communities.FirstOrDefaultAsync(x => x.Id == cid, cancellationToken);
+        var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken);
         if (c == null)
             return NotFound();
 
@@ -221,7 +245,7 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var c = await _db.Communities.FirstOrDefaultAsync(x => x.Id == cid, cancellationToken);
+        var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken);
         if (c == null)
             return NotFound();
 
@@ -231,26 +255,21 @@ public class CommunitiesController : ControllerBase
             return NoContent();
         }
 
-        var existingMember = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            m => m.CommunityId == cid && m.UserId == me.Value,
-            cancellationToken);
+        var existingMember = await _memberships.GetForUserAndCommunityAsync(me.Value, cid, cancellationToken);
         if (existingMember is { Status: "active" })
             return NoContent();
 
-        var pendingJr = await _db.JoinRequests.AnyAsync(
-            j => j.CommunityId == cid && j.UserId == me.Value && j.Status == "pending",
-            cancellationToken);
-        if (pendingJr)
+        if (await _joinRequests.ExistsPendingAsync(cid, me.Value, cancellationToken))
             return NoContent();
 
-        _db.JoinRequests.Add(new JoinRequest
+        _joinRequests.Add(new JoinRequest
         {
             CommunityId = cid,
             UserId = me.Value,
             Status = "pending",
             RequestedAt = DateTime.UtcNow
         });
-        await _db.SaveChangesAsync(cancellationToken);
+        await _joinRequests.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -270,23 +289,20 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var m = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            x => x.CommunityId == cid && x.UserId == me.Value,
-            cancellationToken);
+        var m = await _memberships.GetForUserAndCommunityAsync(me.Value, cid, cancellationToken);
         if (m == null)
             return NoContent();
 
         if (m.Role == "owner")
             return BadRequest();
 
-        _db.CommunityMemberships.Remove(m);
-        await _db.SaveChangesAsync(cancellationToken);
-        var c = await _db.Communities.FirstAsync(x => x.Id == cid, cancellationToken);
-        c.MemberCount = await _db.CommunityMemberships.CountAsync(
-            x => x.CommunityId == cid && x.Status == "active",
-            cancellationToken);
+        _memberships.Remove(m);
+        await _memberships.SaveChangesAsync(cancellationToken);
+        var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
+                ?? throw new InvalidOperationException("Community not found.");
+        c.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);
         c.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _communities.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -301,23 +317,20 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!await IsAdminOrOwnerAsync(cid, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(cid, me.Value, cancellationToken))
             return Forbid();
 
-        var m = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            x => x.CommunityId == cid && x.UserId == uid,
-            cancellationToken);
+        var m = await _memberships.GetForUserAndCommunityAsync(uid, cid, cancellationToken);
         if (m == null)
             return NoContent();
 
-        _db.CommunityMemberships.Remove(m);
-        await _db.SaveChangesAsync(cancellationToken);
-        var c = await _db.Communities.FirstAsync(x => x.Id == cid, cancellationToken);
-        c.MemberCount = await _db.CommunityMemberships.CountAsync(
-            x => x.CommunityId == cid && x.Status == "active",
-            cancellationToken);
+        _memberships.Remove(m);
+        await _memberships.SaveChangesAsync(cancellationToken);
+        var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
+                ?? throw new InvalidOperationException("Community not found.");
+        c.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);
         c.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _communities.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -336,12 +349,10 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!await IsAdminOrOwnerAsync(cid, me.Value, cancellationToken))
+        if (!await _permission.CanModerateCommunityAsync(cid, me.Value, cancellationToken))
             return Forbid();
 
-        var m = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            x => x.CommunityId == cid && x.UserId == uid,
-            cancellationToken);
+        var m = await _memberships.GetForUserAndCommunityAsync(uid, cid, cancellationToken);
         if (m == null)
             return NotFound();
 
@@ -350,34 +361,18 @@ public class CommunitiesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(body.Role))
             m.Role = body.Role.Trim();
 
-        await _db.SaveChangesAsync(cancellationToken);
-        var comm = await _db.Communities.FirstAsync(x => x.Id == cid, cancellationToken);
-        comm.MemberCount = await _db.CommunityMemberships.CountAsync(
-            x => x.CommunityId == cid && x.Status == "active",
-            cancellationToken);
+        await _memberships.SaveChangesAsync(cancellationToken);
+        var comm = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
+                   ?? throw new InvalidOperationException("Community not found.");
+        comm.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);
         comm.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _communities.SaveChangesAsync(cancellationToken);
         return NoContent();
-    }
-
-    private async Task<bool> IsAdminOrOwnerAsync(int communityId, int userId, CancellationToken cancellationToken)
-    {
-        var user = await _db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, cancellationToken);
-        if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var m = await _db.CommunityMemberships.AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.CommunityId == communityId && x.UserId == userId && x.Status == "active",
-                cancellationToken);
-        return m is { Role: "owner" or "admin" };
     }
 
     private async Task EnsureMembershipAsync(int userId, Community c, bool active, string role, CancellationToken cancellationToken)
     {
-        var existing = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            m => m.CommunityId == c.Id && m.UserId == userId,
-            cancellationToken);
+        var existing = await _memberships.GetForUserAndCommunityAsync(userId, c.Id, cancellationToken);
         if (existing != null)
         {
             if (active)
@@ -387,16 +382,14 @@ public class CommunitiesController : ControllerBase
                 existing.JoinedAt ??= DateTime.UtcNow;
             }
 
-            await _db.SaveChangesAsync(cancellationToken);
-            c.MemberCount = await _db.CommunityMemberships.CountAsync(
-                m => m.CommunityId == c.Id && m.Status == "active",
-                cancellationToken);
+            await _memberships.SaveChangesAsync(cancellationToken);
+            c.MemberCount = await _memberships.CountActiveInCommunityAsync(c.Id, cancellationToken);
             c.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(cancellationToken);
+            await _communities.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        _db.CommunityMemberships.Add(new CommunityMembership
+        _memberships.Add(new CommunityMembership
         {
             UserId = userId,
             CommunityId = c.Id,
@@ -404,11 +397,9 @@ public class CommunitiesController : ControllerBase
             Status = active ? "active" : "pending",
             JoinedAt = active ? DateTime.UtcNow : null
         });
-        await _db.SaveChangesAsync(cancellationToken);
-        c.MemberCount = await _db.CommunityMemberships.CountAsync(
-            m => m.CommunityId == c.Id && m.Status == "active",
-            cancellationToken);
+        await _memberships.SaveChangesAsync(cancellationToken);
+        c.MemberCount = await _memberships.CountActiveInCommunityAsync(c.Id, cancellationToken);
         c.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _communities.SaveChangesAsync(cancellationToken);
     }
 }

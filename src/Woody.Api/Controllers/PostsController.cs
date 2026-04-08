@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
+using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
-using Woody.Infrastructure.Mapping;
-using Woody.Infrastructure.Persistence.Context;
+using Woody.Application.Mapping;
 
 namespace Woody.Api.Controllers;
 
@@ -15,11 +14,24 @@ namespace Woody.Api.Controllers;
 [Route("api/posts")]
 public class PostsController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly IPostRepository _posts;
+    private readonly ICommunityMembershipRepository _memberships;
+    private readonly ILikeRepository _likes;
+    private readonly ICommentRepository _comments;
+    private readonly IPostEnrichmentService _postEnrichment;
 
-    public PostsController(WoodyDbContext db)
+    public PostsController(
+        IPostRepository posts,
+        ICommunityMembershipRepository memberships,
+        ILikeRepository likes,
+        ICommentRepository comments,
+        IPostEnrichmentService postEnrichment)
     {
-        _db = db;
+        _posts = posts;
+        _memberships = memberships;
+        _likes = likes;
+        _comments = comments;
+        _postEnrichment = postEnrichment;
     }
 
     [AllowAnonymous]
@@ -31,15 +43,11 @@ public class PostsController : ControllerBase
 
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var post = await _db.Posts.AsNoTracking()
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags)
-            .FirstOrDefaultAsync(p => p.Id == pid && p.DeletedAt == null, cancellationToken);
+        var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
             return NotFound();
 
-        var list = await PostEnricher.ToPostDtosAsync(_db, new[] { post }, viewerId, cancellationToken);
+        var list = await _postEnrichment.ToPostDtosAsync(new[] { post }, viewerId, cancellationToken);
         return Ok(list[0]);
     }
 
@@ -54,9 +62,7 @@ public class PostsController : ControllerBase
         if (!int.TryParse(body.CommunityId, out var communityId))
             return BadRequest();
 
-        var member = await _db.CommunityMemberships.FirstOrDefaultAsync(
-            m => m.CommunityId == communityId && m.UserId == me.Value && m.Status == "active",
-            cancellationToken);
+        var member = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(me.Value, communityId, cancellationToken);
         if (member == null)
             return Forbid();
 
@@ -69,26 +75,22 @@ public class PostsController : ControllerBase
             ImageUrl = string.IsNullOrWhiteSpace(body.ImageUrl) ? null : body.ImageUrl.Trim(),
             CreatedAt = DateTime.UtcNow
         };
-        _db.Posts.Add(post);
-        await _db.SaveChangesAsync(cancellationToken);
+        _posts.Add(post);
+        await _posts.SaveChangesAsync(cancellationToken);
 
         if (body.Tags != null)
         {
-            foreach (var t in body.Tags.Where(x => !string.IsNullOrWhiteSpace(x)))
-            {
-                _db.PostTags.Add(new PostTag { PostId = post.Id, Tag = t.Trim() });
-            }
-
-            await _db.SaveChangesAsync(cancellationToken);
+            var tags = body.Tags
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
+            await _posts.AddPostTagsAsync(tags, cancellationToken);
+            await _posts.SaveChangesAsync(cancellationToken);
         }
 
-        post = await _db.Posts.AsNoTracking()
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags)
-            .FirstAsync(p => p.Id == post.Id, cancellationToken);
+        post = await _posts.GetByIdNonDeletedWithNavAsync(post.Id, cancellationToken)
+               ?? throw new InvalidOperationException("Post not found after create.");
 
-        var dto = await PostEnricher.ToPostDtosAsync(_db, new[] { post }, me, cancellationToken);
+        var dto = await _postEnrichment.ToPostDtosAsync(new[] { post }, me, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
     }
 
@@ -106,7 +108,7 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var post = await _db.Posts.Include(p => p.Tags).FirstOrDefaultAsync(p => p.Id == pid, cancellationToken);
+        var post = await _posts.GetByIdTrackedWithTagsAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
         if (post.UserId != me.Value)
@@ -119,20 +121,19 @@ public class PostsController : ControllerBase
 
         if (body.Tags != null)
         {
-            _db.PostTags.RemoveRange(post.Tags);
-            foreach (var t in body.Tags.Where(x => !string.IsNullOrWhiteSpace(x)))
-                _db.PostTags.Add(new PostTag { PostId = post.Id, Tag = t.Trim() });
+            _posts.RemovePostTags(post.Tags);
+            var newTags = body.Tags
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
+            await _posts.AddPostTagsAsync(newTags, cancellationToken);
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _posts.SaveChangesAsync(cancellationToken);
 
-        post = await _db.Posts.AsNoTracking()
-            .Include(p => p.User)
-            .Include(p => p.Community)
-            .Include(p => p.Tags)
-            .FirstAsync(p => p.Id == pid, cancellationToken);
+        post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken)
+               ?? throw new InvalidOperationException("Post not found after update.");
 
-        var dto = await PostEnricher.ToPostDtosAsync(_db, new[] { post }, me, cancellationToken);
+        var dto = await _postEnrichment.ToPostDtosAsync(new[] { post }, me, cancellationToken);
         return Ok(dto[0]);
     }
 
@@ -147,14 +148,14 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == pid, cancellationToken);
+        var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
         if (post.UserId != me.Value)
             return Forbid();
 
         post.DeletedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _posts.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -169,20 +170,17 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var exists = await _db.Likes.AnyAsync(
-            l => l.UserId == me.Value && l.TargetType == LikeTargetType.Post && l.TargetId == pid,
-            cancellationToken);
-        if (exists)
+        if (await _likes.ExistsPostLikeAsync(me.Value, pid, cancellationToken))
             return NoContent();
 
-        _db.Likes.Add(new Like
+        _likes.Add(new Like
         {
             UserId = me.Value,
             TargetType = LikeTargetType.Post,
             TargetId = pid,
             CreatedAt = DateTime.UtcNow
         });
-        await _db.SaveChangesAsync(cancellationToken);
+        await _likes.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
@@ -197,13 +195,11 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var row = await _db.Likes.FirstOrDefaultAsync(
-            l => l.UserId == me.Value && l.TargetType == LikeTargetType.Post && l.TargetId == pid,
-            cancellationToken);
+        var row = await _likes.GetPostLikeAsync(me.Value, pid, cancellationToken);
         if (row != null)
         {
-            _db.Likes.Remove(row);
-            await _db.SaveChangesAsync(cancellationToken);
+            _likes.Remove(row);
+            await _likes.SaveChangesAsync(cancellationToken);
         }
 
         return NoContent();
@@ -216,17 +212,13 @@ public class PostsController : ControllerBase
         if (!int.TryParse(postId, out var pid))
             return BadRequest();
 
-        var post = await _db.Posts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid, cancellationToken);
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
 
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var comments = await _db.Comments.AsNoTracking()
-            .Where(c => c.PostId == pid && c.DeletedAt == null)
-            .Include(c => c.Author)
-            .OrderBy(c => c.CreatedAt)
-            .ToListAsync(cancellationToken);
+        var comments = await _comments.ListActiveForPostWithAuthorAsync(pid, cancellationToken);
 
         return Ok(comments.Select(c => EntityMappers.ToCommentDto(c, post.UserId, viewerId)).ToList());
     }
@@ -245,8 +237,8 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var post = await _db.Posts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid && p.DeletedAt == null, cancellationToken);
-        if (post == null)
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
+        if (post == null || post.DeletedAt != null)
             return NotFound();
 
         int? parentId = null;
@@ -261,12 +253,11 @@ public class PostsController : ControllerBase
             Content = body.Content.Trim(),
             CreatedAt = DateTime.UtcNow
         };
-        _db.Comments.Add(comment);
-        await _db.SaveChangesAsync(cancellationToken);
+        _comments.Add(comment);
+        await _comments.SaveChangesAsync(cancellationToken);
 
-        comment = await _db.Comments.AsNoTracking()
-            .Include(c => c.Author)
-            .FirstAsync(c => c.Id == comment.Id, cancellationToken);
+        comment = await _comments.GetByIdNonDeletedWithAuthorAsync(comment.Id, cancellationToken)
+                  ?? throw new InvalidOperationException("Comment not found after create.");
 
         return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
     }
@@ -285,22 +276,21 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == pid && p.DeletedAt == null, cancellationToken);
-        if (post == null)
+        var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
+        if (post == null || post.DeletedAt != null)
             return NotFound();
         if (post.UserId != me.Value)
             return Forbid();
 
-        var comment = await _db.Comments.Include(c => c.Author).FirstOrDefaultAsync(c => c.Id == cid && c.PostId == pid, cancellationToken);
+        var comment = await _comments.GetTrackedWithAuthorAsync(cid, pid, cancellationToken);
         if (comment == null || comment.DeletedAt != null)
             return NotFound();
 
         comment.HiddenByPostAuthorAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _comments.SaveChangesAsync(cancellationToken);
 
-        comment = await _db.Comments.AsNoTracking()
-            .Include(c => c.Author)
-            .FirstAsync(c => c.Id == cid, cancellationToken);
+        comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken)
+                  ?? throw new InvalidOperationException("Comment not found after hide.");
 
         return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
     }

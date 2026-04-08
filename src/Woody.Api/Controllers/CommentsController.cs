@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Woody.Api.Extensions;
-using Woody.Infrastructure.Persistence.Context;
+using Woody.Application.Interfaces;
 
 namespace Woody.Api.Controllers;
 
@@ -10,11 +9,11 @@ namespace Woody.Api.Controllers;
 [Route("api/comments")]
 public class CommentsController : ControllerBase
 {
-    private readonly WoodyDbContext _db;
+    private readonly ICommentRepository _comments;
 
-    public CommentsController(WoodyDbContext db)
+    public CommentsController(ICommentRepository comments)
     {
-        _db = db;
+        _comments = comments;
     }
 
     [Authorize]
@@ -28,7 +27,7 @@ public class CommentsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var comment = await _db.Comments.FirstOrDefaultAsync(c => c.Id == cid, cancellationToken);
+        var comment = await _comments.GetTrackedAsync(cid, cancellationToken);
         if (comment == null || comment.DeletedAt != null)
             return NotFound();
 
@@ -36,7 +35,7 @@ public class CommentsController : ControllerBase
             return Forbid();
 
         comment.DeletedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _comments.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 }

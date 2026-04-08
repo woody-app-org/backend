@@ -1,7 +1,7 @@
 using Woody.Application.DTOs.Api;
 using Woody.Domain.Entities;
 
-namespace Woody.Infrastructure.Mapping;
+namespace Woody.Application.Mapping;
 
 public static class EntityMappers
 {
