@@ -19,5 +19,6 @@ namespace Woody.Domain.Entities
 
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public ICollection<PostTag> Tags { get; set; } = new List<PostTag>();
+        public ICollection<PostImage> Images { get; set; } = new List<PostImage>();
     }
 }

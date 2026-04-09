@@ -13,6 +13,12 @@ public class CommunityPermissionService : ICommunityPermissionService
         _memberships = memberships;
     }
 
+    public async Task<bool> CanPublishPostAsync(int communityId, int userId, CancellationToken cancellationToken = default)
+    {
+        var m = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(userId, communityId, cancellationToken);
+        return m != null;
+    }
+
     public async Task<bool> CanModerateCommunityAsync(int communityId, int userId, CancellationToken cancellationToken = default)
     {
         var user = await _users.GetByIdNoTrackingAsync(userId, cancellationToken);

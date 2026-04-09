@@ -20,6 +20,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
+            .Include(p => p.Images)
             .ToListAsync(cancellationToken);
 
     public async Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(
@@ -29,7 +30,8 @@ public class PostRepository : IPostRepository
             .Where(p => p.UserId == userId && p.DeletedAt == null)
             .Include(p => p.User)
             .Include(p => p.Community)
-            .Include(p => p.Tags);
+            .Include(p => p.Tags)
+            .Include(p => p.Images);
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
@@ -48,6 +50,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
+            .Include(p => p.Images)
             .OrderByDescending(p => p.CreatedAt);
 
         var total = await q.CountAsync(cancellationToken);
@@ -63,6 +66,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
     public async Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default) =>
@@ -89,8 +93,14 @@ public class PostRepository : IPostRepository
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
+            .Include(p => p.Images)
             .Take(take)
             .ToListAsync(cancellationToken);
+
+    public async Task AddPostImagesAsync(IEnumerable<PostImage> images, CancellationToken cancellationToken = default)
+    {
+        await _db.PostImages.AddRangeAsync(images, cancellationToken);
+    }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);
