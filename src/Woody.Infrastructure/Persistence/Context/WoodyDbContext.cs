@@ -18,6 +18,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<UserSocialLink> UserSocialLinks { get; set; }
         public virtual DbSet<UserInterest> UserInterests { get; set; }
         public virtual DbSet<PostTag> PostTags { get; set; }
+        public virtual DbSet<PostImage> PostImages { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -56,6 +57,14 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(c => c.Posts)
                     .HasForeignKey(p => p.CommunityId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PostImage>(e =>
+            {
+                e.HasOne(i => i.Post)
+                    .WithMany(p => p.Images)
+                    .HasForeignKey(i => i.PostId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Follow>()

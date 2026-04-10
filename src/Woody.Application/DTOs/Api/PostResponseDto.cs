@@ -9,6 +9,7 @@ public class PostResponseDto
     public string Title { get; set; } = null!;
     public string Content { get; set; } = null!;
     public string? ImageUrl { get; set; }
+    public List<string>? ImageUrls { get; set; }
     public List<string>? Tags { get; set; }
     public string CreatedAt { get; set; } = null!;
     public string? UpdatedAt { get; set; }

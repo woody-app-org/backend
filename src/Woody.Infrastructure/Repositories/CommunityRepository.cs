@@ -14,6 +14,9 @@ public class CommunityRepository : ICommunityRepository
         _db = db;
     }
 
+    public Task<bool> ExistsNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
+        _db.Communities.AsNoTracking().AnyAsync(c => c.Id == id, cancellationToken);
+
     public async Task<List<Community>> ListWithTagsOrderedByNameAsync(CancellationToken cancellationToken = default) =>
         await _db.Communities.AsNoTracking()
             .Include(c => c.Tags)

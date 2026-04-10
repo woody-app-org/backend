@@ -13,6 +13,7 @@ public interface IPostRepository
     Task<Post?> GetByIdNonDeletedForCommentLookupAsync(int id, CancellationToken cancellationToken = default);
     void Add(Post post);
     Task AddPostTagsAsync(IEnumerable<PostTag> tags, CancellationToken cancellationToken = default);
+    Task AddPostImagesAsync(IEnumerable<PostImage> images, CancellationToken cancellationToken = default);
     void RemovePostTags(IEnumerable<PostTag> tags);
     Task<List<Post>> SearchNonDeletedWithNavAsync(string loweredQuery, int take, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

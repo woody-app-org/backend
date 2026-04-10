@@ -4,6 +4,8 @@ namespace Woody.Application.Interfaces;
 
 public interface ICommunityRepository
 {
+    Task<bool> ExistsNoTrackingAsync(int id, CancellationToken cancellationToken = default);
+
     Task<List<Community>> ListWithTagsOrderedByNameAsync(CancellationToken cancellationToken = default);
     Task<Community?> GetByIdWithTagsNoTrackingAsync(int id, CancellationToken cancellationToken = default);
     Task<Community?> GetBySlugWithTagsNoTrackingAsync(string slug, CancellationToken cancellationToken = default);

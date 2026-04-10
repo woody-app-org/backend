@@ -14,21 +14,26 @@ namespace Woody.Api.Controllers;
 [Route("api/posts")]
 public class PostsController : ControllerBase
 {
+    private const int MaxPostImages = 20;
+
     private readonly IPostRepository _posts;
-    private readonly ICommunityMembershipRepository _memberships;
+    private readonly ICommunityRepository _communities;
+    private readonly ICommunityPermissionService _communityPermissions;
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _postEnrichment;
 
     public PostsController(
         IPostRepository posts,
-        ICommunityMembershipRepository memberships,
+        ICommunityRepository communities,
+        ICommunityPermissionService communityPermissions,
         ILikeRepository likes,
         ICommentRepository comments,
         IPostEnrichmentService postEnrichment)
     {
         _posts = posts;
-        _memberships = memberships;
+        _communities = communities;
+        _communityPermissions = communityPermissions;
         _likes = likes;
         _comments = comments;
         _postEnrichment = postEnrichment;
@@ -60,11 +65,20 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         if (!int.TryParse(body.CommunityId, out var communityId))
-            return BadRequest();
+            return BadRequest(new { error = "Identificador de comunidade inválido." });
 
-        var member = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(me.Value, communityId, cancellationToken);
-        if (member == null)
+        if (string.IsNullOrWhiteSpace(body.Title) || string.IsNullOrWhiteSpace(body.Content))
+            return BadRequest(new { error = "Título e conteúdo são obrigatórios." });
+
+        if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
+            return NotFound();
+
+        if (!await _communityPermissions.CanPublishPostAsync(communityId, me.Value, cancellationToken))
             return Forbid();
+
+        var imageUrls = NormalizePostImageUrls(body);
+        if (imageUrls.Count > MaxPostImages)
+            return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
 
         var post = new Post
         {
@@ -72,11 +86,23 @@ public class PostsController : ControllerBase
             CommunityId = communityId,
             Title = body.Title.Trim(),
             Content = body.Content.Trim(),
-            ImageUrl = string.IsNullOrWhiteSpace(body.ImageUrl) ? null : body.ImageUrl.Trim(),
+            ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
             CreatedAt = DateTime.UtcNow
         };
         _posts.Add(post);
         await _posts.SaveChangesAsync(cancellationToken);
+
+        if (imageUrls.Count > 0)
+        {
+            var rows = imageUrls.Select((url, i) => new PostImage
+            {
+                PostId = post.Id,
+                Url = url,
+                DisplayOrder = i
+            });
+            await _posts.AddPostImagesAsync(rows, cancellationToken);
+            await _posts.SaveChangesAsync(cancellationToken);
+        }
 
         if (body.Tags != null)
         {
@@ -92,6 +118,26 @@ public class PostsController : ControllerBase
 
         var dto = await _postEnrichment.ToPostDtosAsync(new[] { post }, me, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
+    }
+
+    private static List<string> NormalizePostImageUrls(CreatePostRequestDTO body)
+    {
+        var list = new List<string>();
+        if (body.ImageUrls is { Count: > 0 })
+        {
+            foreach (var u in body.ImageUrls)
+            {
+                if (string.IsNullOrWhiteSpace(u))
+                    continue;
+                list.Add(u.Trim());
+            }
+
+            return list;
+        }
+
+        if (!string.IsNullOrWhiteSpace(body.ImageUrl))
+            list.Add(body.ImageUrl.Trim());
+        return list;
     }
 
     [Authorize]

@@ -33,6 +33,13 @@ public static class EntityMappers
         int? viewerUserId,
         bool likedByCurrentUser)
     {
+        var imageUrls = p.Images
+            .OrderBy(i => i.DisplayOrder)
+            .Select(i => i.Url)
+            .ToList();
+        if (imageUrls.Count == 0 && !string.IsNullOrWhiteSpace(p.ImageUrl))
+            imageUrls = new List<string> { p.ImageUrl };
+
         return new PostResponseDto
         {
             Id = p.Id.ToString(),
@@ -41,7 +48,8 @@ public static class EntityMappers
             Author = ToUserPublicDto(p.User),
             Title = p.Title,
             Content = p.Content,
-            ImageUrl = p.ImageUrl,
+            ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+            ImageUrls = imageUrls.Count > 0 ? imageUrls : null,
             Tags = p.Tags.Select(t => t.Tag).ToList(),
             CreatedAt = Iso(p.CreatedAt),
             UpdatedAt = p.UpdatedAt.HasValue ? Iso(p.UpdatedAt.Value) : null,
