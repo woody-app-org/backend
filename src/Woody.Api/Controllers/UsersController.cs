@@ -222,7 +222,7 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, page, pageSize, cancellationToken);
+        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, viewerId, page, pageSize, cancellationToken);
 
         var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 

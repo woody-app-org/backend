@@ -78,10 +78,20 @@ public class PostRepository : IPostRepository
     }
 
     public async Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(
-        int userId, int page, int pageSize, CancellationToken cancellationToken = default)
+        int profileUserId,
+        int? viewerUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
     {
         var q = _db.Posts.AsNoTracking()
-            .Where(p => p.UserId == userId && p.DeletedAt == null)
+            .Where(p => p.UserId == profileUserId && p.DeletedAt == null)
+            .Where(p =>
+                p.PublicationContext == PostPublicationContext.Profile
+                || (viewerUserId.HasValue && viewerUserId.Value == profileUserId)
+                || (p.Community != null && p.Community.Visibility == "public")
+                || (viewerUserId != null && p.CommunityId != null && _db.CommunityMemberships.Any(m =>
+                    m.UserId == viewerUserId.Value && m.CommunityId == p.CommunityId && m.Status == "active")))
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
@@ -100,7 +110,10 @@ public class PostRepository : IPostRepository
         int communityId, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var q = _db.Posts.AsNoTracking()
-            .Where(p => p.CommunityId == communityId && p.DeletedAt == null)
+            .Where(p =>
+                p.CommunityId == communityId
+                && p.DeletedAt == null
+                && p.PublicationContext == PostPublicationContext.Community)
             .Include(p => p.User)
             .Include(p => p.Community)
             .Include(p => p.Tags)
@@ -130,7 +143,9 @@ public class PostRepository : IPostRepository
         await _db.Posts.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public async Task<Post?> GetByIdNonDeletedForCommentLookupAsync(int id, CancellationToken cancellationToken = default) =>
-        await _db.Posts.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        await _db.Posts.AsNoTracking()
+            .Include(p => p.Community)
+            .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
     public void Add(Post post) => _db.Posts.Add(post);
 
