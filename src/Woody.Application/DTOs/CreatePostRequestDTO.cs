@@ -2,7 +2,12 @@ namespace Woody.Application.DTOs;
 
 public class CreatePostRequestDTO
 {
-    /// <summary>Omissão ou vazio = publicação no perfil da autora; preenchido = publicação na comunidade indicada.</summary>
+    /// <summary>
+    /// <c>profile</c> | <c>community</c>. Quando omitido, o servidor infere: sem <see cref="CommunityId"/> = perfil; com id = comunidade (legado).
+    /// </summary>
+    public string? PublicationContext { get; set; }
+
+    /// <summary>Obrigatório quando o contexto é comunidade; omitido ou vazio para perfil.</summary>
     public string? CommunityId { get; set; }
     public string Title { get; set; } = null!;
     public string Content { get; set; } = null!;

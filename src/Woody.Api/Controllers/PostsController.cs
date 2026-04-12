@@ -71,8 +71,31 @@ public class PostsController : ControllerBase
         if (imageUrls.Count > MaxPostImages)
             return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
 
+        var ctxRaw = (body.PublicationContext ?? string.Empty).Trim().ToLowerInvariant();
+        var hasCommunityId = !string.IsNullOrWhiteSpace(body.CommunityId);
+
+        bool useProfile;
+        if (string.IsNullOrEmpty(ctxRaw))
+        {
+            useProfile = !hasCommunityId;
+        }
+        else if (ctxRaw == "profile")
+        {
+            if (hasCommunityId)
+                return BadRequest(new { error = "Publicações de perfil não devem incluir comunidade." });
+            useProfile = true;
+        }
+        else if (ctxRaw == "community")
+        {
+            if (!hasCommunityId)
+                return BadRequest(new { error = "Escolha uma comunidade para publicar." });
+            useProfile = false;
+        }
+        else
+            return BadRequest(new { error = "Contexto de publicação inválido. Use \"profile\" ou \"community\"." });
+
         Post post;
-        if (string.IsNullOrWhiteSpace(body.CommunityId))
+        if (useProfile)
         {
             post = new Post
             {
@@ -87,7 +110,7 @@ public class PostsController : ControllerBase
         }
         else
         {
-            if (!int.TryParse(body.CommunityId.Trim(), out var communityId) || communityId <= 0)
+            if (!int.TryParse(body.CommunityId!.Trim(), out var communityId) || communityId <= 0)
                 return BadRequest(new { error = "Identificador de comunidade inválido." });
 
             if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
