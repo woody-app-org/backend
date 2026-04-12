@@ -23,12 +23,53 @@ public class FollowRepository : IFollowRepository
             .Select(f => f.FollowedUserId)
             .ToListAsync(cancellationToken);
 
-    public async Task<List<Follow>> ListFollowingWithFollowedUserAsync(int followingUserId, CancellationToken cancellationToken = default) =>
-        await _db.Follows.AsNoTracking()
-            .Where(f => f.FollowingUserId == followingUserId)
-            .Include(f => f.FollowedUser)
-            .OrderBy(f => f.FollowedUser.DisplayName ?? f.FollowedUser.Username)
+    public Task<int> CountFollowersAsync(int followedUserId, CancellationToken cancellationToken = default) =>
+        _db.Follows.AsNoTracking()
+            .CountAsync(f => f.FollowedUserId == followedUserId, cancellationToken);
+
+    public Task<int> CountFollowingAsync(int followingUserId, CancellationToken cancellationToken = default) =>
+        _db.Follows.AsNoTracking()
+            .CountAsync(f => f.FollowingUserId == followingUserId, cancellationToken);
+
+    public async Task<(List<User> Items, int Total)> ListFollowersPagedAsync(
+        int followedUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var q = _db.Follows.AsNoTracking()
+            .Where(f => f.FollowedUserId == followedUserId);
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q
+            .OrderBy(f => f.FollowingUser.DisplayName ?? f.FollowingUser.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(f => f.FollowingUser)
             .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
+    public async Task<(List<User> Items, int Total)> ListFollowingPagedAsync(
+        int followingUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var q = _db.Follows.AsNoTracking()
+            .Where(f => f.FollowingUserId == followingUserId);
+
+        var total = await q.CountAsync(cancellationToken);
+        var items = await q
+            .OrderBy(f => f.FollowedUser.DisplayName ?? f.FollowedUser.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(f => f.FollowedUser)
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
 
     public void Add(Follow follow) => _db.Follows.Add(follow);
 

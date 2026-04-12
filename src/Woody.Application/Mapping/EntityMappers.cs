@@ -111,7 +111,9 @@ public static class EntityMappers
         User u,
         bool? isFollowing = null,
         List<SocialLinkDto>? links = null,
-        List<InterestItemResponseDto>? interests = null) => new()
+        List<InterestItemResponseDto>? interests = null,
+        int followersCount = 0,
+        int followingCount = 0) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -125,6 +127,8 @@ public static class EntityMappers
         SocialLinks = links ?? new List<SocialLinkDto>(),
         Interests = interests ?? new List<InterestItemResponseDto>(),
         Suggestions = new List<object>(),
-        IsFollowing = isFollowing
+        IsFollowing = isFollowing,
+        FollowersCount = followersCount,
+        FollowingCount = followingCount
     };
 }

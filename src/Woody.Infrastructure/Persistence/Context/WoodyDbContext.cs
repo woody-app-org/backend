@@ -75,6 +75,7 @@ namespace Woody.Infrastructure.Persistence.Context
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Chave composta = unicidade (following_user_id, followed_user_id); equivale a UNIQUE + PK no SQL Server.
             modelBuilder.Entity<Follow>()
                 .HasKey(f => new { f.FollowingUserId, f.FollowedUserId });
 

@@ -6,7 +6,23 @@ public interface IFollowRepository
 {
     Task<bool> ExistsAsync(int followingUserId, int followedUserId, CancellationToken cancellationToken = default);
     Task<List<int>> GetFollowedUserIdsAsync(int followingUserId, CancellationToken cancellationToken = default);
-    Task<List<Follow>> ListFollowingWithFollowedUserAsync(int followingUserId, CancellationToken cancellationToken = default);
+    Task<int> CountFollowersAsync(int followedUserId, CancellationToken cancellationToken = default);
+    Task<int> CountFollowingAsync(int followingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>Utilizadores que seguem <paramref name="followedUserId"/>.</summary>
+    Task<(List<User> Items, int Total)> ListFollowersPagedAsync(
+        int followedUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Utilizadores seguidos por <paramref name="followingUserId"/>.</summary>
+    Task<(List<User> Items, int Total)> ListFollowingPagedAsync(
+        int followingUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     void Add(Follow follow);
     Task<Follow?> GetAsync(int followingUserId, int followedUserId, CancellationToken cancellationToken = default);
     void Remove(Follow follow);
