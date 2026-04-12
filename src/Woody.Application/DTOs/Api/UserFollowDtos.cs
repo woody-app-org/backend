@@ -18,9 +18,12 @@ public class UserFollowStatusResponseDto
 
 /// <summary>
 /// Resposta após seguir / deixar de seguir (estado atual e contagem de seguidores do alvo).
+/// Serialização JSON em camelCase (<c>isFollowing</c>, <c>followersCount</c>) para o cliente.
 /// </summary>
 public class FollowMutationResponseDto
 {
     public bool IsFollowing { get; set; }
+
+    /// <summary>Número de seguidores do perfil alvo após a mutação.</summary>
     public int FollowersCount { get; set; }
 }
