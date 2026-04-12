@@ -3,7 +3,9 @@ namespace Woody.Application.DTOs.Api;
 public class PostResponseDto
 {
     public string Id { get; set; } = null!;
-    public string CommunityId { get; set; } = null!;
+    /// <summary><c>profile</c> ou <c>community</c> — discrimina feeds e UI.</summary>
+    public string PublicationContext { get; set; } = null!;
+    public string? CommunityId { get; set; }
     public string AuthorId { get; set; } = null!;
     public UserPublicDto Author { get; set; } = null!;
     public string Title { get; set; } = null!;

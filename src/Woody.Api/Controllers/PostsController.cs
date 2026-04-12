@@ -64,31 +64,49 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!int.TryParse(body.CommunityId, out var communityId))
-            return BadRequest(new { error = "Identificador de comunidade inválido." });
-
         if (string.IsNullOrWhiteSpace(body.Title) || string.IsNullOrWhiteSpace(body.Content))
             return BadRequest(new { error = "Título e conteúdo são obrigatórios." });
-
-        if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
-            return NotFound();
-
-        if (!await _communityPermissions.CanPublishPostAsync(communityId, me.Value, cancellationToken))
-            return Forbid();
 
         var imageUrls = NormalizePostImageUrls(body);
         if (imageUrls.Count > MaxPostImages)
             return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
 
-        var post = new Post
+        Post post;
+        if (string.IsNullOrWhiteSpace(body.CommunityId))
         {
-            UserId = me.Value,
-            CommunityId = communityId,
-            Title = body.Title.Trim(),
-            Content = body.Content.Trim(),
-            ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
-            CreatedAt = DateTime.UtcNow
-        };
+            post = new Post
+            {
+                UserId = me.Value,
+                CommunityId = null,
+                PublicationContext = PostPublicationContext.Profile,
+                Title = body.Title.Trim(),
+                Content = body.Content.Trim(),
+                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        else
+        {
+            if (!int.TryParse(body.CommunityId.Trim(), out var communityId) || communityId <= 0)
+                return BadRequest(new { error = "Identificador de comunidade inválido." });
+
+            if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
+                return NotFound();
+
+            if (!await _communityPermissions.CanPublishPostAsync(communityId, me.Value, cancellationToken))
+                return Forbid();
+
+            post = new Post
+            {
+                UserId = me.Value,
+                CommunityId = communityId,
+                PublicationContext = PostPublicationContext.Community,
+                Title = body.Title.Trim(),
+                Content = body.Content.Trim(),
+                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
         _posts.Add(post);
         await _posts.SaveChangesAsync(cancellationToken);
 

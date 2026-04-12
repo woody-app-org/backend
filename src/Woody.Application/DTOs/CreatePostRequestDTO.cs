@@ -2,7 +2,8 @@ namespace Woody.Application.DTOs;
 
 public class CreatePostRequestDTO
 {
-    public string CommunityId { get; set; } = null!;
+    /// <summary>Omissão ou vazio = publicação no perfil da autora; preenchido = publicação na comunidade indicada.</summary>
+    public string? CommunityId { get; set; }
     public string Title { get; set; } = null!;
     public string Content { get; set; } = null!;
     /// <summary>Uma única imagem (legado). Se <see cref="ImageUrls"/> vier preenchido, ele tem prioridade.</summary>

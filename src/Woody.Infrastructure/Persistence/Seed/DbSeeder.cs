@@ -295,6 +295,7 @@ public static class DbSeeder
             {
                 UserId = author.Id,
                 CommunityId = com.Id,
+                PublicationContext = PostPublicationContext.Community,
                 Title = title,
                 Content = content,
                 ImageUrl = i % 7 == 0 ? $"https://picsum.photos/seed/woodypost{i}/720/400" : null,

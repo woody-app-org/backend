@@ -1,3 +1,5 @@
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Domain.Entities
 {
     public class Post
@@ -7,8 +9,11 @@ namespace Woody.Domain.Entities
         public int UserId { get; set; }
         public User User { get; set; } = null!;
 
-        public int CommunityId { get; set; }
-        public Community Community { get; set; } = null!;
+        /// <summary>Comunidade quando <see cref="PublicationContext"/> é <see cref="PostPublicationContext.Community"/>; null para post de perfil.</summary>
+        public int? CommunityId { get; set; }
+        public Community? Community { get; set; }
+
+        public PostPublicationContext PublicationContext { get; set; }
 
         public string Title { get; set; } = string.Empty;
         public string Content { get; set; } = null!;

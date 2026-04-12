@@ -1,6 +1,7 @@
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.Services;
 
@@ -73,11 +74,24 @@ public class FeedService : IFeedService
         {
             var mine = (await _memberships.GetActiveCommunityIdsForUserAsync(viewerUserId.Value, cancellationToken)).ToHashSet();
 
-            var fromJoined = posts.Where(p => mine.Contains(p.CommunityId)).OrderByDescending(p => Score(p.Id)).ToList();
-            var discover = posts.Where(p => !mine.Contains(p.CommunityId)).OrderByDescending(p => Score(p.Id)).ToList();
+            bool InJoinedCommunity(Post p) =>
+                p.PublicationContext == PostPublicationContext.Community
+                && p.CommunityId.HasValue
+                && mine.Contains(p.CommunityId.Value);
+
+            bool InOtherCommunity(Post p) =>
+                p.PublicationContext == PostPublicationContext.Community
+                && p.CommunityId.HasValue
+                && !mine.Contains(p.CommunityId.Value);
+
+            var fromJoined = posts.Where(InJoinedCommunity).OrderByDescending(p => Score(p.Id)).ToList();
+            var discover = posts.Where(InOtherCommunity).OrderByDescending(p => Score(p.Id)).ToList();
+            var profilePosts = posts.Where(p => p.PublicationContext == PostPublicationContext.Profile)
+                .OrderByDescending(p => Score(p.Id))
+                .ToList();
             var seen = new HashSet<int>();
             var merged = new List<Post>();
-            foreach (var p in fromJoined.Concat(discover))
+            foreach (var p in fromJoined.Concat(discover).Concat(profilePosts))
             {
                 if (seen.Add(p.Id))
                     merged.Add(p);
