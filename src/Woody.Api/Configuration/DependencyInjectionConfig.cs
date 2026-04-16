@@ -1,10 +1,12 @@
 using Woody.Application.Interfaces;
+using Woody.Application.Interfaces.Email;
 using Woody.Application.Interfaces.Security;
 using Woody.Application.Services;
 using Woody.Application.UseCases.Auth.Login;
 using Woody.Application.UseCases.Auth.Register;
 using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
+using Woody.Infrastructure.Services.Email;
 
 namespace Woody.Api.Configuration;
 
@@ -13,6 +15,7 @@ public static class DependencyInjectionConfig
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
@@ -26,6 +29,11 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityPermissionService, CommunityPermissionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+        builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+        builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.resend.com/");
+        });
         builder.Services.AddScoped<IDefaultCommunityBootstrap, DefaultCommunityBootstrap>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();

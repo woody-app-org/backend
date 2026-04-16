@@ -51,7 +51,19 @@ Ou, em alternativa:
 ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=woody_db;Username=woody_user;Password=woody@123
 ```
 
-Defina também `Jwt__Secret` (mínimo ~32 caracteres recomendado fora de dev). Ver comentários em `.env.example`.
+Defina também:
+
+- `Jwt__Secret` (mínimo ~32 caracteres recomendado fora de dev)
+- `Resend__ApiKey` (chave da API Resend)
+- `Resend__FromEmail` (remetente usado no envio do código)
+- `Resend__FromName` (opcional, nome do remetente)
+
+Parâmetros de verificação de e-mail (com valores padrão no `appsettings.json`, sobrescrevíveis por env vars):
+
+- `EmailVerification__ExpirationMinutes`
+- `EmailVerification__MaxAttempts`
+
+Ver comentários em `.env.example`.
 
 ### 3. Aplicar migrações (base de dados)
 

@@ -19,6 +19,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<UserInterest> UserInterests { get; set; }
         public virtual DbSet<PostTag> PostTags { get; set; }
         public virtual DbSet<PostImage> PostImages { get; set; }
+        public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -30,6 +31,15 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
+            });
+
+            modelBuilder.Entity<EmailVerificationCode>(e =>
+            {
+                e.HasIndex(x => new { x.Email, x.CreatedAt });
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.EmailVerificationCodes)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Community>(e =>

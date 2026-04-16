@@ -8,17 +8,20 @@ namespace Woody.Application.UseCases.Auth.Register;
 public class RegisterHandler
 {
     private readonly IUserRepository _users;
+    private readonly IEmailVerificationCodeRepository _emailVerificationCodes;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IDefaultCommunityBootstrap _defaultCommunity;
     private readonly IJwtTokenService _jwtTokenService;
 
     public RegisterHandler(
         IUserRepository users,
+        IEmailVerificationCodeRepository emailVerificationCodes,
         IPasswordHasher passwordHasher,
         IDefaultCommunityBootstrap defaultCommunity,
         IJwtTokenService jwtTokenService)
     {
         _users = users;
+        _emailVerificationCodes = emailVerificationCodes;
         _passwordHasher = passwordHasher;
         _defaultCommunity = defaultCommunity;
         _jwtTokenService = jwtTokenService;
@@ -37,6 +40,12 @@ public class RegisterHandler
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");
 
+        var isEmailVerified = await _emailVerificationCodes.HasConsumedCodeForEmailAsync(email, cancellationToken);
+        if (!isEmailVerified)
+            throw new InvalidOperationException("Confirme o e-mail antes de concluir o cadastro.");
+
+        var now = DateTime.UtcNow;
+
         var user = new User
         {
             Username = username,
@@ -47,8 +56,10 @@ public class RegisterHandler
             Cpf = request.Cpf.Trim(),
             BirthDate = birthDate,
             ProfilePic = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim(),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            IsEmailVerified = isEmailVerified,
+            EmailVerifiedAt = isEmailVerified ? now : null,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         await _users.AddAsync(user);
@@ -66,6 +77,7 @@ public class RegisterHandler
                 Id = user.Id.ToString(),
                 Username = user.Username,
                 Email = user.Email,
+                IsEmailVerified = user.IsEmailVerified,
                 Name = user.DisplayName ?? user.Username,
                 AvatarUrl = user.ProfilePic
             }

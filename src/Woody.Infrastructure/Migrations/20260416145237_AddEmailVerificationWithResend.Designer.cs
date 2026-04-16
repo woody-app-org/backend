@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Woody.Infrastructure.Persistence.Context;
@@ -11,9 +12,11 @@ using Woody.Infrastructure.Persistence.Context;
 namespace Woody.Infrastructure.Migrations
 {
     [DbContext(typeof(WoodyDbContext))]
-    partial class WoodyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416145237_AddEmailVerificationWithResend")]
+    partial class AddEmailVerificationWithResend
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -302,11 +305,6 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("email");
-
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
@@ -323,18 +321,15 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<int?>("UserId")
+                    b.Property<int>("UserId")
                         .HasColumnType("integer")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id")
                         .HasName("pk_email_verification_codes");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_email_verification_codes_user_id");
-
-                    b.HasIndex("Email", "CreatedAt")
-                        .HasDatabaseName("ix_email_verification_codes_email_created_at");
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_email_verification_codes_user_id_created_at");
 
                     b.ToTable("email_verification_codes", (string)null);
                 });
@@ -828,7 +823,8 @@ namespace Woody.Infrastructure.Migrations
                     b.HasOne("Woody.Domain.Entities.User", "User")
                         .WithMany("EmailVerificationCodes")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_email_verification_codes_users_user_id");
 
                     b.Navigation("User");
