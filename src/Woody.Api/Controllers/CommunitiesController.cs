@@ -6,6 +6,7 @@ using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Application.Mapping;
+using Woody.Application.Utilities;
 
 namespace Woody.Api.Controllers;
 
@@ -19,6 +20,7 @@ public class CommunitiesController : ControllerBase
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly ICommunityPermissionService _permission;
+    private readonly IUserEntitlementService _entitlements;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -26,7 +28,8 @@ public class CommunitiesController : ControllerBase
         IJoinRequestRepository joinRequests,
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
-        ICommunityPermissionService permission)
+        ICommunityPermissionService permission,
+        IUserEntitlementService entitlements)
     {
         _communities = communities;
         _memberships = memberships;
@@ -34,6 +37,83 @@ public class CommunitiesController : ControllerBase
         _posts = posts;
         _postEnrichment = postEnrichment;
         _permission = permission;
+        _entitlements = entitlements;
+    }
+
+    [Authorize]
+    [HttpPost]
+    public async Task<ActionResult<CommunityResponseDto>> Create(
+        [FromBody] CreateCommunityRequestDTO body,
+        CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        if (!await _entitlements.CanCreateCommunityAsync(me.Value, cancellationToken))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "pro_required",
+                error = "Criar comunidades é uma funcionalidade Woody Pro."
+            });
+        }
+
+        var validationError = CreateCommunityRequestValidator.Validate(body);
+        if (validationError != null)
+            return BadRequest(new { error = validationError });
+
+        var tags = CreateCommunityRequestValidator.NormalizeTags(body.Tags);
+        var baseSlug = CommunitySlugHelper.SlugifyBase(body.Name);
+        var slug = baseSlug;
+        var suffix = 2;
+        while (await _communities.ExistsSlugNoTrackingAsync(slug, cancellationToken))
+        {
+            slug = $"{baseSlug}-{suffix}";
+            suffix++;
+        }
+
+        var visibility = string.Equals(body.Visibility?.Trim(), "private", StringComparison.OrdinalIgnoreCase)
+            ? "private"
+            : "public";
+        var now = DateTime.UtcNow;
+
+        var community = new Community
+        {
+            Slug = slug,
+            Name = body.Name.Trim(),
+            Description = body.Description.Trim(),
+            Category = body.Category.Trim().ToLowerInvariant(),
+            Rules = string.IsNullOrWhiteSpace(body.Rules) ? string.Empty : body.Rules.Trim(),
+            Visibility = visibility,
+            OwnerUserId = me.Value,
+            AvatarUrl = string.IsNullOrWhiteSpace(body.AvatarUrl) ? null : body.AvatarUrl.Trim(),
+            CoverUrl = string.IsNullOrWhiteSpace(body.CoverUrl) ? null : body.CoverUrl.Trim(),
+            MemberCount = 1,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _communities.Add(community);
+        await _communities.SaveChangesAsync(cancellationToken);
+
+        foreach (var tag in tags)
+            _communities.AddCommunityTag(new CommunityTag { CommunityId = community.Id, Tag = tag });
+
+        _memberships.Add(new CommunityMembership
+        {
+            UserId = me.Value,
+            CommunityId = community.Id,
+            Role = "owner",
+            Status = "active",
+            JoinedAt = now
+        });
+
+        await _memberships.SaveChangesAsync(cancellationToken);
+
+        var created = await _communities.GetByIdWithTagsNoTrackingAsync(community.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Comunidade criada mas não encontrada.");
+        return Ok(EntityMappers.ToCommunityDto(created));
     }
 
     [AllowAnonymous]

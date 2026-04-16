@@ -13,6 +13,8 @@ public interface ICommunityRepository
     Task<Community?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default);
     Task<Community?> GetByIdTrackedAsync(int id, CancellationToken cancellationToken = default);
     Task<List<Community>> SearchWithTagsAsync(string loweredQuery, int take, CancellationToken cancellationToken = default);
+    Task<bool> ExistsSlugNoTrackingAsync(string slug, CancellationToken cancellationToken = default);
+    void Add(Community community);
     void RemoveCommunityTags(IEnumerable<CommunityTag> tags);
     void AddCommunityTag(CommunityTag tag);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
