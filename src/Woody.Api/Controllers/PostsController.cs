@@ -18,6 +18,7 @@ public class PostsController : ControllerBase
 
     private readonly IPostRepository _posts;
     private readonly ICommunityRepository _communities;
+    private readonly ICommunityMembershipRepository _memberships;
     private readonly ICommunityPermissionService _communityPermissions;
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
@@ -26,6 +27,7 @@ public class PostsController : ControllerBase
     public PostsController(
         IPostRepository posts,
         ICommunityRepository communities,
+        ICommunityMembershipRepository memberships,
         ICommunityPermissionService communityPermissions,
         ILikeRepository likes,
         ICommentRepository comments,
@@ -33,10 +35,31 @@ public class PostsController : ControllerBase
     {
         _posts = posts;
         _communities = communities;
+        _memberships = memberships;
         _communityPermissions = communityPermissions;
         _likes = likes;
         _comments = comments;
         _postEnrichment = postEnrichment;
+    }
+
+    /// <summary>Lê conteúdo do post (detalhe, comentários, gosto) só com as mesmas regras que o feed.</summary>
+    private async Task<bool> ViewerCanReadPostAsync(Post? post, int? viewerUserId, CancellationToken cancellationToken)
+    {
+        if (post == null)
+            return false;
+        if (post.PublicationContext == PostPublicationContext.Profile)
+            return true;
+        if (post.CommunityId == null || post.Community == null)
+            return true;
+        if (string.Equals(post.Community.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (viewerUserId == post.UserId)
+            return true;
+        if (viewerUserId == null)
+            return false;
+        return await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(
+                   viewerUserId.Value, post.CommunityId.Value, cancellationToken)
+               != null;
     }
 
     [AllowAnonymous]
@@ -51,6 +74,8 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
             return NotFound();
+        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
+            return NotFound();
 
         var list = await _postEnrichment.ToPostDtosAsync(new[] { post }, viewerId, cancellationToken);
         return Ok(list[0]);
@@ -64,31 +89,72 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!int.TryParse(body.CommunityId, out var communityId))
-            return BadRequest(new { error = "Identificador de comunidade inválido." });
-
         if (string.IsNullOrWhiteSpace(body.Title) || string.IsNullOrWhiteSpace(body.Content))
             return BadRequest(new { error = "Título e conteúdo são obrigatórios." });
-
-        if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
-            return NotFound();
-
-        if (!await _communityPermissions.CanPublishPostAsync(communityId, me.Value, cancellationToken))
-            return Forbid();
 
         var imageUrls = NormalizePostImageUrls(body);
         if (imageUrls.Count > MaxPostImages)
             return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
 
-        var post = new Post
+        var ctxRaw = (body.PublicationContext ?? string.Empty).Trim().ToLowerInvariant();
+        var hasCommunityId = !string.IsNullOrWhiteSpace(body.CommunityId);
+
+        bool useProfile;
+        if (string.IsNullOrEmpty(ctxRaw))
         {
-            UserId = me.Value,
-            CommunityId = communityId,
-            Title = body.Title.Trim(),
-            Content = body.Content.Trim(),
-            ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
-            CreatedAt = DateTime.UtcNow
-        };
+            useProfile = !hasCommunityId;
+        }
+        else if (ctxRaw == "profile")
+        {
+            if (hasCommunityId)
+                return BadRequest(new { error = "Publicações de perfil não devem incluir comunidade." });
+            useProfile = true;
+        }
+        else if (ctxRaw == "community")
+        {
+            if (!hasCommunityId)
+                return BadRequest(new { error = "Escolha uma comunidade para publicar." });
+            useProfile = false;
+        }
+        else
+            return BadRequest(new { error = "Contexto de publicação inválido. Use \"profile\" ou \"community\"." });
+
+        Post post;
+        if (useProfile)
+        {
+            post = new Post
+            {
+                UserId = me.Value,
+                CommunityId = null,
+                PublicationContext = PostPublicationContext.Profile,
+                Title = body.Title.Trim(),
+                Content = body.Content.Trim(),
+                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        else
+        {
+            if (!int.TryParse(body.CommunityId!.Trim(), out var communityId) || communityId <= 0)
+                return BadRequest(new { error = "Identificador de comunidade inválido." });
+
+            if (!await _communities.ExistsNoTrackingAsync(communityId, cancellationToken))
+                return NotFound();
+
+            if (!await _communityPermissions.CanPublishPostAsync(communityId, me.Value, cancellationToken))
+                return Forbid();
+
+            post = new Post
+            {
+                UserId = me.Value,
+                CommunityId = communityId,
+                PublicationContext = PostPublicationContext.Community,
+                Title = body.Title.Trim(),
+                Content = body.Content.Trim(),
+                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
         _posts.Add(post);
         await _posts.SaveChangesAsync(cancellationToken);
 
@@ -216,6 +282,10 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
+        var postForLike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
+        if (!await ViewerCanReadPostAsync(postForLike, me, cancellationToken))
+            return NotFound();
+
         if (await _likes.ExistsPostLikeAsync(me.Value, pid, cancellationToken))
             return NoContent();
 
@@ -241,6 +311,10 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
+        var postForUnlike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
+        if (!await ViewerCanReadPostAsync(postForUnlike, me, cancellationToken))
+            return NotFound();
+
         var row = await _likes.GetPostLikeAsync(me.Value, pid, cancellationToken);
         if (row != null)
         {
@@ -259,14 +333,14 @@ public class PostsController : ControllerBase
             return BadRequest();
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (post == null || post.DeletedAt != null)
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
-        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
-
+        var postAuthorId = post!.UserId;
         var comments = await _comments.ListActiveForPostWithAuthorAsync(pid, cancellationToken);
 
-        return Ok(comments.Select(c => EntityMappers.ToCommentDto(c, post.UserId, viewerId)).ToList());
+        return Ok(comments.Select(c => EntityMappers.ToCommentDto(c, postAuthorId, viewerId)).ToList());
     }
 
     [Authorize]
@@ -284,8 +358,10 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (post == null || post.DeletedAt != null)
+        if (!await ViewerCanReadPostAsync(post, me, cancellationToken))
             return NotFound();
+
+        var postAuthorId = post!.UserId;
 
         int? parentId = null;
         if (!string.IsNullOrWhiteSpace(body.ParentCommentId) && int.TryParse(body.ParentCommentId, out var pcid))
@@ -305,7 +381,7 @@ public class PostsController : ControllerBase
         comment = await _comments.GetByIdNonDeletedWithAuthorAsync(comment.Id, cancellationToken)
                   ?? throw new InvalidOperationException("Comment not found after create.");
 
-        return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
+        return Ok(EntityMappers.ToCommentDto(comment, postAuthorId, me));
     }
 
     [Authorize]

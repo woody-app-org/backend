@@ -295,6 +295,7 @@ public static class DbSeeder
             {
                 UserId = author.Id,
                 CommunityId = com.Id,
+                PublicationContext = PostPublicationContext.Community,
                 Title = title,
                 Content = content,
                 ImageUrl = i % 7 == 0 ? $"https://picsum.photos/seed/woodypost{i}/720/400" : null,
@@ -408,6 +409,31 @@ public static class DbSeeder
             {
                 var target = users[(i + j) % users.Count];
                 TryAdd(users[i].Id, target.Id);
+            }
+        }
+
+        // Cenários de QA: listagens longas e contagens marcantes (user1 = 2.ª conta seed = Beatriz).
+        if (users.Count >= 12)
+        {
+            var beatriz = users[1];
+            var camila = users[2];
+            // Muitos seguidores em Beatriz — GET /followers + paginação no cliente.
+            for (var i = 2; i < users.Count; i++)
+                TryAdd(users[i].Id, beatriz.Id);
+            // Beatriz segue quase todas as outras — GET /following preenchido.
+            for (var i = 2; i < users.Count; i++)
+                TryAdd(beatriz.Id, users[i].Id);
+            // Camila: rede média (perfil alternativo para testar modais).
+            for (var i = 3; i < Math.Min(users.Count, 14); i++)
+                TryAdd(users[i].Id, camila.Id);
+            for (var i = 3; i < Math.Min(users.Count, 12); i++)
+                TryAdd(camila.Id, users[i].Id);
+            // Última conta seed: poucos follows (estado “quase vazio” em A seguir).
+            var yara = users[^1];
+            if (yara.Id != beatriz.Id)
+            {
+                TryAdd(yara.Id, beatriz.Id);
+                TryAdd(yara.Id, camila.Id);
             }
         }
 

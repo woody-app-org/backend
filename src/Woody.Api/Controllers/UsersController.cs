@@ -47,15 +47,29 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/following")]
-    public async Task<ActionResult<List<UserPublicDto>>> GetMyFollowing(CancellationToken cancellationToken)
+    public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
     {
         var me = User.GetUserId();
         if (me == null)
             return Unauthorized();
 
-        var rows = await _follows.ListFollowingWithFollowedUserAsync(me.Value, cancellationToken);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
 
-        return Ok(rows.Select(f => EntityMappers.ToUserPublicDto(f.FollowedUser)).ToList());
+        var (items, total) = await _follows.ListFollowingPagedAsync(me.Value, page, pageSize, cancellationToken);
+
+        return Ok(new PaginatedResponseDto<UserPublicDto>
+        {
+            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total,
+            HasNextPage = page * pageSize < total,
+            HasPreviousPage = page > 1
+        });
     }
 
     [Authorize]
@@ -222,7 +236,7 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, page, pageSize, cancellationToken);
+        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, viewerId, page, pageSize, cancellationToken);
 
         var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 
@@ -237,33 +251,130 @@ public class UsersController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
+    [HttpGet("{userId}/follow/status")]
+    public async Task<ActionResult<UserFollowStatusResponseDto>> GetFollowStatus(
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(userId, out var targetId))
+            return BadRequest();
+
+        if (await _users.GetByIdNoTrackingAsync(targetId, cancellationToken) == null)
+            return NotFound();
+
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        bool? isFollowing = null;
+        if (viewerId.HasValue && viewerId.Value != targetId)
+            isFollowing = await _follows.ExistsAsync(viewerId.Value, targetId, cancellationToken);
+
+        var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);
+        var followingCount = await _follows.CountFollowingAsync(targetId, cancellationToken);
+
+        return Ok(new UserFollowStatusResponseDto
+        {
+            TargetUserId = targetId.ToString(),
+            IsFollowing = isFollowing,
+            FollowersCount = followersCount,
+            FollowingCount = followingCount
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{userId}/followers")]
+    public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetFollowers(
+        string userId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (!int.TryParse(userId, out var uid))
+            return BadRequest();
+
+        if (await _users.GetByIdNoTrackingAsync(uid, cancellationToken) == null)
+            return NotFound();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var (items, total) = await _follows.ListFollowersPagedAsync(uid, page, pageSize, cancellationToken);
+
+        return Ok(new PaginatedResponseDto<UserPublicDto>
+        {
+            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total,
+            HasNextPage = page * pageSize < total,
+            HasPreviousPage = page > 1
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{userId}/following")]
+    public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetUserFollowingList(
+        string userId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (!int.TryParse(userId, out var uid))
+            return BadRequest();
+
+        if (await _users.GetByIdNoTrackingAsync(uid, cancellationToken) == null)
+            return NotFound();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var (items, total) = await _follows.ListFollowingPagedAsync(uid, page, pageSize, cancellationToken);
+
+        return Ok(new PaginatedResponseDto<UserPublicDto>
+        {
+            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total,
+            HasNextPage = page * pageSize < total,
+            HasPreviousPage = page > 1
+        });
+    }
+
     [Authorize]
     [HttpPost("{userId}/follow")]
-    public async Task<IActionResult> Follow(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<FollowMutationResponseDto>> Follow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))
             return BadRequest();
 
         var me = User.GetUserId();
-        if (me == null || me.Value == targetId)
-            return BadRequest();
+        if (me == null)
+            return Unauthorized();
 
-        if (await _follows.ExistsAsync(me.Value, targetId, cancellationToken))
-            return NoContent();
+        if (me.Value == targetId)
+            return BadRequest(new { error = "Não podes seguir a ti própria." });
 
-        _follows.Add(new Follow
+        if (await _users.GetByIdNoTrackingAsync(targetId, cancellationToken) == null)
+            return NotFound();
+
+        if (!await _follows.ExistsAsync(me.Value, targetId, cancellationToken))
         {
-            FollowingUserId = me.Value,
-            FollowedUserId = targetId,
-            CreatedAt = DateTime.UtcNow
-        });
-        await _follows.SaveChangesAsync(cancellationToken);
-        return NoContent();
+            _follows.Add(new Follow
+            {
+                FollowingUserId = me.Value,
+                FollowedUserId = targetId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _follows.SaveChangesAsync(cancellationToken);
+        }
+
+        var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);
+        return Ok(new FollowMutationResponseDto { IsFollowing = true, FollowersCount = followersCount });
     }
 
     [Authorize]
     [HttpDelete("{userId}/follow")]
-    public async Task<IActionResult> Unfollow(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<FollowMutationResponseDto>> Unfollow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))
             return BadRequest();
@@ -279,7 +390,8 @@ public class UsersController : ControllerBase
             await _follows.SaveChangesAsync(cancellationToken);
         }
 
-        return NoContent();
+        var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);
+        return Ok(new FollowMutationResponseDto { IsFollowing = false, FollowersCount = followersCount });
     }
 
     private async Task<UserProfileDto?> BuildProfileAsync(int userId, int? viewerId, CancellationToken cancellationToken)
@@ -309,6 +421,9 @@ public class UsersController : ControllerBase
             Label = i.Label
         }).ToList();
 
-        return EntityMappers.ToUserProfile(u, following, links, interests);
+        var followersCount = await _follows.CountFollowersAsync(userId, cancellationToken);
+        var followingCount = await _follows.CountFollowingAsync(userId, cancellationToken);
+
+        return EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount);
     }
 }

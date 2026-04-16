@@ -72,6 +72,19 @@ public class CommunitiesController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
+        var c = await _communities.GetByIdWithTagsNoTrackingAsync(id, cancellationToken);
+        if (c == null)
+            return NotFound();
+
+        if (!string.Equals(c.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+        {
+            if (viewerId == null)
+                return Forbid();
+            var member = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(viewerId.Value, id, cancellationToken);
+            if (member == null)
+                return Forbid();
+        }
+
         var (posts, total) = await _posts.ListByCommunityIdPagedAsync(id, page, pageSize, cancellationToken);
 
         var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);

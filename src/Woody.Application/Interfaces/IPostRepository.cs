@@ -1,3 +1,4 @@
+using Woody.Application.DTOs;
 using Woody.Domain.Entities;
 
 namespace Woody.Application.Interfaces;
@@ -5,7 +6,30 @@ namespace Woody.Application.Interfaces;
 public interface IPostRepository
 {
     Task<List<Post>> ListNonDeletedWithNavAsync(CancellationToken cancellationToken = default);
-    Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(int userId, int page, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Posts não apagados que a utilizadora pode ver: perfil; comunidade pública; ou comunidade privada com membership ativa.
+    /// </summary>
+    Task<List<PostFeedCandidate>> ListNonDeletedVisibleFeedCandidatesAsync(
+        int? viewerUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Hidrata posts por ids (com navegações para DTO). A ordem da lista devolvida segue <paramref name="ids"/>.
+    /// </summary>
+    Task<List<Post>> ListNonDeletedByIdsWithNavOrderedAsync(
+        IReadOnlyList<int> ids,
+        CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Publicações da utilizadora no perfil: posts de perfil; posts em comunidade pública;
+    /// ou privada se a visitante for membra ativa. A própria autora vê todas as suas publicações.
+    /// </summary>
+    Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(
+        int profileUserId,
+        int? viewerUserId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
     Task<(List<Post> Items, int Total)> ListByCommunityIdPagedAsync(int communityId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdNonDeletedWithNavAsync(int id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default);

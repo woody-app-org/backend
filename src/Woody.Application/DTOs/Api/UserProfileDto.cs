@@ -15,6 +15,8 @@ public class UserProfileDto
     public List<InterestItemResponseDto> Interests { get; set; } = new();
     public List<object> Suggestions { get; set; } = new();
     public bool? IsFollowing { get; set; }
+    public int FollowersCount { get; set; }
+    public int FollowingCount { get; set; }
 }
 
 public class InterestItemResponseDto

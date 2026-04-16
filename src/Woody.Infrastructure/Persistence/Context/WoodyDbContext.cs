@@ -53,10 +53,18 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<Post>(e =>
             {
+                e.ToTable(
+                    "posts",
+                    t => t.HasCheckConstraint(
+                        "ck_posts_publication_context_community",
+                        "(publication_context = 2 AND community_id IS NOT NULL) OR (publication_context = 1 AND community_id IS NULL)"));
+
                 e.HasOne(p => p.Community)
                     .WithMany(c => c.Posts)
                     .HasForeignKey(p => p.CommunityId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasIndex(p => new { p.PublicationContext, p.UserId });
             });
 
             modelBuilder.Entity<PostImage>(e =>
@@ -67,6 +75,7 @@ namespace Woody.Infrastructure.Persistence.Context
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Chave composta = unicidade (following_user_id, followed_user_id); equivale a UNIQUE + PK no SQL Server.
             modelBuilder.Entity<Follow>()
                 .HasKey(f => new { f.FollowingUserId, f.FollowedUserId });
 

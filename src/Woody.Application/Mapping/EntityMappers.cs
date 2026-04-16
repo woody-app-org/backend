@@ -1,5 +1,6 @@
 using Woody.Application.DTOs.Api;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.Mapping;
 
@@ -16,6 +17,9 @@ public static class EntityMappers
         Bio = u.Bio,
         Pronouns = u.Pronouns
     };
+
+    public static string ToPublicationContextApi(PostPublicationContext ctx) =>
+        ctx == PostPublicationContext.Profile ? "profile" : "community";
 
     public static PostCommunityPreviewDto ToCommunityPreview(Community c) => new()
     {
@@ -43,7 +47,8 @@ public static class EntityMappers
         return new PostResponseDto
         {
             Id = p.Id.ToString(),
-            CommunityId = p.CommunityId.ToString(),
+            PublicationContext = ToPublicationContextApi(p.PublicationContext),
+            CommunityId = p.CommunityId?.ToString(),
             AuthorId = p.UserId.ToString(),
             Author = ToUserPublicDto(p.User),
             Title = p.Title,
@@ -57,7 +62,7 @@ public static class EntityMappers
             LikesCount = likesCount,
             CommentsCount = commentsCount,
             LikedByCurrentUser = likedByCurrentUser,
-            Community = ToCommunityPreview(p.Community)
+            Community = p.Community != null ? ToCommunityPreview(p.Community) : null
         };
     }
 
@@ -106,7 +111,9 @@ public static class EntityMappers
         User u,
         bool? isFollowing = null,
         List<SocialLinkDto>? links = null,
-        List<InterestItemResponseDto>? interests = null) => new()
+        List<InterestItemResponseDto>? interests = null,
+        int followersCount = 0,
+        int followingCount = 0) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -120,6 +127,8 @@ public static class EntityMappers
         SocialLinks = links ?? new List<SocialLinkDto>(),
         Interests = interests ?? new List<InterestItemResponseDto>(),
         Suggestions = new List<object>(),
-        IsFollowing = isFollowing
+        IsFollowing = isFollowing,
+        FollowersCount = followersCount,
+        FollowingCount = followingCount
     };
 }
