@@ -128,22 +128,43 @@ public static class DbSeeder
             context.SaveChanges();
     }
 
-    /// <summary>Utilizadora de demo com Pro ativo (UI / permissões futuras).</summary>
     private static void SeedProDemoSubscription(WoodyDbContext context)
     {
-        var u = context.Users.FirstOrDefault(x => x.Username == "user7");
-        if (u == null)
+        var now = DateTime.UtcNow;
+
+        // user7: Pro ativo (caso principal – consegue criar comunidades, badge visível).
+        PromoteToPro(context, "user7", SubscriptionStatus.Active, now.AddDays(30), cancelAtPeriodEnd: false, now);
+
+        // user2: Pro a cancelar no fim do período (ainda com benefícios até CurrentPeriodEnd).
+        PromoteToPro(context, "user2", SubscriptionStatus.Canceling, now.AddDays(10), cancelAtPeriodEnd: true, now);
+
+        // user3: Pro expirado (sem benefícios, mas com histórico de Pro).
+        PromoteToPro(context, "user3", SubscriptionStatus.Expired, now.AddDays(-5), cancelAtPeriodEnd: false, now.AddDays(-30));
+
+        context.SaveChanges();
+    }
+
+    private static void PromoteToPro(
+        WoodyDbContext context,
+        string username,
+        SubscriptionStatus status,
+        DateTime? periodEnd,
+        bool cancelAtPeriodEnd,
+        DateTime updatedAt)
+    {
+        var user = context.Users.FirstOrDefault(x => x.Username == username);
+        if (user == null)
             return;
 
-        var sub = context.UserSubscriptions.FirstOrDefault(s => s.UserId == u.Id);
+        var sub = context.UserSubscriptions.FirstOrDefault(s => s.UserId == user.Id);
         if (sub == null)
             return;
 
         sub.Plan = SubscriptionPlan.Pro;
-        sub.Status = SubscriptionStatus.Active;
-        sub.CurrentPeriodEnd = DateTime.UtcNow.AddDays(30);
-        sub.UpdatedAt = DateTime.UtcNow;
-        context.SaveChanges();
+        sub.Status = status;
+        sub.CurrentPeriodEnd = periodEnd;
+        sub.CancelAtPeriodEnd = cancelAtPeriodEnd;
+        sub.UpdatedAt = updatedAt;
     }
 
     private static string Pic(int n) => $"https://picsum.photos/seed/woodyu{n}/128/128";
