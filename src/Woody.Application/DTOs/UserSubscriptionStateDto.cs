@@ -2,6 +2,8 @@ namespace Woody.Application.DTOs;
 
 /// <summary>
 /// Estado de assinatura exposto à API (camelCase via serialização padrão ASP.NET).
+/// Renovação, cancelamento e <see cref="CancelAtPeriodEnd"/> serão preenchidos pelo motor de billing/webhooks;
+/// o cliente usa estes campos para UX e trata o servidor como fonte de verdade para permissões.
 /// </summary>
 public class UserSubscriptionStateDto
 {

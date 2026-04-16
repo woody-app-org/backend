@@ -4,6 +4,10 @@ using Woody.Domain.Subscription;
 
 namespace Woody.Application.Services;
 
+/// <summary>
+/// Regras de produto ligadas ao <see cref="UserSubscription"/> (plano Pro, features premium).
+/// Quem pode <em>moderar uma comunidade</em> continua em <see cref="CommunityPermissionService"/> (papéis owner/admin na membership).
+/// </summary>
 public class UserEntitlementService : IUserEntitlementService
 {
     private readonly IUserSubscriptionRepository _subscriptions;

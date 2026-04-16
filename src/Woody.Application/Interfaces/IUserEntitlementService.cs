@@ -3,7 +3,8 @@ using Woody.Domain.Entities;
 namespace Woody.Application.Interfaces;
 
 /// <summary>
-/// Porta de entrada para feature gating no backend (handlers/controllers chamam aqui em vez de duplicar regras).
+/// Porta de entrada para feature gating por <strong>plano / assinatura</strong> (ex.: criar comunidade).
+/// Moderação dentro de uma comunidade (owner/admin) usa <see cref="ICommunityPermissionService"/> — não misturar os dois conceitos.
 /// </summary>
 public interface IUserEntitlementService
 {

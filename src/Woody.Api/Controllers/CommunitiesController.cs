@@ -40,6 +40,7 @@ public class CommunitiesController : ControllerBase
         _entitlements = entitlements;
     }
 
+    /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<CommunityResponseDto>> Create(
