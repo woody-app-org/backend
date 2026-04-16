@@ -50,13 +50,12 @@ public class EmailVerificationService : IEmailVerificationService
     {
         var email = NormalizeEmail(request.Email);
         var code = NormalizeCode(request.Code);
-        var user = await GetUserOrThrowAsync(email);
-
-        if (user.IsEmailVerified)
+        var user = await _users.GetByEmailAsync(email);
+        if (user is not null && user.IsEmailVerified)
             throw new InvalidOperationException("E-mail já verificado.");
 
         var now = DateTime.UtcNow;
-        var latestCode = await _codes.GetLatestByUserIdAsync(user.Id, cancellationToken);
+        var latestCode = await _codes.GetLatestByEmailAsync(email, cancellationToken);
         if (latestCode is null)
             throw new ArgumentException("Código inválido.");
 
@@ -86,9 +85,13 @@ public class EmailVerificationService : IEmailVerificationService
 
         latestCode.ConsumedAt = now;
         latestCode.UpdatedAt = now;
-        user.IsEmailVerified = true;
-        user.EmailVerifiedAt = now;
-        user.UpdatedAt = now;
+        if (user is not null)
+        {
+            user.IsEmailVerified = true;
+            user.EmailVerifiedAt = now;
+            user.UpdatedAt = now;
+            latestCode.UserId = user.Id;
+        }
 
         await _codes.SaveChangesAsync(cancellationToken);
 
@@ -104,20 +107,20 @@ public class EmailVerificationService : IEmailVerificationService
         CancellationToken cancellationToken)
     {
         var email = NormalizeEmail(request.Email);
-        var user = await GetUserOrThrowAsync(email);
-
-        if (user.IsEmailVerified)
+        var user = await _users.GetByEmailAsync(email);
+        if (user is not null && user.IsEmailVerified)
             throw new InvalidOperationException("E-mail já verificado.");
 
         var now = DateTime.UtcNow;
-        await _codes.InvalidateActiveByUserIdAsync(user.Id, now, cancellationToken);
+        await _codes.InvalidateActiveByEmailAsync(email, now, cancellationToken);
 
         var plainCode = GenerateSixDigitCode();
         var expiresAt = now.AddMinutes(_options.ExpirationMinutes);
 
         var entity = new EmailVerificationCode
         {
-            UserId = user.Id,
+            Email = email,
+            UserId = user?.Id,
             CodeHash = _passwordHasher.HashPassword(plainCode),
             ExpiresAt = expiresAt,
             AttemptCount = 0,
@@ -129,30 +132,31 @@ public class EmailVerificationService : IEmailVerificationService
         await _codes.AddAsync(entity, cancellationToken);
         await _codes.SaveChangesAsync(cancellationToken);
 
-        await _emailSender.SendAsync(
-            new EmailMessage
-            {
-                To = user.Email,
-                Subject = "Confirme seu e-mail na Woody",
-                HtmlBody = BuildHtmlBody(plainCode, _options.ExpirationMinutes),
-                TextBody = BuildTextBody(plainCode, _options.ExpirationMinutes)
-            },
-            cancellationToken);
+        try
+        {
+            await _emailSender.SendAsync(
+                new EmailMessage
+                {
+                    To = email,
+                    Subject = "Confirme seu e-mail na Woody",
+                    HtmlBody = BuildHtmlBody(plainCode, _options.ExpirationMinutes),
+                    TextBody = BuildTextBody(plainCode, _options.ExpirationMinutes)
+                },
+                cancellationToken);
+        }
+        catch
+        {
+            entity.InvalidatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = DateTime.UtcNow;
+            await _codes.SaveChangesAsync(cancellationToken);
+            throw new InvalidOperationException("Não foi possível enviar o código de verificação. Tente novamente.");
+        }
 
         return new SendEmailVerificationCodeResponseDTO
         {
             RequestId = entity.Id.ToString(),
             ExpiresAt = expiresAt
         };
-    }
-
-    private async Task<User> GetUserOrThrowAsync(string email)
-    {
-        var user = await _users.GetByEmailAsync(email);
-        if (user is null)
-            throw new KeyNotFoundException("Utilizadora não encontrada.");
-
-        return user;
     }
 
     private static string NormalizeEmail(string email)

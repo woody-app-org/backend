@@ -35,11 +35,11 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<EmailVerificationCode>(e =>
             {
-                e.HasIndex(x => new { x.UserId, x.CreatedAt });
+                e.HasIndex(x => new { x.Email, x.CreatedAt });
                 e.HasOne(x => x.User)
                     .WithMany(u => u.EmailVerificationCodes)
                     .HasForeignKey(x => x.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Community>(e =>

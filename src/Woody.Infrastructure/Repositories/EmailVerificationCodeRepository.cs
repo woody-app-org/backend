@@ -17,16 +17,16 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
     public async Task AddAsync(EmailVerificationCode code, CancellationToken cancellationToken = default) =>
         await _context.EmailVerificationCodes.AddAsync(code, cancellationToken);
 
-    public async Task<EmailVerificationCode?> GetLatestByUserIdAsync(int userId, CancellationToken cancellationToken = default) =>
+    public async Task<EmailVerificationCode?> GetLatestByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         await _context.EmailVerificationCodes
-            .Where(x => x.UserId == userId)
+            .Where(x => x.Email == email)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task InvalidateActiveByUserIdAsync(int userId, DateTime utcNow, CancellationToken cancellationToken = default)
+    public async Task InvalidateActiveByEmailAsync(string email, DateTime utcNow, CancellationToken cancellationToken = default)
     {
         var activeCodes = await _context.EmailVerificationCodes
-            .Where(x => x.UserId == userId
+            .Where(x => x.Email == email
                         && x.ConsumedAt == null
                         && x.InvalidatedAt == null
                         && x.ExpiresAt > utcNow)
@@ -38,6 +38,10 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
             code.UpdatedAt = utcNow;
         }
     }
+
+    public async Task<bool> HasConsumedCodeForEmailAsync(string email, CancellationToken cancellationToken = default) =>
+        await _context.EmailVerificationCodes
+            .AnyAsync(x => x.Email == email && x.ConsumedAt != null, cancellationToken);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);
