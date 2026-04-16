@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Woody.Api.Configuration;
+using Woody.Application.Configuration;
 using Woody.Api.Middlewares;
 using Woody.Infrastructure.Persistence.Configuration;
 using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
 using Woody.Infrastructure.Security;
+using Woody.Infrastructure.Services.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,10 @@ builder.Services.AddHealthChecks()
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
     ?? throw new InvalidOperationException("Seção Jwt ausente na configuração.");
+var resendOptions = builder.Configuration.GetSection("Resend").Get<ResendOptions>()
+    ?? throw new InvalidOperationException("Seção Resend ausente na configuração.");
+var emailVerificationOptions = builder.Configuration.GetSection("EmailVerification").Get<EmailVerificationOptions>()
+    ?? throw new InvalidOperationException("Seção EmailVerification ausente na configuração.");
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
 {
@@ -39,6 +45,9 @@ if (!builder.Environment.IsDevelopment() && jwtOptions.Secret.Length < 32)
     throw new InvalidOperationException(
         "Jwt:Secret deve ter pelo menos 32 caracteres fora do ambiente Development.");
 }
+
+ValidateResendOptions(resendOptions);
+ValidateEmailVerificationOptions(emailVerificationOptions);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -71,6 +80,8 @@ if (builder.Environment.IsDevelopment())
 WoodyDbConfiguration.ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
+builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
 
 var corsEnabled = ConfigureCors(builder);
 
@@ -190,4 +201,22 @@ static bool ShouldRunDevSeed(IHostEnvironment environment)
     var flag = Environment.GetEnvironmentVariable("WOODY_ENABLE_DEV_SEED");
     return !string.IsNullOrWhiteSpace(flag)
            && flag.Equals("true", StringComparison.OrdinalIgnoreCase);
+}
+
+static void ValidateResendOptions(ResendOptions resendOptions)
+{
+    if (string.IsNullOrWhiteSpace(resendOptions.ApiKey))
+        throw new InvalidOperationException("Resend:ApiKey não configurado.");
+
+    if (string.IsNullOrWhiteSpace(resendOptions.FromEmail))
+        throw new InvalidOperationException("Resend:FromEmail não configurado.");
+}
+
+static void ValidateEmailVerificationOptions(EmailVerificationOptions options)
+{
+    if (options.ExpirationMinutes <= 0)
+        throw new InvalidOperationException("EmailVerification:ExpirationMinutes deve ser maior que zero.");
+
+    if (options.MaxAttempts <= 0)
+        throw new InvalidOperationException("EmailVerification:MaxAttempts deve ser maior que zero.");
 }

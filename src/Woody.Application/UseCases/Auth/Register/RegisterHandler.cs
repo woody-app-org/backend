@@ -47,6 +47,8 @@ public class RegisterHandler
             Cpf = request.Cpf.Trim(),
             BirthDate = birthDate,
             ProfilePic = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim(),
+            IsEmailVerified = false,
+            EmailVerifiedAt = null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -66,6 +68,7 @@ public class RegisterHandler
                 Id = user.Id.ToString(),
                 Username = user.Username,
                 Email = user.Email,
+                IsEmailVerified = user.IsEmailVerified,
                 Name = user.DisplayName ?? user.Username,
                 AvatarUrl = user.ProfilePic
             }

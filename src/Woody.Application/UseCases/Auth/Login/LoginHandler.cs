@@ -48,6 +48,7 @@ public class LoginHandler
         Id = user.Id.ToString(),
         Username = user.Username,
         Email = user.Email,
+        IsEmailVerified = user.IsEmailVerified,
         Name = user.DisplayName ?? user.Username,
         AvatarUrl = user.ProfilePic
     };

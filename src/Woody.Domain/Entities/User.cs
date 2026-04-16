@@ -17,6 +17,8 @@ namespace Woody.Domain.Entities
         public string? Location { get; set; }
         public string? Cpf { get; set; }
         public DateOnly? BirthDate { get; set; }
+        public bool IsEmailVerified { get; set; }
+        public DateTime? EmailVerifiedAt { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -34,5 +36,6 @@ namespace Woody.Domain.Entities
         public ICollection<UserSocialLink> SocialLinks { get; set; } = new List<UserSocialLink>();
         public ICollection<UserInterest> Interests { get; set; } = new List<UserInterest>();
         public ICollection<ContentReport> ContentReports { get; set; } = new List<ContentReport>();
+        public ICollection<EmailVerificationCode> EmailVerificationCodes { get; set; } = new List<EmailVerificationCode>();
     }
 }

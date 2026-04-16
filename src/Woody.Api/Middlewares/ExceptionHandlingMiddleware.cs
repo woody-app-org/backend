@@ -30,6 +30,11 @@ namespace Woody.Api.Middlewares
                 context.Response.StatusCode = (int)HttpStatusCode.Conflict;
                 await WriteError(context, ex.Message);
             }
+            catch (KeyNotFoundException ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                await WriteError(context, ex.Message);
+            }
             catch (ArgumentException ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
