@@ -29,9 +29,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequestDTO request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDTO request, CancellationToken cancellationToken)
     {
-        var result = await _loginHandler.HandleAsync(request);
+        var result = await _loginHandler.HandleAsync(request, cancellationToken);
         _logger.LogInformation("User logged in successfully.");
         return Ok(result);
     }

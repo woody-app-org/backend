@@ -8,4 +8,5 @@ public class AuthUserDto
     public bool IsEmailVerified { get; set; }
     public string? Name { get; set; }
     public string? AvatarUrl { get; set; }
+    public UserSubscriptionStateDto Subscription { get; set; } = null!;
 }

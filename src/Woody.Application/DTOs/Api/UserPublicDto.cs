@@ -8,4 +8,5 @@ public class UserPublicDto
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
     public string? Pronouns { get; set; }
+    public bool ShowProBadge { get; set; }
 }

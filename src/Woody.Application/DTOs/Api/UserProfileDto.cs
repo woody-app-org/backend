@@ -17,6 +17,7 @@ public class UserProfileDto
     public bool? IsFollowing { get; set; }
     public int FollowersCount { get; set; }
     public int FollowingCount { get; set; }
+    public bool ShowProBadge { get; set; }
 }
 
 public class InterestItemResponseDto

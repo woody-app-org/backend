@@ -17,7 +17,7 @@ public class JoinRequestRepository : IJoinRequestRepository
     public async Task<List<JoinRequest>> ListPendingWithUserForCommunityAsync(int communityId, CancellationToken cancellationToken = default) =>
         await _db.JoinRequests.AsNoTracking()
             .Where(j => j.CommunityId == communityId && j.Status == "pending")
-            .Include(j => j.User)
+            .Include(j => j.User).ThenInclude(u => u.Subscription)
             .OrderBy(j => j.RequestedAt)
             .ToListAsync(cancellationToken);
 

@@ -42,6 +42,7 @@ public class FollowRepository : IFollowRepository
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
+            .Include(f => f.FollowingUser).ThenInclude(u => u.Subscription)
             .OrderBy(f => f.FollowingUser.DisplayName ?? f.FollowingUser.Username)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -62,6 +63,7 @@ public class FollowRepository : IFollowRepository
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
+            .Include(f => f.FollowedUser).ThenInclude(u => u.Subscription)
             .OrderBy(f => f.FollowedUser.DisplayName ?? f.FollowedUser.Username)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

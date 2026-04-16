@@ -20,6 +20,8 @@ namespace Woody.Domain.Entities
         public bool IsEmailVerified { get; set; }
         public DateTime? EmailVerifiedAt { get; set; }
 
+        public UserSubscription? Subscription { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 

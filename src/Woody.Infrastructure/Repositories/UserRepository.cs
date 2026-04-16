@@ -37,6 +37,7 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByIdWithSocialLinksAndInterestsNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()
+            .Include(x => x.Subscription)
             .Include(x => x.SocialLinks)
             .Include(x => x.Interests)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -55,6 +56,7 @@ public class UserRepository : IUserRepository
 
     public async Task<List<User>> SearchUsersNoTrackingAsync(string loweredQuery, int take, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()
+            .Include(u => u.Subscription)
             .Where(u => u.Username.ToLower().Contains(loweredQuery)
                         || (u.DisplayName != null && u.DisplayName.ToLower().Contains(loweredQuery))
                         || u.Email.ToLower().Contains(loweredQuery))
@@ -63,6 +65,7 @@ public class UserRepository : IUserRepository
 
     public async Task<List<User>> ListUsersForSuggestionsAsync(IReadOnlyCollection<int> excludeUserIds, int take, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()
+            .Include(u => u.Subscription)
             .Where(u => !excludeUserIds.Contains(u.Id))
             .OrderBy(u => u.DisplayName ?? u.Username)
             .Take(take)

@@ -43,7 +43,7 @@ public class CommunityMembershipRepository : ICommunityMembershipRepository
     {
         var q = _db.CommunityMemberships.AsNoTracking()
             .Where(m => m.CommunityId == communityId && m.Status == "active")
-            .Include(m => m.User)
+            .Include(m => m.User).ThenInclude(u => u.Subscription)
             .OrderBy(m => m.Role == "owner" ? 0 : m.Role == "admin" ? 1 : 2)
             .ThenBy(m => m.User.DisplayName ?? m.User.Username)
             .ThenBy(m => m.User.Username);

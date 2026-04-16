@@ -15,6 +15,8 @@ public static class DependencyInjectionConfig
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+        builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();

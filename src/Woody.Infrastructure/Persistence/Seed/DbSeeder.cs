@@ -17,6 +17,8 @@ public static class DbSeeder
     public static void Seed(WoodyDbContext context)
     {
         SeedUsers(context);
+        EnsureUserSubscriptions(context);
+        SeedProDemoSubscription(context);
         SeedCommunitiesAndMemberships(context);
         SeedPosts(context);
         SeedComments(context);
@@ -102,6 +104,45 @@ public static class DbSeeder
             });
         }
 
+        context.SaveChanges();
+    }
+
+    private static void EnsureUserSubscriptions(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+        var userIds = context.Users.Select(u => u.Id).ToList();
+        var existing = context.UserSubscriptions.Select(s => s.UserId).ToHashSet();
+        foreach (var id in userIds.Where(id => !existing.Contains(id)))
+        {
+            context.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = id,
+                Plan = SubscriptionPlan.Free,
+                Status = SubscriptionStatus.Active,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
+    }
+
+    /// <summary>Utilizadora de demo com Pro ativo (UI / permissões futuras).</summary>
+    private static void SeedProDemoSubscription(WoodyDbContext context)
+    {
+        var u = context.Users.FirstOrDefault(x => x.Username == "user7");
+        if (u == null)
+            return;
+
+        var sub = context.UserSubscriptions.FirstOrDefault(s => s.UserId == u.Id);
+        if (sub == null)
+            return;
+
+        sub.Plan = SubscriptionPlan.Pro;
+        sub.Status = SubscriptionStatus.Active;
+        sub.CurrentPeriodEnd = DateTime.UtcNow.AddDays(30);
+        sub.UpdatedAt = DateTime.UtcNow;
         context.SaveChanges();
     }
 
