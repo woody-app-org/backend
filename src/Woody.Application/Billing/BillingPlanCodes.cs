@@ -5,4 +5,5 @@ public static class BillingPlanCodes
 {
     public const string Free = "free";
     public const string ProMonthly = "pro_monthly";
+    public const string ProAnnual = "pro_annual";
 }

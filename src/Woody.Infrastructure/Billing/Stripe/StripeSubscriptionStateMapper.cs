@@ -30,9 +30,14 @@ internal static class StripeSubscriptionStateMapper
     private static (SubscriptionPlan Plan, string? PlanCode) ResolvePlan(string? priceId, BillingOptions options)
     {
         var proMonthly = options.Stripe?.PriceIds?.ProMonthly;
+        var proAnnual = options.Stripe?.PriceIds?.ProAnnual;
         if (!string.IsNullOrEmpty(priceId) && !string.IsNullOrEmpty(proMonthly) &&
             string.Equals(priceId, proMonthly, StringComparison.Ordinal))
             return (SubscriptionPlan.Pro, BillingPlanCodes.ProMonthly);
+
+        if (!string.IsNullOrEmpty(priceId) && !string.IsNullOrEmpty(proAnnual) &&
+            string.Equals(priceId, proAnnual, StringComparison.Ordinal))
+            return (SubscriptionPlan.Pro, BillingPlanCodes.ProAnnual);
 
         if (!string.IsNullOrEmpty(priceId))
             return (SubscriptionPlan.Pro, null);

@@ -11,15 +11,27 @@ public static class BillingPlanCatalog
         if (string.IsNullOrWhiteSpace(planCode))
             return false;
 
-        if (string.Equals(planCode.Trim(), BillingPlanCodes.ProMonthly, StringComparison.Ordinal))
+        var t = planCode.Trim();
+        if (string.Equals(t, BillingPlanCodes.ProMonthly, StringComparison.Ordinal))
         {
             priceId = options.Stripe?.PriceIds?.ProMonthly?.Trim() ?? string.Empty;
+            return !string.IsNullOrEmpty(priceId);
+        }
+
+        if (string.Equals(t, BillingPlanCodes.ProAnnual, StringComparison.Ordinal))
+        {
+            priceId = options.Stripe?.PriceIds?.ProAnnual?.Trim() ?? string.Empty;
             return !string.IsNullOrEmpty(priceId);
         }
 
         return false;
     }
 
-    public static bool IsKnownCheckoutPlanCode(string planCode) =>
-        string.Equals(planCode?.Trim(), BillingPlanCodes.ProMonthly, StringComparison.Ordinal);
+    public static bool IsKnownCheckoutPlanCode(string planCode)
+    {
+        var t = planCode?.Trim();
+        if (string.IsNullOrEmpty(t)) return false;
+        return string.Equals(t, BillingPlanCodes.ProMonthly, StringComparison.Ordinal)
+               || string.Equals(t, BillingPlanCodes.ProAnnual, StringComparison.Ordinal);
+    }
 }
