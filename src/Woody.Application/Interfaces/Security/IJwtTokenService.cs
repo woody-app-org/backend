@@ -4,6 +4,6 @@ namespace Woody.Application.Interfaces.Security
 {
     public interface IJwtTokenService
     {
-        string GenerateToken(User user);
+        string GenerateToken(User user, UserSubscription? subscription);
     }
 }

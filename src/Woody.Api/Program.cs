@@ -82,6 +82,7 @@ WoodyDbConfiguration.ConfigureServices(builder.Services, builder.Configuration, 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
+builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
 
 var corsEnabled = ConfigureCors(builder);
 

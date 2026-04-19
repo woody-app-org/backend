@@ -22,6 +22,27 @@ namespace Woody.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Woody.Domain.Entities.BillingWebhookReceipt", b =>
+                {
+                    b.Property<string>("EventId")
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_type");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at_utc");
+
+                    b.HasKey("EventId")
+                        .HasName("pk_billing_webhook_receipts");
+
+                    b.ToTable("billing_webhook_receipts", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.Comment", b =>
                 {
                     b.Property<int>("Id")
@@ -721,6 +742,67 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("user_social_links", (string)null);
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.UserSubscription", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("BillingProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("billing_provider");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_at_period_end");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<DateTime?>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_start");
+
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan");
+
+                    b.Property<string>("PlanCode")
+                        .HasColumnType("text")
+                        .HasColumnName("plan_code");
+
+                    b.Property<string>("ProviderCustomerId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_customer_id");
+
+                    b.Property<string>("ProviderSubscriptionId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_subscription_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_subscriptions");
+
+                    b.HasIndex("ProviderSubscriptionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscriptions_provider_subscription_id")
+                        .HasFilter("provider_subscription_id IS NOT NULL");
+
+                    b.ToTable("subscriptions", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.Comment", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.User", "Author")
@@ -956,6 +1038,18 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.UserSubscription", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.User", "User")
+                        .WithOne("Subscription")
+                        .HasForeignKey("Woody.Domain.Entities.UserSubscription", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscriptions_users_user_id");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.Comment", b =>
                 {
                     b.Navigation("Replies");
@@ -1006,6 +1100,8 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Posts");
 
                     b.Navigation("SocialLinks");
+
+                    b.Navigation("Subscription");
                 });
 #pragma warning restore 612, 618
         }

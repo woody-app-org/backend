@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Woody.Application.Billing;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
@@ -17,6 +18,8 @@ public static class DbSeeder
     public static void Seed(WoodyDbContext context)
     {
         SeedUsers(context);
+        EnsureUserSubscriptions(context);
+        SeedProDemoSubscription(context);
         SeedCommunitiesAndMemberships(context);
         SeedPosts(context);
         SeedComments(context);
@@ -103,6 +106,70 @@ public static class DbSeeder
         }
 
         context.SaveChanges();
+    }
+
+    private static void EnsureUserSubscriptions(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+        var userIds = context.Users.Select(u => u.Id).ToList();
+        var existing = context.UserSubscriptions.Select(s => s.UserId).ToHashSet();
+        foreach (var id in userIds.Where(id => !existing.Contains(id)))
+        {
+            context.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = id,
+                Plan = SubscriptionPlan.Free,
+                Status = SubscriptionStatus.Active,
+                PlanCode = BillingPlanCodes.Free,
+                BillingProvider = BillingProvider.None,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
+    }
+
+    private static void SeedProDemoSubscription(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+
+        // user7: Pro ativo (caso principal – consegue criar comunidades, badge visível).
+        PromoteToPro(context, "user7", SubscriptionStatus.Active, now.AddDays(30), cancelAtPeriodEnd: false, now);
+
+        // user2: Pro a cancelar no fim do período (ainda com benefícios até CurrentPeriodEnd).
+        PromoteToPro(context, "user2", SubscriptionStatus.Canceling, now.AddDays(10), cancelAtPeriodEnd: true, now);
+
+        // user3: Pro expirado (sem benefícios, mas com histórico de Pro).
+        PromoteToPro(context, "user3", SubscriptionStatus.Expired, now.AddDays(-5), cancelAtPeriodEnd: false, now.AddDays(-30));
+
+        context.SaveChanges();
+    }
+
+    private static void PromoteToPro(
+        WoodyDbContext context,
+        string username,
+        SubscriptionStatus status,
+        DateTime? periodEnd,
+        bool cancelAtPeriodEnd,
+        DateTime updatedAt)
+    {
+        var user = context.Users.FirstOrDefault(x => x.Username == username);
+        if (user == null)
+            return;
+
+        var sub = context.UserSubscriptions.FirstOrDefault(s => s.UserId == user.Id);
+        if (sub == null)
+            return;
+
+        sub.Plan = SubscriptionPlan.Pro;
+        sub.Status = status;
+        sub.PlanCode = BillingPlanCodes.ProMonthly;
+        sub.BillingProvider = BillingProvider.None;
+        sub.CurrentPeriodEnd = periodEnd;
+        sub.CancelAtPeriodEnd = cancelAtPeriodEnd;
+        sub.UpdatedAt = updatedAt;
     }
 
     private static string Pic(int n) => $"https://picsum.photos/seed/woodyu{n}/128/128";

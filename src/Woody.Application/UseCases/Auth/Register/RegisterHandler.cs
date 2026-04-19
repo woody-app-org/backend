@@ -1,13 +1,17 @@
+using Woody.Application.Billing;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
+using Woody.Application.Mapping;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.UseCases.Auth.Register;
 
 public class RegisterHandler
 {
     private readonly IUserRepository _users;
+    private readonly IUserSubscriptionRepository _subscriptions;
     private readonly IEmailVerificationCodeRepository _emailVerificationCodes;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IDefaultCommunityBootstrap _defaultCommunity;
@@ -15,12 +19,14 @@ public class RegisterHandler
 
     public RegisterHandler(
         IUserRepository users,
+        IUserSubscriptionRepository subscriptions,
         IEmailVerificationCodeRepository emailVerificationCodes,
         IPasswordHasher passwordHasher,
         IDefaultCommunityBootstrap defaultCommunity,
         IJwtTokenService jwtTokenService)
     {
         _users = users;
+        _subscriptions = subscriptions;
         _emailVerificationCodes = emailVerificationCodes;
         _passwordHasher = passwordHasher;
         _defaultCommunity = defaultCommunity;
@@ -65,22 +71,27 @@ public class RegisterHandler
         await _users.AddAsync(user);
         await _users.SaveChangesAsync();
 
+        var subscription = new UserSubscription
+        {
+            UserId = user.Id,
+            Plan = SubscriptionPlan.Free,
+            Status = SubscriptionStatus.Active,
+            PlanCode = BillingPlanCodes.Free,
+            BillingProvider = BillingProvider.None,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        await _subscriptions.AddAsync(subscription, cancellationToken);
+        await _subscriptions.SaveChangesAsync(cancellationToken);
+
         await _defaultCommunity.EnsureUserInDefaultCommunityAsync(user.Id, cancellationToken);
 
-        var token = _jwtTokenService.GenerateToken(user);
+        var token = _jwtTokenService.GenerateToken(user, subscription);
 
         return new LoginResultDTO
         {
             Token = token,
-            User = new AuthUserDto
-            {
-                Id = user.Id.ToString(),
-                Username = user.Username,
-                Email = user.Email,
-                IsEmailVerified = user.IsEmailVerified,
-                Name = user.DisplayName ?? user.Username,
-                AvatarUrl = user.ProfilePic
-            }
+            User = AuthUserMapper.From(user, subscription, now)
         };
     }
 }

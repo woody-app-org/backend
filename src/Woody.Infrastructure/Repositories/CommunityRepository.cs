@@ -49,6 +49,11 @@ public class CommunityRepository : ICommunityRepository
             .Take(take)
             .ToListAsync(cancellationToken);
 
+    public Task<bool> ExistsSlugNoTrackingAsync(string slug, CancellationToken cancellationToken = default) =>
+        _db.Communities.AsNoTracking().AnyAsync(c => c.Slug == slug, cancellationToken);
+
+    public void Add(Community community) => _db.Communities.Add(community);
+
     public void RemoveCommunityTags(IEnumerable<CommunityTag> tags) => _db.CommunityTags.RemoveRange(tags);
 
     public void AddCommunityTag(CommunityTag tag) => _db.CommunityTags.Add(tag);

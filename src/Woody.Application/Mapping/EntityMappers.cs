@@ -1,6 +1,7 @@
 using Woody.Application.DTOs.Api;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Subscription;
 
 namespace Woody.Application.Mapping;
 
@@ -8,15 +9,20 @@ public static class EntityMappers
 {
     public static string Iso(DateTime dt) => dt.ToUniversalTime().ToString("o");
 
-    public static UserPublicDto ToUserPublicDto(User u) => new()
+    public static UserPublicDto ToUserPublicDto(User u)
     {
-        Id = u.Id.ToString(),
-        Name = u.DisplayName ?? u.Username,
-        Username = u.Username,
-        AvatarUrl = u.ProfilePic,
-        Bio = u.Bio,
-        Pronouns = u.Pronouns
-    };
+        var utcNow = DateTime.UtcNow;
+        return new UserPublicDto
+        {
+            Id = u.Id.ToString(),
+            Name = u.DisplayName ?? u.Username,
+            Username = u.Username,
+            AvatarUrl = u.ProfilePic,
+            Bio = u.Bio,
+            Pronouns = u.Pronouns,
+            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, utcNow)
+        };
+    }
 
     public static string ToPublicationContextApi(PostPublicationContext ctx) =>
         ctx == PostPublicationContext.Profile ? "profile" : "community";
@@ -129,6 +135,7 @@ public static class EntityMappers
         Suggestions = new List<object>(),
         IsFollowing = isFollowing,
         FollowersCount = followersCount,
-        FollowingCount = followingCount
+        FollowingCount = followingCount,
+        ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow)
     };
 }
