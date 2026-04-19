@@ -15,6 +15,7 @@ public static class SubscriptionDtoMapper
         {
             EffectivePlan = effective,
             BillingPlan = billing,
+            PlanCode = subscription?.PlanCode,
             Status = ToApiStatus(subscription?.Status ?? SubscriptionStatus.Active),
             CurrentPeriodEnd = subscription?.CurrentPeriodEnd,
             CancelAtPeriodEnd = subscription?.CancelAtPeriodEnd ?? false,

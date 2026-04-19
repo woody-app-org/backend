@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Woody.Application.Billing;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
@@ -119,6 +120,8 @@ public static class DbSeeder
                 UserId = id,
                 Plan = SubscriptionPlan.Free,
                 Status = SubscriptionStatus.Active,
+                PlanCode = BillingPlanCodes.Free,
+                BillingProvider = BillingProvider.None,
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -162,6 +165,8 @@ public static class DbSeeder
 
         sub.Plan = SubscriptionPlan.Pro;
         sub.Status = status;
+        sub.PlanCode = BillingPlanCodes.ProMonthly;
+        sub.BillingProvider = BillingProvider.None;
         sub.CurrentPeriodEnd = periodEnd;
         sub.CancelAtPeriodEnd = cancelAtPeriodEnd;
         sub.UpdatedAt = updatedAt;

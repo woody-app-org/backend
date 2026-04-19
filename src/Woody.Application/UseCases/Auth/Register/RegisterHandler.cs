@@ -1,3 +1,4 @@
+using Woody.Application.Billing;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
@@ -75,6 +76,8 @@ public class RegisterHandler
             UserId = user.Id,
             Plan = SubscriptionPlan.Free,
             Status = SubscriptionStatus.Active,
+            PlanCode = BillingPlanCodes.Free,
+            BillingProvider = BillingProvider.None,
             CreatedAt = now,
             UpdatedAt = now
         };

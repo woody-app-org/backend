@@ -36,8 +36,11 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<UserSubscription>(e =>
             {
-                e.ToTable("user_subscriptions");
+                e.ToTable("subscriptions");
                 e.HasKey(x => x.UserId);
+                e.HasIndex(x => x.ProviderSubscriptionId)
+                    .IsUnique()
+                    .HasFilter("provider_subscription_id IS NOT NULL");
                 e.HasOne(x => x.User)
                     .WithOne(u => u.Subscription)
                     .HasForeignKey<UserSubscription>(x => x.UserId)

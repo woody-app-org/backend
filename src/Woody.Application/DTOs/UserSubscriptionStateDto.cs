@@ -13,6 +13,9 @@ public class UserSubscriptionStateDto
     /// <summary>Plano persistido na base (pode ser <c>pro</c> sem benefícios se expirado/cancelado).</summary>
     public string BillingPlan { get; set; } = "free";
 
+    /// <summary>Código de catálogo (ex.: <c>free</c>, <c>pro_monthly</c>); alinhado com Stripe price ids na configuração.</summary>
+    public string? PlanCode { get; set; }
+
     public string Status { get; set; } = "active";
     public DateTime? CurrentPeriodEnd { get; set; }
     public bool CancelAtPeriodEnd { get; set; }
