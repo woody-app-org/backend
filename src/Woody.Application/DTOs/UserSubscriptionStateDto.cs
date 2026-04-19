@@ -20,4 +20,7 @@ public class UserSubscriptionStateDto
     public DateTime? CurrentPeriodEnd { get; set; }
     public bool CancelAtPeriodEnd { get; set; }
     public bool ShowProBadge { get; set; }
+
+    /// <summary>Indica se a sessão pode abrir o Stripe Customer Billing Portal (<c>cus_…</c> persistido).</summary>
+    public bool CanOpenBillingPortal { get; set; }
 }

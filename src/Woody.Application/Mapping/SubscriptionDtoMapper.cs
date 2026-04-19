@@ -19,7 +19,8 @@ public static class SubscriptionDtoMapper
             Status = ToApiStatus(subscription?.Status ?? SubscriptionStatus.Active),
             CurrentPeriodEnd = subscription?.CurrentPeriodEnd,
             CancelAtPeriodEnd = subscription?.CancelAtPeriodEnd ?? false,
-            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(subscription, utcNow)
+            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(subscription, utcNow),
+            CanOpenBillingPortal = !string.IsNullOrWhiteSpace(subscription?.ProviderCustomerId)
         };
     }
 

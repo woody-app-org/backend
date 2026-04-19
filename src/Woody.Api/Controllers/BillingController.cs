@@ -12,10 +12,14 @@ namespace Woody.Api.Controllers;
 public class BillingController : ControllerBase
 {
     private readonly CreateCheckoutSessionHandler _createCheckoutSession;
+    private readonly CreateCustomerPortalSessionHandler _createCustomerPortalSession;
 
-    public BillingController(CreateCheckoutSessionHandler createCheckoutSession)
+    public BillingController(
+        CreateCheckoutSessionHandler createCheckoutSession,
+        CreateCustomerPortalSessionHandler createCustomerPortalSession)
     {
         _createCheckoutSession = createCheckoutSession;
+        _createCustomerPortalSession = createCustomerPortalSession;
     }
 
     /// <summary>Inicia checkout Stripe (subscription). O <c>planCode</c> é validado no servidor.</summary>
@@ -41,6 +45,30 @@ public class BillingController : ControllerBase
         {
             if (ex.Message.Contains("Já tens Woody Pro", StringComparison.Ordinal))
                 return Conflict(new { error = ex.Message });
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Abre sessão do Stripe Customer Billing Portal (cartão, faturas, cancelamento/reversão).</summary>
+    [HttpPost("portal/session")]
+    public async Task<ActionResult<BillingPortalSessionResponseDto>> CreateBillingPortalSession(
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        try
+        {
+            var result = await _createCustomerPortalSession.HandleAsync(userId.Value, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
             return BadRequest(new { error = ex.Message });
         }
         catch (KeyNotFoundException ex)

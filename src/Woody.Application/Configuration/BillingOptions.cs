@@ -20,6 +20,12 @@ public class StripeBillingOptions
     /// <summary>URL absoluta se a utilizadora cancelar no checkout.</summary>
     public string CheckoutCancelUrl { get; set; } = string.Empty;
 
+    /// <summary>URL absoluta para onde a Stripe redireciona após sair do Customer Billing Portal.</summary>
+    public string CustomerPortalReturnUrl { get; set; } = string.Empty;
+
+    /// <summary>Opcional: id <c>bpc_…</c> de configuração do portal na Stripe (produto/cancelamento/faturas).</summary>
+    public string CustomerPortalConfigurationId { get; set; } = string.Empty;
+
     public StripePriceIdsOptions PriceIds { get; set; } = new();
 }
 
