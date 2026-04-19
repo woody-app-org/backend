@@ -14,6 +14,12 @@ public class StripeBillingOptions
 
     public string WebhookSecret { get; set; } = string.Empty;
 
+    /// <summary>URL absoluta de sucesso (pode incluir <c>{CHECKOUT_SESSION_ID}</c> do Stripe).</summary>
+    public string CheckoutSuccessUrl { get; set; } = string.Empty;
+
+    /// <summary>URL absoluta se a utilizadora cancelar no checkout.</summary>
+    public string CheckoutCancelUrl { get; set; } = string.Empty;
+
     public StripePriceIdsOptions PriceIds { get; set; } = new();
 }
 

@@ -424,6 +424,10 @@ public class UsersController : ControllerBase
         var followersCount = await _follows.CountFollowersAsync(userId, cancellationToken);
         var followingCount = await _follows.CountFollowingAsync(userId, cancellationToken);
 
-        return EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount);
+        var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount);
+        if (viewerId.HasValue && viewerId.Value == userId)
+            profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
+
+        return profile;
     }
 }
