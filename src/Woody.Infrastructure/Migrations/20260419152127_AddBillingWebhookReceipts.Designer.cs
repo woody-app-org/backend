@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Woody.Infrastructure.Persistence.Context;
@@ -11,9 +12,11 @@ using Woody.Infrastructure.Persistence.Context;
 namespace Woody.Infrastructure.Migrations
 {
     [DbContext(typeof(WoodyDbContext))]
-    partial class WoodyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419152127_AddBillingWebhookReceipts")]
+    partial class AddBillingWebhookReceipts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

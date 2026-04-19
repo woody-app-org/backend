@@ -25,6 +25,11 @@ public class UserSubscriptionRepository : IUserSubscriptionRepository
         _context.UserSubscriptions.FirstOrDefaultAsync(x => x.ProviderSubscriptionId == providerSubscriptionId,
             cancellationToken);
 
+    public Task<UserSubscription?> GetByProviderCustomerIdTrackedAsync(string providerCustomerId,
+        CancellationToken cancellationToken = default) =>
+        _context.UserSubscriptions.FirstOrDefaultAsync(x => x.ProviderCustomerId == providerCustomerId,
+            cancellationToken);
+
     public Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default) =>
         _context.UserSubscriptions.AddAsync(subscription, cancellationToken).AsTask();
 

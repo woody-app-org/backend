@@ -21,6 +21,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<PostImage> PostImages { get; set; }
         public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
+        public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -45,6 +46,12 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithOne(u => u.Subscription)
                     .HasForeignKey<UserSubscription>(x => x.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<BillingWebhookReceipt>(e =>
+            {
+                e.ToTable("billing_webhook_receipts");
+                e.HasKey(x => x.EventId);
             });
 
             modelBuilder.Entity<EmailVerificationCode>(e =>

@@ -18,10 +18,12 @@ public static class DependencyInjectionConfig
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();
         builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         builder.Services.AddScoped<IBillingSubscriptionGateway, StripeBillingSubscriptionGateway>();
         builder.Services.AddScoped<IBillingCheckoutGateway, StripeBillingCheckoutGateway>();
         builder.Services.AddSingleton<IBillingWebhookSignatureVerifier, StripeBillingWebhookSignatureVerifier>();
+        builder.Services.AddScoped<IStripeWebhookBillingProcessor, StripeBillingWebhookProcessor>();
         builder.Services.AddScoped<CreateCheckoutSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();

@@ -16,6 +16,9 @@ public interface IUserSubscriptionRepository
     Task<UserSubscription?> GetByProviderSubscriptionIdTrackedAsync(string providerSubscriptionId,
         CancellationToken cancellationToken = default);
 
+    Task<UserSubscription?> GetByProviderCustomerIdTrackedAsync(string providerCustomerId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default);
     void Update(UserSubscription subscription);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
