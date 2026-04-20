@@ -39,6 +39,17 @@ public class ConversationRepository : IConversationRepository
                 c => c.Id == conversationId && (c.UserLowId == userId || c.UserHighId == userId),
                 cancellationToken);
 
+    public async Task<(int UserLowId, int UserHighId)?> GetParticipantPairIdsNoTrackingAsync(
+        int conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await _db.Conversations.AsNoTracking()
+            .Where(c => c.Id == conversationId)
+            .Select(c => new { c.UserLowId, c.UserHighId })
+            .FirstOrDefaultAsync(cancellationToken);
+        return row == null ? null : (row.UserLowId, row.UserHighId);
+    }
+
     public async Task<List<Conversation>> ListMineNoTrackingAsync(int userId, CancellationToken cancellationToken = default) =>
         await WithPeerUsers(_db.Conversations.AsNoTracking())
             .Where(c =>

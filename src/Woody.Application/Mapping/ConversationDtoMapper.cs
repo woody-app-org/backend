@@ -40,4 +40,17 @@ public static class ConversationDtoMapper
 
     public static IReadOnlyList<ConversationResponseDto> ToResponseList(IEnumerable<Conversation> items, int viewerUserId) =>
         items.Select(c => ToResponse(c, viewerUserId)).ToList();
+
+    public static ConversationRealtimeDto ToRealtime(Conversation c) =>
+        new()
+        {
+            Id = c.Id,
+            Status = StatusToApi(c.Status),
+            UserLowId = c.UserLowId,
+            UserHighId = c.UserHighId,
+            InitiatorUserId = c.InitiatorUserId,
+            CreatedAt = c.CreatedAt,
+            UpdatedAt = c.UpdatedAt,
+            RespondedAt = c.RespondedAt
+        };
 }

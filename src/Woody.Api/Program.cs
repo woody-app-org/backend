@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Woody.Api.Configuration;
+using Woody.Api.Hubs;
 using Woody.Application.Configuration;
 using Woody.Api.Middlewares;
 using Woody.Infrastructure.Persistence.Configuration;
@@ -62,6 +63,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtOptions.Secret))
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -70,6 +83,7 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -120,6 +134,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<DirectMessagesHub>(DirectMessagesHub.RoutePath).RequireAuthorization();
 
 app.MapHealthChecks(
     "/health",

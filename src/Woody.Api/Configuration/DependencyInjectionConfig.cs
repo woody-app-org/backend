@@ -1,5 +1,6 @@
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
+using Woody.Api.Realtime;
 using Woody.Application.Interfaces.Email;
 using Woody.Application.Interfaces.Security;
 using Woody.Application.Services;
@@ -39,6 +40,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
         builder.Services.AddScoped<IMessageRepository, MessageRepository>();
         builder.Services.AddScoped<IDirectMessagingService, DirectMessagingService>();
+        builder.Services.AddSingleton<IDirectMessageRealtimePublisher, DirectMessageRealtimePublisher>();
         builder.Services.AddScoped<IContentReportRepository, ContentReportRepository>();
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();

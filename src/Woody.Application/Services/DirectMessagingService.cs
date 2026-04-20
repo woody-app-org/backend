@@ -18,17 +18,20 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private readonly IMessageRepository _messages;
     private readonly IFollowRepository _follows;
     private readonly IUserRepository _users;
+    private readonly IDirectMessageRealtimePublisher _realtime;
 
     public DirectMessagingService(
         IConversationRepository conversations,
         IMessageRepository messages,
         IFollowRepository follows,
-        IUserRepository users)
+        IUserRepository users,
+        IDirectMessageRealtimePublisher realtime)
     {
         _conversations = conversations;
         _messages = messages;
         _follows = follows;
         _users = users;
+        _realtime = realtime;
     }
 
     public async Task<ConversationResponseDto> StartOrGetConversationAsync(
@@ -159,7 +162,13 @@ public sealed class DirectMessagingService : IDirectMessagingService
         c.UpdatedAt = DateTime.UtcNow;
 
         await _conversations.SaveChangesAsync(cancellationToken);
-        return ConversationDtoMapper.ToResponse(c, actorUserId);
+        var acceptedDto = ConversationDtoMapper.ToResponse(c, actorUserId);
+        await _realtime.BroadcastConversationUpdatedAsync(
+            ConversationDtoMapper.ToRealtime(c),
+            c.UserLowId,
+            c.UserHighId,
+            cancellationToken);
+        return acceptedDto;
     }
 
     public async Task<ConversationResponseDto> RejectPendingAsync(
@@ -182,7 +191,13 @@ public sealed class DirectMessagingService : IDirectMessagingService
         c.UpdatedAt = DateTime.UtcNow;
 
         await _conversations.SaveChangesAsync(cancellationToken);
-        return ConversationDtoMapper.ToResponse(c, actorUserId);
+        var convDto = ConversationDtoMapper.ToResponse(c, actorUserId);
+        await _realtime.BroadcastConversationUpdatedAsync(
+            ConversationDtoMapper.ToRealtime(c),
+            c.UserLowId,
+            c.UserHighId,
+            cancellationToken);
+        return convDto;
     }
 
     public async Task<ConversationMessagesPageDto> ListMessagesAsync(
@@ -273,7 +288,13 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (persisted == null)
             throw new InvalidOperationException("Não foi possível carregar a mensagem após o envio.");
 
-        return MessageDtoMapper.ToResponse(persisted);
+        var messageDto = MessageDtoMapper.ToResponse(persisted);
+        await _realtime.BroadcastMessageCreatedAsync(
+            messageDto,
+            conversation.UserLowId,
+            conversation.UserHighId,
+            cancellationToken);
+        return messageDto;
     }
 
     public async Task<MessageResponseDto> EditMessageAsync(
@@ -319,7 +340,18 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (persisted == null)
             throw new InvalidOperationException("Não foi possível carregar a mensagem após a edição.");
 
-        return MessageDtoMapper.ToResponse(persisted);
+        var messageDto = MessageDtoMapper.ToResponse(persisted);
+        var pair = await _conversations.GetParticipantPairIdsNoTrackingAsync(conversationId, cancellationToken);
+        if (pair != null)
+        {
+            await _realtime.BroadcastMessageUpdatedAsync(
+                messageDto,
+                pair.Value.UserLowId,
+                pair.Value.UserHighId,
+                cancellationToken);
+        }
+
+        return messageDto;
     }
 
     public async Task DeleteMessageAsync(
@@ -358,6 +390,24 @@ public sealed class DirectMessagingService : IDirectMessagingService
             conv.UpdatedAt = utcNow;
 
         await _messages.SaveChangesAsync(cancellationToken);
+
+        var deletedSnapshot = await _messages.GetNoTrackingByIdInConversationAsync(
+            conversationId,
+            messageId,
+            cancellationToken);
+        if (deletedSnapshot != null)
+        {
+            var dto = MessageDtoMapper.ToResponse(deletedSnapshot);
+            var pair = await _conversations.GetParticipantPairIdsNoTrackingAsync(conversationId, cancellationToken);
+            if (pair != null)
+            {
+                await _realtime.BroadcastMessageDeletedAsync(
+                    dto,
+                    pair.Value.UserLowId,
+                    pair.Value.UserHighId,
+                    cancellationToken);
+            }
+        }
     }
 
     private static List<string> NormalizeAttachmentUrls(IReadOnlyList<string>? raw)
