@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Infrastructure.Persistence.Context
 {
@@ -22,6 +23,10 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
+        public virtual DbSet<Conversation> Conversations { get; set; }
+        public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
+        public virtual DbSet<Message> Messages { get; set; }
+        public virtual DbSet<MessageAttachment> MessageAttachments { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -146,6 +151,77 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany()
                     .HasForeignKey(r => r.CommentId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Conversation>(e =>
+            {
+                e.ToTable(
+                    "conversations",
+                    t =>
+                    {
+                        t.HasCheckConstraint("ck_conversations_ordered_pair", "user_low_id < user_high_id");
+                        t.HasCheckConstraint(
+                            "ck_conversations_pending_has_initiator",
+                            "(status <> "
+                            + (int)ConversationStatus.Pending
+                            + ") OR (initiator_user_id IS NOT NULL AND (initiator_user_id = user_low_id OR initiator_user_id = user_high_id))");
+                    });
+
+                e.HasIndex(c => new { c.UserLowId, c.UserHighId }).IsUnique();
+
+                e.HasOne(c => c.UserLow)
+                    .WithMany(u => u.ConversationsAsUserLow)
+                    .HasForeignKey(c => c.UserLowId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(c => c.UserHigh)
+                    .WithMany(u => u.ConversationsAsUserHigh)
+                    .HasForeignKey(c => c.UserHighId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(c => c.Initiator)
+                    .WithMany(u => u.InitiatedConversations)
+                    .HasForeignKey(c => c.InitiatorUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ConversationParticipant>(e =>
+            {
+                e.HasKey(p => new { p.ConversationId, p.UserId });
+                e.HasIndex(p => p.UserId);
+
+                e.HasOne(p => p.Conversation)
+                    .WithMany(c => c.Participants)
+                    .HasForeignKey(p => p.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(p => p.User)
+                    .WithMany(u => u.ConversationParticipations)
+                    .HasForeignKey(p => p.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Message>(e =>
+            {
+                e.HasIndex(m => new { m.ConversationId, m.CreatedAt });
+
+                e.HasOne(m => m.Conversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(m => m.Sender)
+                    .WithMany(u => u.SentMessages)
+                    .HasForeignKey(m => m.SenderUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<MessageAttachment>(e =>
+            {
+                e.HasOne(a => a.Message)
+                    .WithMany(m => m.Attachments)
+                    .HasForeignKey(a => a.MessageId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             base.OnModelCreating(modelBuilder);

@@ -4,6 +4,9 @@ namespace Woody.Application.Interfaces;
 
 public interface IFollowRepository
 {
+    /// <summary>True se A segue B e B segue A.</summary>
+    Task<bool> AreMutualFollowersAsync(int userIdA, int userIdB, CancellationToken cancellationToken = default);
+
     Task<bool> ExistsAsync(int followingUserId, int followedUserId, CancellationToken cancellationToken = default);
     Task<List<int>> GetFollowedUserIdsAsync(int followingUserId, CancellationToken cancellationToken = default);
     Task<int> CountFollowersAsync(int followedUserId, CancellationToken cancellationToken = default);

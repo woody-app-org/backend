@@ -14,6 +14,17 @@ public class FollowRepository : IFollowRepository
         _db = db;
     }
 
+    public async Task<bool> AreMutualFollowersAsync(int userIdA, int userIdB, CancellationToken cancellationToken = default)
+    {
+        var aFollowsB = await _db.Follows.AsNoTracking()
+            .AnyAsync(f => f.FollowingUserId == userIdA && f.FollowedUserId == userIdB, cancellationToken);
+        if (!aFollowsB)
+            return false;
+
+        return await _db.Follows.AsNoTracking()
+            .AnyAsync(f => f.FollowingUserId == userIdB && f.FollowedUserId == userIdA, cancellationToken);
+    }
+
     public Task<bool> ExistsAsync(int followingUserId, int followedUserId, CancellationToken cancellationToken = default) =>
         _db.Follows.AnyAsync(f => f.FollowingUserId == followingUserId && f.FollowedUserId == followedUserId, cancellationToken);
 
