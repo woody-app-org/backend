@@ -83,7 +83,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
             if (changed)
                 await _conversations.SaveChangesAsync(cancellationToken);
 
-            return ConversationDtoMapper.ToResponse(existing, actorUserId);
+            var existingDto = ConversationDtoMapper.ToResponse(existing, actorUserId);
+            await EnrichConversationPreviewsAsync(new[] { existingDto }, cancellationToken);
+            return existingDto;
         }
 
         var status = DirectMessageConversationPolicy.InitialStatus(mutual);
@@ -110,7 +112,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
         var tracked = await _conversations.GetTrackedByPairAsync(low, high, cancellationToken)
                       ?? conversation;
 
-        return ConversationDtoMapper.ToResponse(tracked, actorUserId);
+        var createdDto = ConversationDtoMapper.ToResponse(tracked, actorUserId);
+        await EnrichConversationPreviewsAsync(new[] { createdDto }, cancellationToken);
+        return createdDto;
     }
 
     public async Task<IReadOnlyList<ConversationResponseDto>> ListMyConversationsAsync(
@@ -118,7 +122,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
         CancellationToken cancellationToken = default)
     {
         var list = await _conversations.ListMineNoTrackingAsync(actorUserId, cancellationToken);
-        return ConversationDtoMapper.ToResponseList(list, actorUserId);
+        var dtos = ConversationDtoMapper.ToResponseList(list, actorUserId).ToList();
+        await EnrichConversationPreviewsAsync(dtos, cancellationToken);
+        return dtos;
     }
 
     public async Task<IReadOnlyList<ConversationResponseDto>> ListPendingRequestsReceivedAsync(
@@ -126,7 +132,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
         CancellationToken cancellationToken = default)
     {
         var list = await _conversations.ListPendingInboundNoTrackingAsync(actorUserId, cancellationToken);
-        return ConversationDtoMapper.ToResponseList(list, actorUserId);
+        var dtos = ConversationDtoMapper.ToResponseList(list, actorUserId).ToList();
+        await EnrichConversationPreviewsAsync(dtos, cancellationToken);
+        return dtos;
     }
 
     public async Task<ConversationResponseDto> GetConversationForParticipantAsync(
@@ -138,7 +146,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (c == null)
             throw new KeyNotFoundException("Conversa não encontrada.");
 
-        return ConversationDtoMapper.ToResponse(c, actorUserId);
+        var dto = ConversationDtoMapper.ToResponse(c, actorUserId);
+        await EnrichConversationPreviewsAsync(new[] { dto }, cancellationToken);
+        return dto;
     }
 
     public async Task<ConversationResponseDto> AcceptPendingAsync(
@@ -168,6 +178,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
             c.UserLowId,
             c.UserHighId,
             cancellationToken);
+        await EnrichConversationPreviewsAsync(new[] { acceptedDto }, cancellationToken);
         return acceptedDto;
     }
 
@@ -197,6 +208,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
             c.UserLowId,
             c.UserHighId,
             cancellationToken);
+        await EnrichConversationPreviewsAsync(new[] { convDto }, cancellationToken);
         return convDto;
     }
 
@@ -407,6 +419,24 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     pair.Value.UserHighId,
                     cancellationToken);
             }
+        }
+    }
+
+    private async Task EnrichConversationPreviewsAsync(
+        IReadOnlyList<ConversationResponseDto> items,
+        CancellationToken cancellationToken = default)
+    {
+        if (items.Count == 0)
+            return;
+
+        var ids = items.Select(i => i.Id).Distinct().ToList();
+        var map = await _messages.GetLastMessageSummariesByConversationIdsAsync(ids, cancellationToken);
+        foreach (var dto in items)
+        {
+            if (!map.TryGetValue(dto.Id, out var row))
+                continue;
+            dto.LastMessagePreview = row.Preview;
+            dto.LastMessageAt = row.AtUtc;
         }
     }
 

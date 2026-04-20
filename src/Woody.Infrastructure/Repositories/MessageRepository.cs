@@ -14,6 +14,39 @@ public class MessageRepository : IMessageRepository
         _db = db;
     }
 
+    public async Task<IReadOnlyDictionary<int, (string? Preview, DateTime AtUtc)>> GetLastMessageSummariesByConversationIdsAsync(
+        IReadOnlyList<int> conversationIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (conversationIds.Count == 0)
+            return new Dictionary<int, (string? Preview, DateTime AtUtc)>();
+
+        var rows = await _db.Messages.AsNoTracking()
+            .Include(m => m.Attachments)
+            .Where(m => conversationIds.Contains(m.ConversationId) && m.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+
+        var dict = new Dictionary<int, (string? Preview, DateTime AtUtc)>();
+        foreach (var g in rows.GroupBy(m => m.ConversationId))
+        {
+            var m = g.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).First();
+            dict[g.Key] = (BuildPreview(m), m.CreatedAt);
+        }
+
+        return dict;
+    }
+
+    private static string? BuildPreview(Message m)
+    {
+        if (!string.IsNullOrWhiteSpace(m.Body))
+        {
+            var t = m.Body.Trim();
+            return t.Length <= 120 ? t : t[..120] + "…";
+        }
+
+        return m.Attachments.Count > 0 ? "Imagem" : null;
+    }
+
     public async Task<(List<Message> Items, int Total)> ListByConversationPagedAsync(
         int conversationId,
         int page,

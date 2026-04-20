@@ -19,4 +19,10 @@ public sealed class ConversationResponseDto
 
     /// <summary>A outra participante face à utilizadora autenticada.</summary>
     public ConversationPeerPreviewDto OtherUser { get; set; } = null!;
+
+    /// <summary>Prévia curta da última mensagem não apagada (texto truncado ou “Imagem”).</summary>
+    public string? LastMessagePreview { get; set; }
+
+    /// <summary>Instante da última mensagem não apagada, para ordenação na inbox.</summary>
+    public DateTime? LastMessageAt { get; set; }
 }
