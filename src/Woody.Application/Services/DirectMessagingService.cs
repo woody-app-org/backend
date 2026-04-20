@@ -12,7 +12,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
 {
     private const int MaxMessageBodyLength = 16_000;
     private const int MaxMessageAttachments = 10;
-    private const int MaxAttachmentUrlLength = 2048;
+    /// <summary>Permite data URLs de imagem (mesmo padrão conceptual dos posts) até ~450KB ficheiro.</summary>
+    private const int MaxAttachmentUrlLength = 900_000;
 
     private readonly IConversationRepository _conversations;
     private readonly IMessageRepository _messages;
