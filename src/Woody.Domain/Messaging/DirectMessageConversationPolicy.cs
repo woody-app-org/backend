@@ -6,6 +6,7 @@ namespace Woody.Domain.Messaging;
 /// <summary>
 /// Regras centrais de conversas diretas (fonte de verdade no domínio). Serviços da API devem delegar aqui
 /// para não duplicar condições de pedido, aceite e envio de mensagens.
+/// Extensões futuras (lido/não lido, arquivo, bloqueio) devem acrescentar métodos explícitos aqui ou em políticas adjacentes.
 /// </summary>
 public static class DirectMessageConversationPolicy
 {

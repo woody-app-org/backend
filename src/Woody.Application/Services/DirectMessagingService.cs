@@ -454,6 +454,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
             var t = u.Trim();
             if (t.Length > MaxAttachmentUrlLength)
                 throw new ArgumentException($"Cada URL de anexo não pode exceder {MaxAttachmentUrlLength} caracteres.");
+            if (!DirectMessageAttachmentPolicy.IsPermittedAttachmentUrl(t))
+                throw new ArgumentException(
+                    "Cada anexo tem de ser uma imagem: URL http(s) ou data:image (png, jpeg, gif ou webp) em base64.");
             if (list.Contains(t))
                 continue;
             list.Add(t);

@@ -53,6 +53,15 @@ public sealed class DirectMessagesHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, DirectMessageHubGroups.Conversation(conversationId));
     }
 
-    public async Task LeaveConversation(int conversationId) =>
+    public async Task LeaveConversation(int conversationId)
+    {
+        var uid = Context.User?.GetUserId();
+        if (uid == null)
+            return;
+
+        if (!await _conversations.IsParticipantAsync(conversationId, uid.Value, Context.ConnectionAborted))
+            return;
+
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, DirectMessageHubGroups.Conversation(conversationId));
+    }
 }
