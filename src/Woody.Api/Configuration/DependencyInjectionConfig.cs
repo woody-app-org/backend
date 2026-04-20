@@ -36,6 +36,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityRepository, CommunityRepository>();
         builder.Services.AddScoped<ICommunityMembershipRepository, CommunityMembershipRepository>();
         builder.Services.AddScoped<IJoinRequestRepository, JoinRequestRepository>();
+        builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+        builder.Services.AddScoped<IDirectMessagingService, DirectMessagingService>();
         builder.Services.AddScoped<IContentReportRepository, ContentReportRepository>();
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();
