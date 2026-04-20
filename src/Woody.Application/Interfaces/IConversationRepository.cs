@@ -11,6 +11,8 @@ public interface IConversationRepository
         int userId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> IsParticipantAsync(int conversationId, int userId, CancellationToken cancellationToken = default);
+
     Task<List<Conversation>> ListMineNoTrackingAsync(int userId, CancellationToken cancellationToken = default);
 
     Task<List<Conversation>> ListPendingInboundNoTrackingAsync(int userId, CancellationToken cancellationToken = default);

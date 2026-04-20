@@ -10,16 +10,23 @@ namespace Woody.Application.Services;
 
 public sealed class DirectMessagingService : IDirectMessagingService
 {
+    private const int MaxMessageBodyLength = 16_000;
+    private const int MaxMessageAttachments = 10;
+    private const int MaxAttachmentUrlLength = 2048;
+
     private readonly IConversationRepository _conversations;
+    private readonly IMessageRepository _messages;
     private readonly IFollowRepository _follows;
     private readonly IUserRepository _users;
 
     public DirectMessagingService(
         IConversationRepository conversations,
+        IMessageRepository messages,
         IFollowRepository follows,
         IUserRepository users)
     {
         _conversations = conversations;
+        _messages = messages;
         _follows = follows;
         _users = users;
     }
@@ -176,5 +183,203 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         await _conversations.SaveChangesAsync(cancellationToken);
         return ConversationDtoMapper.ToResponse(c, actorUserId);
+    }
+
+    public async Task<ConversationMessagesPageDto> ListMessagesAsync(
+        int actorUserId,
+        int conversationId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (page < 1)
+            throw new ArgumentException("Página inválida.", nameof(page));
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentException("pageSize deve estar entre 1 e 100.", nameof(pageSize));
+
+        if (!await _conversations.IsParticipantAsync(conversationId, actorUserId, cancellationToken))
+            throw new KeyNotFoundException("Conversa não encontrada.");
+
+        var (items, total) = await _messages.ListByConversationPagedAsync(
+            conversationId,
+            page,
+            pageSize,
+            cancellationToken);
+
+        return new ConversationMessagesPageDto
+        {
+            Items = MessageDtoMapper.ToResponseList(items),
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<MessageResponseDto> SendMessageAsync(
+        int actorUserId,
+        int conversationId,
+        SendConversationMessageRequestDto body,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _conversations.GetTrackedByIdForParticipantAsync(
+            conversationId,
+            actorUserId,
+            cancellationToken);
+        if (conversation == null)
+            throw new KeyNotFoundException("Conversa não encontrada.");
+
+        if (!DirectMessageConversationPolicy.MaySendMessage(conversation, actorUserId))
+            throw new ForbiddenException("Não podes enviar mensagens nesta conversa.");
+
+        var text = string.IsNullOrWhiteSpace(body.Body) ? null : body.Body.Trim();
+        var urls = NormalizeAttachmentUrls(body.AttachmentUrls);
+        if (text == null && urls.Count == 0)
+            throw new ArgumentException("A mensagem precisa de texto ou de pelo menos um anexo.");
+
+        if (text != null && text.Length > MaxMessageBodyLength)
+            throw new ArgumentException($"O texto não pode exceder {MaxMessageBodyLength} caracteres.");
+
+        if (urls.Count > MaxMessageAttachments)
+            throw new ArgumentException($"Máximo de {MaxMessageAttachments} imagens por mensagem.");
+
+        var utcNow = DateTime.UtcNow;
+        var message = new Message
+        {
+            ConversationId = conversationId,
+            SenderUserId = actorUserId,
+            Body = text,
+            CreatedAt = utcNow
+        };
+
+        var order = 0;
+        foreach (var url in urls)
+        {
+            message.Attachments.Add(new MessageAttachment
+            {
+                Url = url,
+                DisplayOrder = order++,
+                CreatedAt = utcNow
+            });
+        }
+
+        conversation.UpdatedAt = utcNow;
+        _messages.Add(message);
+        await _messages.SaveChangesAsync(cancellationToken);
+
+        var persisted = await _messages.GetNoTrackingByIdInConversationAsync(
+            conversationId,
+            message.Id,
+            cancellationToken);
+        if (persisted == null)
+            throw new InvalidOperationException("Não foi possível carregar a mensagem após o envio.");
+
+        return MessageDtoMapper.ToResponse(persisted);
+    }
+
+    public async Task<MessageResponseDto> EditMessageAsync(
+        int actorUserId,
+        int conversationId,
+        int messageId,
+        EditConversationMessageRequestDto body,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _conversations.IsParticipantAsync(conversationId, actorUserId, cancellationToken))
+            throw new KeyNotFoundException("Mensagem não encontrada.");
+
+        var message = await _messages.GetTrackedInConversationAsync(conversationId, messageId, cancellationToken);
+        if (message == null)
+            throw new KeyNotFoundException("Mensagem não encontrada.");
+
+        if (message.DeletedAt != null)
+            throw new KeyNotFoundException("Mensagem não encontrada.");
+
+        if (!DirectMessageMessagePolicy.MayEditOrSoftDelete(message, actorUserId))
+            throw new ForbiddenException("Só a autora pode editar esta mensagem.");
+
+        var newBody = (body.Body ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(newBody))
+            throw new ArgumentException("O texto da mensagem não pode ficar vazio.");
+
+        if (newBody.Length > MaxMessageBodyLength)
+            throw new ArgumentException($"O texto não pode exceder {MaxMessageBodyLength} caracteres.");
+
+        message.Body = newBody;
+        message.EditedAt = DateTime.UtcNow;
+
+        var conv = await _conversations.GetTrackedByIdForParticipantAsync(conversationId, actorUserId, cancellationToken);
+        if (conv != null)
+            conv.UpdatedAt = DateTime.UtcNow;
+
+        await _messages.SaveChangesAsync(cancellationToken);
+
+        var persisted = await _messages.GetNoTrackingByIdInConversationAsync(
+            conversationId,
+            messageId,
+            cancellationToken);
+        if (persisted == null)
+            throw new InvalidOperationException("Não foi possível carregar a mensagem após a edição.");
+
+        return MessageDtoMapper.ToResponse(persisted);
+    }
+
+    public async Task DeleteMessageAsync(
+        int actorUserId,
+        int conversationId,
+        int messageId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _conversations.IsParticipantAsync(conversationId, actorUserId, cancellationToken))
+            throw new KeyNotFoundException("Mensagem não encontrada.");
+
+        var message = await _messages.GetTrackedInConversationAsync(conversationId, messageId, cancellationToken);
+        if (message == null)
+            throw new KeyNotFoundException("Mensagem não encontrada.");
+
+        if (message.DeletedAt != null)
+        {
+            if (message.SenderUserId != actorUserId)
+                throw new KeyNotFoundException("Mensagem não encontrada.");
+            return;
+        }
+
+        if (!DirectMessageMessagePolicy.MayEditOrSoftDelete(message, actorUserId))
+            throw new ForbiddenException("Só a autora pode apagar esta mensagem.");
+
+        var utcNow = DateTime.UtcNow;
+        message.DeletedAt = utcNow;
+        message.Body = null;
+        message.EditedAt = null;
+
+        if (message.Attachments.Count > 0)
+            _messages.RemoveAttachments(message.Attachments.ToList());
+
+        var conv = await _conversations.GetTrackedByIdForParticipantAsync(conversationId, actorUserId, cancellationToken);
+        if (conv != null)
+            conv.UpdatedAt = utcNow;
+
+        await _messages.SaveChangesAsync(cancellationToken);
+    }
+
+    private static List<string> NormalizeAttachmentUrls(IReadOnlyList<string>? raw)
+    {
+        if (raw == null || raw.Count == 0)
+            return new List<string>();
+
+        var list = new List<string>();
+        foreach (var u in raw)
+        {
+            if (string.IsNullOrWhiteSpace(u))
+                continue;
+            var t = u.Trim();
+            if (t.Length > MaxAttachmentUrlLength)
+                throw new ArgumentException($"Cada URL de anexo não pode exceder {MaxAttachmentUrlLength} caracteres.");
+            if (list.Contains(t))
+                continue;
+            list.Add(t);
+            if (list.Count > MaxMessageAttachments)
+                throw new ArgumentException($"Máximo de {MaxMessageAttachments} imagens por mensagem.");
+        }
+
+        return list;
     }
 }

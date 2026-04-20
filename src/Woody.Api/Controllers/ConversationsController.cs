@@ -55,6 +55,61 @@ public class ConversationsController : ControllerBase
         return Ok(await _directMessaging.ListPendingRequestsReceivedAsync(me.Value, cancellationToken));
     }
 
+    [HttpGet("{conversationId:int}/messages")]
+    public async Task<ActionResult<ConversationMessagesPageDto>> ListMessages(
+        int conversationId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var result = await _directMessaging.ListMessagesAsync(me.Value, conversationId, page, pageSize, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{conversationId:int}/messages")]
+    public async Task<ActionResult<MessageResponseDto>> SendMessage(
+        int conversationId,
+        [FromBody] SendConversationMessageRequestDto body,
+        CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var result = await _directMessaging.SendMessageAsync(me.Value, conversationId, body, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPatch("{conversationId:int}/messages/{messageId:int}")]
+    public async Task<ActionResult<MessageResponseDto>> EditMessage(
+        int conversationId,
+        int messageId,
+        [FromBody] EditConversationMessageRequestDto body,
+        CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var result = await _directMessaging.EditMessageAsync(me.Value, conversationId, messageId, body, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("{conversationId:int}/messages/{messageId:int}")]
+    public async Task<IActionResult> DeleteMessage(int conversationId, int messageId, CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        await _directMessaging.DeleteMessageAsync(me.Value, conversationId, messageId, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("{conversationId:int}")]
     public async Task<ActionResult<ConversationResponseDto>> GetById(
         int conversationId,
