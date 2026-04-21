@@ -68,10 +68,29 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnMessageReceived = context =>
             {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
-                    context.Token = accessToken;
+                // SignalR: negotiate (HTTP) envia Bearer via header com accessTokenFactory;
+                // WebSocket usa access_token na query. Aceitar ambos em todos os caminhos /hubs/...
+                var path = context.HttpContext.Request.Path.Value ?? "";
+                if (!path.StartsWith("/hubs/", StringComparison.OrdinalIgnoreCase)
+                    && !path.Equals("/hubs", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var fromQuery = context.Request.Query["access_token"].ToString();
+                if (!string.IsNullOrEmpty(fromQuery))
+                {
+                    context.Token = fromQuery;
+                    return Task.CompletedTask;
+                }
+
+                var authHeader = context.Request.Headers.Authorization.ToString();
+                if (!string.IsNullOrEmpty(authHeader)
+                    && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Token = authHeader["Bearer ".Length..].Trim();
+                }
+
                 return Task.CompletedTask;
             }
         };
@@ -177,13 +196,16 @@ static bool ConfigureCors(WebApplicationBuilder builder)
     {
         if (builder.Environment.IsDevelopment())
         {
+            // SignalR negotiate envia Authorization → preflight CORS; ACAO: * bloqueia no browser.
+            // Refletir a origem (localhost:5173, 127.0.0.1, etc.) em vez de AllowAnyOrigin().
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.SetIsOriginAllowed(_ => true)
                         .AllowAnyHeader()
-                        .AllowAnyMethod();
+                        .AllowAnyMethod()
+                        .AllowCredentials();
                 });
             });
             return true;
@@ -203,7 +225,8 @@ static bool ConfigureCors(WebApplicationBuilder builder)
         {
             policy.WithOrigins(origins)
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
     });
 
