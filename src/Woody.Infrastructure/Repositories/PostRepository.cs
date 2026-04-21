@@ -99,7 +99,9 @@ public class PostRepository : IPostRepository
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
-            .OrderByDescending(p => p.CreatedAt)
+            .OrderByDescending(p => p.PinnedOnProfileAt != null)
+            .ThenBy(p => p.PinnedOnProfileAt)
+            .ThenByDescending(p => p.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -170,6 +172,14 @@ public class PostRepository : IPostRepository
     {
         await _db.PostImages.AddRangeAsync(images, cancellationToken);
     }
+
+    public Task<int> CountPinnedPostsForAuthorAsync(int authorUserId, CancellationToken cancellationToken = default) =>
+        _db.Posts.AsNoTracking()
+            .CountAsync(
+                p => p.UserId == authorUserId
+                     && p.DeletedAt == null
+                     && p.PinnedOnProfileAt != null,
+                cancellationToken);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

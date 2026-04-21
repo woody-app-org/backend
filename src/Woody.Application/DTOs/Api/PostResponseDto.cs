@@ -20,4 +20,7 @@ public class PostResponseDto
     public int CommentsCount { get; set; }
     public bool LikedByCurrentUser { get; set; }
     public PostCommunityPreviewDto? Community { get; set; }
+
+    /// <summary>Destaque no perfil da autora; <c>null</c> se não fixado.</summary>
+    public string? PinnedOnProfileAt { get; set; }
 }

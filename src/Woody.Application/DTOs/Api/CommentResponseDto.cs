@@ -12,4 +12,7 @@ public class CommentResponseDto
     public string? DeletedAt { get; set; }
     public string? HiddenByPostAuthorAt { get; set; }
     public string? ContentModerationMask { get; set; }
+
+    /// <summary>Destaque escolhido pela autora do post; <c>null</c> se não fixo.</summary>
+    public string? PinnedOnPostAt { get; set; }
 }

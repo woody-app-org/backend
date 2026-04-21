@@ -40,5 +40,9 @@ public interface IPostRepository
     Task AddPostImagesAsync(IEnumerable<PostImage> images, CancellationToken cancellationToken = default);
     void RemovePostTags(IEnumerable<PostTag> tags);
     Task<List<Post>> SearchNonDeletedWithNavAsync(string loweredQuery, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>Conta posts não apagados da autora com pin ativo no perfil.</summary>
+    Task<int> CountPinnedPostsForAuthorAsync(int authorUserId, CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
