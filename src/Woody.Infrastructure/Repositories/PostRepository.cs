@@ -3,6 +3,7 @@ using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Posts;
 using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Repositories;
@@ -77,35 +78,46 @@ public class PostRepository : IPostRepository
             .ToList();
     }
 
-    public async Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(
+    public async Task<(List<Post> Pinned, List<Post> Items, int UnpinnedTotalCount, int AllVisibleCount)> GetProfilePostsPageAsync(
         int profileUserId,
         int? viewerUserId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var q = _db.Posts.AsNoTracking()
+        var visible = _db.Posts.AsNoTracking()
             .Where(p => p.UserId == profileUserId && p.DeletedAt == null)
             .Where(p =>
                 p.PublicationContext == PostPublicationContext.Profile
                 || (viewerUserId.HasValue && viewerUserId.Value == profileUserId)
                 || (p.Community != null && p.Community.Visibility == "public")
                 || (viewerUserId != null && p.CommunityId != null && _db.CommunityMemberships.Any(m =>
-                    m.UserId == viewerUserId.Value && m.CommunityId == p.CommunityId && m.Status == "active")))
+                    m.UserId == viewerUserId.Value && m.CommunityId == p.CommunityId && m.Status == "active")));
+
+        var allVisibleCount = await visible.CountAsync(cancellationToken);
+
+        var withNav = visible
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community)
             .Include(p => p.Tags)
             .Include(p => p.Images);
 
-        var total = await q.CountAsync(cancellationToken);
-        var items = await q
-            .OrderByDescending(p => p.PinnedOnProfileAt != null)
-            .ThenBy(p => p.PinnedOnProfileAt)
-            .ThenByDescending(p => p.CreatedAt)
+        var pinned = await withNav
+            .Where(p => p.PinnedOnProfileAt != null)
+            .OrderBy(p => p.PinnedOnProfileAt)
+            .Take(PostProfilePinPolicy.MaxPinnedPostsOnProfile)
+            .ToListAsync(cancellationToken);
+
+        var unpinnedTotalCount = await visible.CountAsync(p => p.PinnedOnProfileAt == null, cancellationToken);
+
+        var items = await withNav
+            .Where(p => p.PinnedOnProfileAt == null)
+            .OrderByDescending(p => p.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
-        return (items, total);
+
+        return (pinned, items, unpinnedTotalCount, allVisibleCount);
     }
 
     public async Task<(List<Post> Items, int Total)> ListByCommunityIdPagedAsync(
