@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Woody.Application.Exceptions;
 
 namespace Woody.Api.Middlewares
 {
@@ -23,6 +24,11 @@ namespace Woody.Api.Middlewares
             catch (UnauthorizedAccessException ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                await WriteError(context, ex.Message);
+            }
+            catch (ForbiddenException ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
                 await WriteError(context, ex.Message);
             }
             catch (InvalidOperationException ex)

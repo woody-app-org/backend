@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Woody.Api.Configuration;
+using Woody.Api.Hubs;
 using Woody.Application.Configuration;
 using Woody.Api.Middlewares;
 using Woody.Infrastructure.Persistence.Configuration;
@@ -62,6 +63,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtOptions.Secret))
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                // SignalR: negotiate (HTTP) envia Bearer via header com accessTokenFactory;
+                // WebSocket usa access_token na query. Aceitar ambos em todos os caminhos /hubs/...
+                var path = context.HttpContext.Request.Path.Value ?? "";
+                if (!path.StartsWith("/hubs/", StringComparison.OrdinalIgnoreCase)
+                    && !path.Equals("/hubs", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var fromQuery = context.Request.Query["access_token"].ToString();
+                if (!string.IsNullOrEmpty(fromQuery))
+                {
+                    context.Token = fromQuery;
+                    return Task.CompletedTask;
+                }
+
+                var authHeader = context.Request.Headers.Authorization.ToString();
+                if (!string.IsNullOrEmpty(authHeader)
+                    && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Token = authHeader["Bearer ".Length..].Trim();
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -70,6 +102,7 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -121,6 +154,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+app.MapHub<DirectMessagesHub>(DirectMessagesHub.RoutePath).RequireAuthorization();
+
 app.MapHealthChecks(
     "/health",
     new HealthCheckOptions { Predicate = r => r.Tags.Contains("live") });
@@ -161,13 +196,16 @@ static bool ConfigureCors(WebApplicationBuilder builder)
     {
         if (builder.Environment.IsDevelopment())
         {
+            // SignalR negotiate envia Authorization → preflight CORS; ACAO: * bloqueia no browser.
+            // Refletir a origem (localhost:5173, 127.0.0.1, etc.) em vez de AllowAnyOrigin().
             builder.Services.AddCors(options =>
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.SetIsOriginAllowed(_ => true)
                         .AllowAnyHeader()
-                        .AllowAnyMethod();
+                        .AllowAnyMethod()
+                        .AllowCredentials();
                 });
             });
             return true;
@@ -187,7 +225,8 @@ static bool ConfigureCors(WebApplicationBuilder builder)
         {
             policy.WithOrigins(origins)
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
     });
 
