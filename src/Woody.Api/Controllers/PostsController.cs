@@ -5,6 +5,7 @@ using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Posts;
 using Woody.Domain.Entities.Enum;
 using Woody.Application.Mapping;
 
@@ -23,6 +24,7 @@ public class PostsController : ControllerBase
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _postEnrichment;
+    private readonly IContentPinningService _pinning;
 
     public PostsController(
         IPostRepository posts,
@@ -31,7 +33,8 @@ public class PostsController : ControllerBase
         ICommunityPermissionService communityPermissions,
         ILikeRepository likes,
         ICommentRepository comments,
-        IPostEnrichmentService postEnrichment)
+        IPostEnrichmentService postEnrichment,
+        IContentPinningService pinning)
     {
         _posts = posts;
         _communities = communities;
@@ -40,6 +43,7 @@ public class PostsController : ControllerBase
         _likes = likes;
         _comments = comments;
         _postEnrichment = postEnrichment;
+        _pinning = pinning;
     }
 
     /// <summary>Lê conteúdo do post (detalhe, comentários, gosto) só com as mesmas regras que o feed.</summary>
@@ -61,6 +65,23 @@ public class PostsController : ControllerBase
                    viewerUserId.Value, post.CommunityId.Value, cancellationToken)
                != null;
     }
+
+    private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
+    {
+        ContentPinningOutcome.Success => NoContent(),
+        ContentPinningOutcome.PostNotFound => NotFound(),
+        ContentPinningOutcome.CommentNotFound => NotFound(),
+        ContentPinningOutcome.Forbidden => Forbid(),
+        ContentPinningOutcome.ProfilePinLimitReached => Conflict(new
+        {
+            error = $"Só podes fixar até {PostProfilePinPolicy.MaxPinnedPostsOnProfile} publicações no teu perfil."
+        }),
+        ContentPinningOutcome.CommentNotEligible => BadRequest(new
+        {
+            error = "Só é possível fixar um comentário raiz que esteja visível (não oculto)."
+        }),
+        _ => BadRequest()
+    };
 
     [AllowAnonymous]
     [HttpGet("{postId}")]
@@ -415,5 +436,65 @@ public class PostsController : ControllerBase
                   ?? throw new InvalidOperationException("Comment not found after hide.");
 
         return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
+    }
+
+    [Authorize]
+    [HttpPost("{postId}/profile-pin")]
+    public async Task<IActionResult> PinOnProfile(string postId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var outcome = await _pinning.PinPostOnProfileAsync(me.Value, pid, cancellationToken);
+        return FromPinningOutcome(outcome);
+    }
+
+    [Authorize]
+    [HttpDelete("{postId}/profile-pin")]
+    public async Task<IActionResult> UnpinFromProfile(string postId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var outcome = await _pinning.UnpinPostOnProfileAsync(me.Value, pid, cancellationToken);
+        return FromPinningOutcome(outcome);
+    }
+
+    [Authorize]
+    [HttpPost("{postId}/comments/{commentId}/pin")]
+    public async Task<IActionResult> PinComment(string postId, string commentId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid) || !int.TryParse(commentId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var outcome = await _pinning.PinCommentOnPostAsync(me.Value, pid, cid, cancellationToken);
+        return FromPinningOutcome(outcome);
+    }
+
+    [Authorize]
+    [HttpDelete("{postId}/comments/{commentId}/pin")]
+    public async Task<IActionResult> UnpinComment(string postId, string commentId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid) || !int.TryParse(commentId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var outcome = await _pinning.UnpinCommentOnPostAsync(me.Value, pid, cid, cancellationToken);
+        return FromPinningOutcome(outcome);
     }
 }

@@ -10,5 +10,9 @@ public interface ICommentRepository
     Task<Comment?> GetTrackedAsync(int commentId, CancellationToken cancellationToken = default);
     void Add(Comment comment);
     Task<Comment?> GetByIdNonDeletedWithAuthorAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Comentário fixo atual do post (tracked), se existir.</summary>
+    Task<Comment?> GetTrackedPinnedCommentForPostAsync(int postId, CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

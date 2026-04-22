@@ -22,6 +22,9 @@ namespace Woody.Domain.Entities
         public DateTime? UpdatedAt { get; set; }
         public DateTime? DeletedAt { get; set; }
 
+        /// <summary>Quando não nulo, o post está destacado no perfil da autora (limite definido em <c>PostProfilePinPolicy</c>).</summary>
+        public DateTime? PinnedOnProfileAt { get; set; }
+
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public ICollection<PostTag> Tags { get; set; } = new List<PostTag>();
         public ICollection<PostImage> Images { get; set; } = new List<PostImage>();

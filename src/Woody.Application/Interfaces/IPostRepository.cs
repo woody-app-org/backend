@@ -21,10 +21,10 @@ public interface IPostRepository
         IReadOnlyList<int> ids,
         CancellationToken cancellationToken = default);
     /// <summary>
-    /// Publicações da utilizadora no perfil: posts de perfil; posts em comunidade pública;
-    /// ou privada se a visitante for membra ativa. A própria autora vê todas as suas publicações.
+    /// Publicações da utilizadora no perfil: fixados (até o limite) e página de não fixados,
+    /// com as mesmas regras de visibilidade que o feed do perfil.
     /// </summary>
-    Task<(List<Post> Items, int Total)> ListByUserIdPagedAsync(
+    Task<(List<Post> Pinned, List<Post> Items, int UnpinnedTotalCount, int AllVisibleCount)> GetProfilePostsPageAsync(
         int profileUserId,
         int? viewerUserId,
         int page,
@@ -40,5 +40,9 @@ public interface IPostRepository
     Task AddPostImagesAsync(IEnumerable<PostImage> images, CancellationToken cancellationToken = default);
     void RemovePostTags(IEnumerable<PostTag> tags);
     Task<List<Post>> SearchNonDeletedWithNavAsync(string loweredQuery, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>Conta posts não apagados da autora com pin ativo no perfil.</summary>
+    Task<int> CountPinnedPostsForAuthorAsync(int authorUserId, CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

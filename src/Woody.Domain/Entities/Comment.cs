@@ -18,5 +18,8 @@ namespace Woody.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? DeletedAt { get; set; }
         public DateTime? HiddenByPostAuthorAt { get; set; }
+
+        /// <summary>Quando não nulo, o comentário está destacado neste post (no máximo um por post).</summary>
+        public DateTime? PinnedOnPostAt { get; set; }
     }
 }

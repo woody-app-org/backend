@@ -223,7 +223,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userId}/posts")]
-    public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> GetUserPosts(
+    public async Task<ActionResult<ProfilePostsPageResponseDto>> GetUserPosts(
         string userId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
@@ -236,17 +236,21 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
-        var (posts, total) = await _posts.ListByUserIdPagedAsync(uid, viewerId, page, pageSize, cancellationToken);
+        var (pinned, posts, unpinnedTotal, allVisible) =
+            await _posts.GetProfilePostsPageAsync(uid, viewerId, page, pageSize, cancellationToken);
 
-        var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
+        var pinnedDtos = await _postEnrichment.ToPostDtosAsync(pinned, viewerId, cancellationToken);
+        var itemDtos = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 
-        return Ok(new PaginatedResponseDto<PostResponseDto>
+        return Ok(new ProfilePostsPageResponseDto
         {
-            Items = items,
+            Pinned = pinnedDtos,
+            Items = itemDtos,
             Page = page,
             PageSize = pageSize,
-            TotalCount = total,
-            HasNextPage = page * pageSize < total,
+            TotalCount = allVisible,
+            UnpinnedTotalCount = unpinnedTotal,
+            HasNextPage = page * pageSize < unpinnedTotal,
             HasPreviousPage = page > 1
         });
     }

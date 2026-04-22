@@ -30,7 +30,8 @@ public class CommentRepository : ICommentRepository
         await _db.Comments.AsNoTracking()
             .Where(c => c.PostId == postId && c.DeletedAt == null)
             .Include(c => c.Author).ThenInclude(a => a.Subscription)
-            .OrderBy(c => c.CreatedAt)
+            .OrderByDescending(c => c.PinnedOnPostAt != null)
+            .ThenBy(c => c.CreatedAt)
             .ToListAsync(cancellationToken);
 
     public async Task<Comment?> GetTrackedWithAuthorAsync(int commentId, int postId, CancellationToken cancellationToken = default) =>
@@ -45,6 +46,11 @@ public class CommentRepository : ICommentRepository
         await _db.Comments.AsNoTracking()
             .Include(c => c.Author).ThenInclude(a => a.Subscription)
             .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
+
+    public async Task<Comment?> GetTrackedPinnedCommentForPostAsync(int postId, CancellationToken cancellationToken = default) =>
+        await _db.Comments
+            .Where(c => c.PostId == postId && c.PinnedOnPostAt != null && c.DeletedAt == null)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

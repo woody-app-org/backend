@@ -68,7 +68,8 @@ public static class EntityMappers
             LikesCount = likesCount,
             CommentsCount = commentsCount,
             LikedByCurrentUser = likedByCurrentUser,
-            Community = p.Community != null ? ToCommunityPreview(p.Community) : null
+            Community = p.Community != null ? ToCommunityPreview(p.Community) : null,
+            PinnedOnProfileAt = p.PinnedOnProfileAt.HasValue ? Iso(p.PinnedOnProfileAt.Value) : null
         };
     }
 
@@ -93,7 +94,8 @@ public static class EntityMappers
             CreatedAt = Iso(c.CreatedAt),
             DeletedAt = c.DeletedAt.HasValue ? Iso(c.DeletedAt.Value) : null,
             HiddenByPostAuthorAt = c.HiddenByPostAuthorAt.HasValue ? Iso(c.HiddenByPostAuthorAt.Value) : null,
-            ContentModerationMask = mask
+            ContentModerationMask = mask,
+            PinnedOnPostAt = c.PinnedOnPostAt.HasValue ? Iso(c.PinnedOnPostAt.Value) : null
         };
     }
 

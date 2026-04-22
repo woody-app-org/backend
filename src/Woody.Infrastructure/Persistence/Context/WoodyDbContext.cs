@@ -101,6 +101,7 @@ namespace Woody.Infrastructure.Persistence.Context
                     .OnDelete(DeleteBehavior.Restrict);
 
                 e.HasIndex(p => new { p.PublicationContext, p.UserId });
+                e.HasIndex(p => new { p.UserId, p.PinnedOnProfileAt });
             });
 
             modelBuilder.Entity<PostImage>(e =>
@@ -127,11 +128,17 @@ namespace Woody.Infrastructure.Persistence.Context
                 .HasForeignKey(f => f.FollowedUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<Comment>()
-                .HasOne(c => c.ParentComment)
-                .WithMany(c => c.Replies)
-                .HasForeignKey(c => c.ParentCommentId)
-                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Comment>(e =>
+            {
+                e.HasIndex(c => c.PostId)
+                    .IsUnique()
+                    .HasFilter("pinned_on_post_at IS NOT NULL");
+
+                e.HasOne(c => c.ParentComment)
+                    .WithMany(c => c.Replies)
+                    .HasForeignKey(c => c.ParentCommentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             modelBuilder.Entity<Like>()
                 .HasIndex(l => new { l.UserId, l.TargetType, l.TargetId })
