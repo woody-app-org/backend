@@ -24,6 +24,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
         public virtual DbSet<CommunitySubscription> CommunitySubscriptions { get; set; }
         public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
+        public virtual DbSet<CommunityPostBoost> CommunityPostBoosts { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
@@ -98,6 +99,21 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasIndex(x => x.CommunityId);
                 e.HasOne(x => x.Community)
                     .WithMany(c => c.DailyRollups)
+                    .HasForeignKey(x => x.CommunityId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CommunityPostBoost>(e =>
+            {
+                e.HasIndex(x => x.CommunityId);
+                e.HasIndex(x => x.PostId);
+                e.HasIndex(x => new { x.CommunityId, x.EndsAtUtc });
+                e.HasOne(x => x.Post)
+                    .WithMany(p => p.CommunityPostBoosts)
+                    .HasForeignKey(x => x.PostId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Community)
+                    .WithMany(c => c.PostBoosts)
                     .HasForeignKey(x => x.CommunityId)
                     .OnDelete(DeleteBehavior.Cascade);
             });

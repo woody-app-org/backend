@@ -23,4 +23,10 @@ public class PostResponseDto
 
     /// <summary>Destaque no perfil da autora; <c>null</c> se não fixado.</summary>
     public string? PinnedOnProfileAt { get; set; }
+
+    /// <summary>Impulsionamento activo (plano premium da comunidade).</summary>
+    public bool CommunityBoostActive { get; set; }
+
+    /// <summary>Fim do impulsionamento em ISO UTC, quando <see cref="CommunityBoostActive"/> é verdadeiro.</summary>
+    public string? CommunityBoostEndsAt { get; set; }
 }

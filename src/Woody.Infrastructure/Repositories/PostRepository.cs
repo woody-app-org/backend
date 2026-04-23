@@ -123,6 +123,7 @@ public class PostRepository : IPostRepository
     public async Task<(List<Post> Items, int Total)> ListByCommunityIdPagedAsync(
         int communityId, int page, int pageSize, CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
         var q = _db.Posts.AsNoTracking()
             .Where(p =>
                 p.CommunityId == communityId
@@ -132,7 +133,13 @@ public class PostRepository : IPostRepository
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
-            .OrderByDescending(p => p.CreatedAt);
+            .OrderByDescending(p => _db.CommunityPostBoosts.Any(b =>
+                b.PostId == p.Id
+                && b.CommunityId == communityId
+                && b.CancelledAtUtc == null
+                && b.StartedAtUtc <= now
+                && b.EndsAtUtc > now))
+            .ThenByDescending(p => p.CreatedAt);
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q

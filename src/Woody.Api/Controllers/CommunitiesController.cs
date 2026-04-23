@@ -7,7 +7,6 @@ using Woody.Application.Billing;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
-using Woody.Domain.Posts;
 using Woody.Application.Mapping;
 using Woody.Application.Services;
 using Woody.Application.Utilities;
@@ -29,6 +28,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityPremiumEntitlementService _communityPremiumEntitlements;
     private readonly ICommunityDailyRollupRepository _dailyRollups;
     private readonly ICommunityDashboardAnalyticsService _communityDashboardAnalytics;
+    private readonly ICommunityPostBoostService _communityPostBoosts;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -41,7 +41,8 @@ public class CommunitiesController : ControllerBase
         ICommunitySubscriptionRepository communitySubscriptions,
         ICommunityPremiumEntitlementService communityPremiumEntitlements,
         ICommunityDailyRollupRepository dailyRollups,
-        ICommunityDashboardAnalyticsService communityDashboardAnalytics)
+        ICommunityDashboardAnalyticsService communityDashboardAnalytics,
+        ICommunityPostBoostService communityPostBoosts)
     {
         _communities = communities;
         _memberships = memberships;
@@ -54,6 +55,7 @@ public class CommunitiesController : ControllerBase
         _communityPremiumEntitlements = communityPremiumEntitlements;
         _dailyRollups = dailyRollups;
         _communityDashboardAnalytics = communityDashboardAnalytics;
+        _communityPostBoosts = communityPostBoosts;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -348,10 +350,47 @@ public class CommunitiesController : ControllerBase
         return Ok(dto);
     }
 
-    /// <summary>Impulsionar post (staff + premium); base operacional preparada para evolução do produto.</summary>
+    /// <summary>Activa impulsionamento (owner/admin + premium da comunidade).</summary>
     [Authorize]
     [HttpPost("{communityId}/posts/{postId}/boost")]
-    public async Task<IActionResult> BoostCommunityPost(
+    public async Task<ActionResult<CommunityPostBoostResponseDto>> BoostCommunityPost(
+        string communityId,
+        string postId,
+        [FromBody] CommunityPostBoostActivateRequestDto? body,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid) || !int.TryParse(postId, out var pid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var (dto, err) = await _communityPostBoosts.ActivateAsync(cid, pid, me.Value, body?.DurationDays, cancellationToken);
+        return err switch
+        {
+            "community_staff_required" => StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = err,
+                error = "Só owner ou admin pode impulsionar posts desta comunidade."
+            }),
+            "community_premium_required" => StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = err,
+                error = "Plano premium ativo da comunidade necessário para impulsionar publicações."
+            }),
+            "post_not_found" => NotFound(),
+            "post_not_in_community" => BadRequest(new { error = "Esta publicação não pertence a esta comunidade." }),
+            _ => dto == null
+                ? StatusCode(StatusCodes.Status500InternalServerError)
+                : StatusCode(StatusCodes.Status201Created, dto)
+        };
+    }
+
+    /// <summary>Cancela impulsionamento activo do post nesta comunidade.</summary>
+    [Authorize]
+    [HttpDelete("{communityId}/posts/{postId}/boost")]
+    public async Task<IActionResult> UnboostCommunityPost(
         string communityId,
         string postId,
         CancellationToken cancellationToken)
@@ -363,35 +402,59 @@ public class CommunitiesController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var caps = await _communityPremiumEntitlements.GetCapabilitiesAsync(cid, me.Value, cancellationToken);
-        if (!caps.IsStaffForPremiumTools)
+        var (ok, err) = await _communityPostBoosts.DeactivateAsync(cid, pid, me.Value, cancellationToken);
+        if (!ok)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new
+            return err switch
             {
-                code = "community_staff_required",
-                error = "Só owner ou admin pode impulsionar posts desta comunidade."
-            });
-        }
-
-        if (!caps.CommunityPremiumActive)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new
-            {
-                code = "community_premium_required",
-                error = "Plano premium ativo da comunidade necessário para impulsionar publicações."
-            });
-        }
-
-        var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
-        if (post == null)
-            return NotFound();
-
-        if (post.PublicationContext != PostPublicationContext.Community || post.CommunityId != cid)
-        {
-            return BadRequest(new { error = "Esta publicação não pertence a esta comunidade." });
+                "community_staff_required" => StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    code = err,
+                    error = "Só owner ou admin pode gerir impulsionamentos."
+                }),
+                "community_premium_required" => StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    code = err,
+                    error = "Plano premium ativo da comunidade necessário."
+                }),
+                "post_not_found" => NotFound(),
+                "post_not_in_community" => BadRequest(new { error = "Esta publicação não pertence a esta comunidade." }),
+                _ => StatusCode(StatusCodes.Status500InternalServerError)
+            };
         }
 
         return NoContent();
+    }
+
+    /// <summary>Lista impulsionamentos activos (staff + premium).</summary>
+    [Authorize]
+    [HttpGet("{communityId}/post-boosts")]
+    public async Task<ActionResult<IReadOnlyList<CommunityPostBoostListItemDto>>> ListCommunityPostBoosts(
+        string communityId,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var (items, err) = await _communityPostBoosts.ListActiveAsync(cid, me.Value, cancellationToken);
+        return err switch
+        {
+            "community_staff_required" => StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = err,
+                error = "Só owner ou admin pode listar impulsionamentos."
+            }),
+            "community_premium_required" => StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = err,
+                error = "Plano premium ativo da comunidade necessário."
+            }),
+            _ => Ok(items)
+        };
     }
 
     [Authorize]

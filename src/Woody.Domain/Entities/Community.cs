@@ -27,4 +27,6 @@ public class Community
     public ICollection<JoinRequest> JoinRequests { get; set; } = new List<JoinRequest>();
 
     public ICollection<CommunityDailyRollup> DailyRollups { get; set; } = new List<CommunityDailyRollup>();
+
+    public ICollection<CommunityPostBoost> PostBoosts { get; set; } = new List<CommunityPostBoost>();
 }

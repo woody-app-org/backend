@@ -51,6 +51,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityDailyRollupRepository, CommunityDailyRollupRepository>();
         builder.Services.AddScoped<ICommunityAnalyticsReadRepository, CommunityAnalyticsReadRepository>();
         builder.Services.AddScoped<ICommunityDashboardAnalyticsService, CommunityDashboardAnalyticsService>();
+        builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
+        builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

@@ -46,7 +46,9 @@ public static class EntityMappers
         int likesCount,
         int commentsCount,
         int? viewerUserId,
-        bool likedByCurrentUser)
+        bool likedByCurrentUser,
+        bool communityBoostActive = false,
+        string? communityBoostEndsAt = null)
     {
         var imageUrls = p.Images
             .OrderBy(i => i.DisplayOrder)
@@ -74,7 +76,9 @@ public static class EntityMappers
             CommentsCount = commentsCount,
             LikedByCurrentUser = likedByCurrentUser,
             Community = p.Community != null ? ToCommunityPreview(p.Community) : null,
-            PinnedOnProfileAt = p.PinnedOnProfileAt.HasValue ? Iso(p.PinnedOnProfileAt.Value) : null
+            PinnedOnProfileAt = p.PinnedOnProfileAt.HasValue ? Iso(p.PinnedOnProfileAt.Value) : null,
+            CommunityBoostActive = communityBoostActive,
+            CommunityBoostEndsAt = communityBoostEndsAt
         };
     }
 
