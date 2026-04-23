@@ -9,6 +9,7 @@ using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Posts;
 using Woody.Application.Mapping;
+using Woody.Application.Services;
 using Woody.Application.Utilities;
 
 namespace Woody.Api.Controllers;
@@ -26,6 +27,8 @@ public class CommunitiesController : ControllerBase
     private readonly IUserEntitlementService _entitlements;
     private readonly ICommunitySubscriptionRepository _communitySubscriptions;
     private readonly ICommunityPremiumEntitlementService _communityPremiumEntitlements;
+    private readonly ICommunityDailyRollupRepository _dailyRollups;
+    private readonly ICommunityDashboardAnalyticsService _communityDashboardAnalytics;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -36,7 +39,9 @@ public class CommunitiesController : ControllerBase
         ICommunityPermissionService permission,
         IUserEntitlementService entitlements,
         ICommunitySubscriptionRepository communitySubscriptions,
-        ICommunityPremiumEntitlementService communityPremiumEntitlements)
+        ICommunityPremiumEntitlementService communityPremiumEntitlements,
+        ICommunityDailyRollupRepository dailyRollups,
+        ICommunityDashboardAnalyticsService communityDashboardAnalytics)
     {
         _communities = communities;
         _memberships = memberships;
@@ -47,6 +52,8 @@ public class CommunitiesController : ControllerBase
         _entitlements = entitlements;
         _communitySubscriptions = communitySubscriptions;
         _communityPremiumEntitlements = communityPremiumEntitlements;
+        _dailyRollups = dailyRollups;
+        _communityDashboardAnalytics = communityDashboardAnalytics;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -151,7 +158,18 @@ public class CommunitiesController : ControllerBase
     public async Task<ActionResult<CommunityResponseDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var c = await _communities.GetByIdWithTagsNoTrackingAsync(id, cancellationToken);
-        return c == null ? NotFound() : Ok(EntityMappers.ToCommunityDto(c));
+        if (c == null)
+            return NotFound();
+        try
+        {
+            await _dailyRollups.IncrementPageViewAsync(id, DateTime.UtcNow, cancellationToken);
+        }
+        catch
+        {
+            // Métricas não devem impedir o carregamento público da comunidade.
+        }
+
+        return Ok(EntityMappers.ToCommunityDto(c));
     }
 
     [AllowAnonymous]
@@ -159,7 +177,18 @@ public class CommunitiesController : ControllerBase
     public async Task<ActionResult<CommunityResponseDto>> BySlug(string slug, CancellationToken cancellationToken)
     {
         var c = await _communities.GetBySlugWithTagsNoTrackingAsync(slug, cancellationToken);
-        return c == null ? NotFound() : Ok(EntityMappers.ToCommunityDto(c));
+        if (c == null)
+            return NotFound();
+        try
+        {
+            await _dailyRollups.IncrementPageViewAsync(c.Id, DateTime.UtcNow, cancellationToken);
+        }
+        catch
+        {
+            // Métricas não devem impedir o carregamento público da comunidade.
+        }
+
+        return Ok(EntityMappers.ToCommunityDto(c));
     }
 
     [AllowAnonymous]
@@ -277,10 +306,13 @@ public class CommunitiesController : ControllerBase
         return Ok(new { isMember = true, role = row.Role, premiumCapabilities = caps });
     }
 
-    /// <summary>Resumo analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
+    /// <summary>Dashboard analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
     [Authorize]
     [HttpGet("{communityId}/premium/analytics")]
-    public async Task<IActionResult> CommunityPremiumAnalytics(string communityId, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommunityPremiumDashboardAnalyticsDto>> CommunityPremiumAnalytics(
+        string communityId,
+        [FromQuery] int days = 30,
+        CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(communityId, out var cid))
             return BadRequest();
@@ -312,16 +344,8 @@ public class CommunitiesController : ControllerBase
         if (c == null)
             return NotFound();
 
-        var postTotal = await _posts.CountNonDeletedCommunityPostsAsync(cid, cancellationToken);
-
-        return Ok(new
-        {
-            communityId = cid.ToString(),
-            memberCount = c.MemberCount,
-            totalPosts = postTotal,
-            headline = "Resumo da comunidade",
-            note = "Métricas avançadas serão alargadas em versões futuras."
-        });
+        var dto = await _communityDashboardAnalytics.BuildDashboardAsync(cid, c.Slug, days, cancellationToken);
+        return Ok(dto);
     }
 
     /// <summary>Impulsionar post (staff + premium); base operacional preparada para evolução do produto.</summary>
@@ -505,8 +529,12 @@ public class CommunitiesController : ControllerBase
         if (m.Role == "owner")
             return BadRequest();
 
+        var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         _memberships.Remove(m);
         await _memberships.SaveChangesAsync(cancellationToken);
+        if (wasActive)
+            await _dailyRollups.IncrementMemberLeaveAsync(cid, DateTime.UtcNow, cancellationToken);
+
         var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
                 ?? throw new InvalidOperationException("Community not found.");
         c.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);
@@ -533,13 +561,19 @@ public class CommunitiesController : ControllerBase
         if (m == null)
             return NoContent();
 
+        var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         _memberships.Remove(m);
         await _memberships.SaveChangesAsync(cancellationToken);
+
         var c = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
                 ?? throw new InvalidOperationException("Community not found.");
         c.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);
         c.UpdatedAt = DateTime.UtcNow;
         await _communities.SaveChangesAsync(cancellationToken);
+
+        if (wasActive)
+            await _dailyRollups.IncrementMemberLeaveAsync(cid, DateTime.UtcNow, cancellationToken);
+
         return NoContent();
     }
 
@@ -565,12 +599,17 @@ public class CommunitiesController : ControllerBase
         if (m == null)
             return NotFound();
 
+        var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(body.Status))
             m.Status = body.Status.Trim();
         if (!string.IsNullOrWhiteSpace(body.Role))
             m.Role = body.Role.Trim();
 
+        var nowActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         await _memberships.SaveChangesAsync(cancellationToken);
+        if (wasActive && !nowActive)
+            await _dailyRollups.IncrementMemberLeaveAsync(cid, DateTime.UtcNow, cancellationToken);
+
         var comm = await _communities.GetByIdTrackedAsync(cid, cancellationToken)
                    ?? throw new InvalidOperationException("Community not found.");
         comm.MemberCount = await _memberships.CountActiveInCommunityAsync(cid, cancellationToken);

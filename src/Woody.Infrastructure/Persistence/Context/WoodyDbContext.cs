@@ -23,6 +23,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
         public virtual DbSet<CommunitySubscription> CommunitySubscriptions { get; set; }
+        public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
@@ -88,6 +89,16 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasOne(x => x.Community)
                     .WithOne(c => c.Subscription)
                     .HasForeignKey<CommunitySubscription>(x => x.CommunityId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CommunityDailyRollup>(e =>
+            {
+                e.HasKey(x => new { x.CommunityId, x.DayUtc });
+                e.HasIndex(x => x.CommunityId);
+                e.HasOne(x => x.Community)
+                    .WithMany(c => c.DailyRollups)
+                    .HasForeignKey(x => x.CommunityId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
