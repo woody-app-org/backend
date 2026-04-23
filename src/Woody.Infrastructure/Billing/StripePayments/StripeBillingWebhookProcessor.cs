@@ -25,6 +25,7 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
     private readonly IOptions<BillingOptions> _options;
     private readonly IBillingWebhookReceiptRepository _receipts;
     private readonly IUserSubscriptionRepository _subscriptions;
+    private readonly ICommunitySubscriptionRepository _communitySubscriptions;
     private readonly IBillingSubscriptionGateway _subscriptionGateway;
     private readonly ILogger<StripeBillingWebhookProcessor> _logger;
 
@@ -32,12 +33,14 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         IOptions<BillingOptions> options,
         IBillingWebhookReceiptRepository receipts,
         IUserSubscriptionRepository subscriptions,
+        ICommunitySubscriptionRepository communitySubscriptions,
         IBillingSubscriptionGateway subscriptionGateway,
         ILogger<StripeBillingWebhookProcessor> logger)
     {
         _options = options;
         _receipts = receipts;
         _subscriptions = subscriptions;
+        _communitySubscriptions = communitySubscriptions;
         _subscriptionGateway = subscriptionGateway;
         _logger = logger;
     }
@@ -109,23 +112,52 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         if (!string.Equals(session.Mode, "subscription", StringComparison.Ordinal))
             return true;
 
-        if (!TryResolveWoodyUserId(session.ClientReferenceId, session.Metadata, out var userId))
-        {
-            _logger.LogWarning("checkout.session.completed sem referência de utilizadora Stripe.");
-            return false;
-        }
-
         if (string.IsNullOrWhiteSpace(session.SubscriptionId))
         {
             _logger.LogWarning("checkout.session.completed sem subscription id.");
             return false;
         }
 
-        var snapshot = await _subscriptionGateway.GetSubscriptionAsync(session.SubscriptionId, cancellationToken);
-        if (snapshot is null)
+        var read = await _subscriptionGateway.GetSubscriptionAsync(session.SubscriptionId, cancellationToken);
+        if (read is null)
         {
-            _logger.LogWarning("Não foi possível obter a subscrição Stripe {SubscriptionId} após checkout.",
+            _logger.LogWarning("checkout.session.completed sem leitura no gateway para {SubscriptionId}.",
                 session.SubscriptionId);
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+
+        if (read.Community != null)
+        {
+            var communityId = TryResolveCommunityIdFromCheckoutSession(session) ?? read.WoodyCommunityIdFromStripeMetadata;
+            if (communityId is null or <= 0)
+            {
+                _logger.LogWarning("checkout.session.completed comunidade sem id em metadata.");
+                return false;
+            }
+
+            var crow = await _communitySubscriptions.GetByCommunityIdTrackedAsync(communityId.Value, cancellationToken);
+            if (crow == null)
+            {
+                _logger.LogWarning("Comunidade {CommunityId} sem linha community_subscriptions.", communityId);
+                return false;
+            }
+
+            CommunitySubscriptionStripeSync.ApplyGatewaySnapshot(crow, read.Community, now);
+            _communitySubscriptions.Update(crow);
+            return true;
+        }
+
+        if (read.User is null)
+        {
+            _logger.LogWarning("checkout.session.completed sem ramo utilizadora nem comunidade reconhecido.");
+            return false;
+        }
+
+        if (!TryResolveWoodyUserId(session.ClientReferenceId, session.Metadata, out var userId))
+        {
+            _logger.LogWarning("checkout.session.completed sem referência de utilizadora Stripe.");
             return false;
         }
 
@@ -136,9 +168,18 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
             return false;
         }
 
-        UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, snapshot, DateTime.UtcNow);
+        UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, read.User, now);
         _subscriptions.Update(row);
         return true;
+    }
+
+    private static int? TryResolveCommunityIdFromCheckoutSession(global::Stripe.Checkout.Session session)
+    {
+        if (session.Metadata != null &&
+            session.Metadata.TryGetValue(StripeBillingMetadataKeys.WoodyCommunityId, out var raw) &&
+            int.TryParse(raw, out var id))
+            return id;
+        return null;
     }
 
     private Task<bool> HandleSubscriptionUpsertAsync(Event stripeEvent, CancellationToken cancellationToken) =>
@@ -150,12 +191,23 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         if (subscription is null)
             return false;
 
-        var row = await ResolveSubscriptionRowAsync(subscription, cancellationToken);
-        if (row is null)
+        var now = DateTime.UtcNow;
+        var userRow = await ResolveUserSubscriptionRowAsync(subscription, cancellationToken);
+        if (userRow != null)
+        {
+            UserSubscriptionStripeSync.ApplySubscriptionRemoved(userRow, now);
+            _subscriptions.Update(userRow);
             return true;
+        }
 
-        UserSubscriptionStripeSync.ApplySubscriptionRemoved(row, DateTime.UtcNow);
-        _subscriptions.Update(row);
+        var commRow = await ResolveCommunitySubscriptionRowAsync(subscription, cancellationToken);
+        if (commRow != null)
+        {
+            CommunitySubscriptionStripeSync.ApplySubscriptionRemoved(commRow, now);
+            _communitySubscriptions.Update(commRow);
+            return true;
+        }
+
         return true;
     }
 
@@ -201,39 +253,81 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         if (subscription is null)
             return false;
 
-        var snapshot = StripeSubscriptionStateMapper.ToSnapshot(subscription, _options.Value);
-        var row = await ResolveSubscriptionRowAsync(subscription, cancellationToken);
-        if (row is null)
+        var read = StripeSubscriptionStateMapper.ToReadResult(subscription, _options.Value);
+        var now = DateTime.UtcNow;
+
+        if (read.Community != null)
         {
-            _logger.LogWarning("Subscrição Stripe {SubscriptionId} sem correspondência na BD.", subscription.Id);
-            return false;
+            var row = await ResolveCommunitySubscriptionRowAsync(subscription, cancellationToken);
+            if (row is null)
+            {
+                _logger.LogWarning("Subscrição Stripe {SubscriptionId} comunidade sem correspondência na BD.",
+                    subscription.Id);
+                return false;
+            }
+
+            CommunitySubscriptionStripeSync.ApplyGatewaySnapshot(row, read.Community, now);
+            _communitySubscriptions.Update(row);
+            return true;
         }
 
-        UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, snapshot, DateTime.UtcNow);
-        _subscriptions.Update(row);
-        return true;
+        if (read.User != null)
+        {
+            var row = await ResolveUserSubscriptionRowAsync(subscription, cancellationToken);
+            if (row is null)
+            {
+                _logger.LogWarning("Subscrição Stripe {SubscriptionId} utilizadora sem correspondência na BD.",
+                    subscription.Id);
+                return false;
+            }
+
+            UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, read.User, now);
+            _subscriptions.Update(row);
+            return true;
+        }
+
+        return false;
     }
 
     private async Task<bool> RefreshSubscriptionFromGatewayAsync(string subscriptionId, string? customerId,
         CancellationToken cancellationToken)
     {
-        var snapshot = await _subscriptionGateway.GetSubscriptionAsync(subscriptionId, cancellationToken);
-        if (snapshot is null)
+        var read = await _subscriptionGateway.GetSubscriptionAsync(subscriptionId, cancellationToken);
+        if (read is null)
             return true;
 
-        var row = await _subscriptions.GetByProviderSubscriptionIdTrackedAsync(subscriptionId, cancellationToken);
-        if (row is null && !string.IsNullOrEmpty(customerId))
-            row = await _subscriptions.GetByProviderCustomerIdTrackedAsync(customerId, cancellationToken);
+        var now = DateTime.UtcNow;
 
-        if (row is null)
+        if (read.Community != null)
+        {
+            var row = await _communitySubscriptions.GetByProviderSubscriptionIdTrackedAsync(subscriptionId,
+                cancellationToken);
+            if (row is null)
+                return true;
+
+            CommunitySubscriptionStripeSync.ApplyGatewaySnapshot(row, read.Community, now);
+            _communitySubscriptions.Update(row);
             return true;
+        }
 
-        UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, snapshot, DateTime.UtcNow);
-        _subscriptions.Update(row);
+        if (read.User != null)
+        {
+            var row = await _subscriptions.GetByProviderSubscriptionIdTrackedAsync(subscriptionId, cancellationToken);
+            if (row is null && !string.IsNullOrEmpty(customerId))
+                row = await _subscriptions.GetByProviderCustomerIdTrackedAsync(customerId, cancellationToken);
+
+            if (row is null)
+                return true;
+
+            UserSubscriptionStripeSync.ApplyGatewaySnapshot(row, read.User, now);
+            _subscriptions.Update(row);
+            return true;
+        }
+
         return true;
     }
 
-    private async Task<UserSubscription?> ResolveSubscriptionRowAsync(global::Stripe.Subscription subscription,
+    private async Task<UserSubscription?> ResolveUserSubscriptionRowAsync(global::Stripe.Subscription subscription,
         CancellationToken cancellationToken)
     {
         var row = await _subscriptions.GetByProviderSubscriptionIdTrackedAsync(subscription.Id, cancellationToken);
@@ -241,9 +335,25 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
             return row;
 
         if (subscription.Metadata != null &&
-            subscription.Metadata.TryGetValue("woody_user_id", out var uidRaw) &&
+            subscription.Metadata.TryGetValue(StripeBillingMetadataKeys.WoodyUserId, out var uidRaw) &&
             int.TryParse(uidRaw, out var uid))
             return await _subscriptions.GetByUserIdTrackedAsync(uid, cancellationToken);
+
+        return null;
+    }
+
+    private async Task<CommunitySubscription?> ResolveCommunitySubscriptionRowAsync(
+        global::Stripe.Subscription subscription, CancellationToken cancellationToken)
+    {
+        var row = await _communitySubscriptions.GetByProviderSubscriptionIdTrackedAsync(subscription.Id,
+            cancellationToken);
+        if (row != null)
+            return row;
+
+        if (subscription.Metadata != null &&
+            subscription.Metadata.TryGetValue(StripeBillingMetadataKeys.WoodyCommunityId, out var raw) &&
+            int.TryParse(raw, out var cid))
+            return await _communitySubscriptions.GetByCommunityIdTrackedAsync(cid, cancellationToken);
 
         return null;
     }
@@ -255,7 +365,9 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         if (!string.IsNullOrWhiteSpace(clientReferenceId) && int.TryParse(clientReferenceId, out userId))
             return true;
 
-        if (metadata != null && metadata.TryGetValue("woody_user_id", out var m) && int.TryParse(m, out userId))
+        if (metadata != null &&
+            metadata.TryGetValue(StripeBillingMetadataKeys.WoodyUserId, out var m) &&
+            int.TryParse(m, out userId))
             return true;
 
         return false;

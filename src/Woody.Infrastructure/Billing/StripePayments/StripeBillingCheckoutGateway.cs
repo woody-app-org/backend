@@ -50,11 +50,19 @@ public class StripeBillingCheckoutGateway : IBillingCheckoutGateway
                 customerId = created.Id;
             }
 
+            var subject = request.SubjectKind == BillingCheckoutSubjectKind.CommunityPremium
+                ? StripeBillingMetadataKeys.SubjectCommunityPremium
+                : StripeBillingMetadataKeys.SubjectUserPro;
+
             var meta = new Dictionary<string, string>
             {
-                ["woody_user_id"] = request.UserId.ToString(),
-                ["plan_code"] = request.PlanCode
+                [StripeBillingMetadataKeys.WoodyUserId] = request.UserId.ToString(),
+                [StripeBillingMetadataKeys.PlanCode] = request.PlanCode,
+                [StripeBillingMetadataKeys.WoodyBillingSubject] = subject
             };
+
+            if (request.CommunityId is > 0)
+                meta[StripeBillingMetadataKeys.WoodyCommunityId] = request.CommunityId.Value.ToString();
 
             var session = await sessionService.CreateAsync(
                 new SessionCreateOptions

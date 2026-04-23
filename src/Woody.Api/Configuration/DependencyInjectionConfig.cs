@@ -28,6 +28,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddSingleton<IBillingWebhookSignatureVerifier, StripeBillingWebhookSignatureVerifier>();
         builder.Services.AddScoped<IStripeWebhookBillingProcessor, StripeBillingWebhookProcessor>();
         builder.Services.AddScoped<CreateCheckoutSessionHandler>();
+        builder.Services.AddScoped<CreateCommunityPremiumCheckoutSessionHandler>();
         builder.Services.AddScoped<CreateCustomerPortalSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();

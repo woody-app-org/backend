@@ -7,4 +7,6 @@ public sealed record BillingCheckoutSessionRequest(
     string StripePriceId,
     string PlanCode,
     string SuccessUrl,
-    string CancelUrl);
+    string CancelUrl,
+    BillingCheckoutSubjectKind SubjectKind = BillingCheckoutSubjectKind.UserSubscription,
+    int? CommunityId = null);
