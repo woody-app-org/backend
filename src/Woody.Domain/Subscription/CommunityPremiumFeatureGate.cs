@@ -8,6 +8,13 @@ namespace Woody.Domain.Subscription;
 /// </summary>
 public static class CommunityPremiumFeatureGate
 {
+    /// <summary>Owner ou admin ativo (papel na comunidade) — independente do plano premium.</summary>
+    public static bool IsStaffForPremiumTools(string? membershipRole) => IsCommunityStaff(membershipRole);
+
+    /// <summary>Comunidade com plano premium ativo (independente do papel da utilizadora).</summary>
+    public static bool CommunityPremiumIsActive(CommunitySubscription? subscription, DateTime utcNow) =>
+        CommunitySubscriptionEntitlement.HasActivePremiumBenefits(subscription, utcNow);
+
     /// <summary>Benefícios ao nível do espaço (independentemente de quem consulta).</summary>
     public static bool CanAccessCommunityPremiumFeatures(CommunitySubscription? subscription, DateTime utcNow) =>
         CommunitySubscriptionEntitlement.HasActivePremiumBenefits(subscription, utcNow);

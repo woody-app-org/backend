@@ -47,6 +47,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();
         builder.Services.AddScoped<ICommunityPermissionService, CommunityPermissionService>();
+        builder.Services.AddScoped<ICommunityPremiumEntitlementService, CommunityPremiumEntitlementService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

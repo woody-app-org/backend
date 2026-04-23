@@ -142,6 +142,14 @@ public class PostRepository : IPostRepository
         return (items, total);
     }
 
+    public Task<int> CountNonDeletedCommunityPostsAsync(int communityId, CancellationToken cancellationToken = default) =>
+        _db.Posts.AsNoTracking()
+            .CountAsync(
+                p => p.CommunityId == communityId
+                     && p.DeletedAt == null
+                     && p.PublicationContext == PostPublicationContext.Community,
+                cancellationToken);
+
     public async Task<Post?> GetByIdNonDeletedWithNavAsync(int id, CancellationToken cancellationToken = default) =>
         await _db.Posts.AsNoTracking()
             .Include(p => p.User).ThenInclude(u => u.Subscription)

@@ -7,6 +7,7 @@ using Woody.Application.Billing;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Posts;
 using Woody.Application.Mapping;
 using Woody.Application.Utilities;
 
@@ -24,6 +25,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityPermissionService _permission;
     private readonly IUserEntitlementService _entitlements;
     private readonly ICommunitySubscriptionRepository _communitySubscriptions;
+    private readonly ICommunityPremiumEntitlementService _communityPremiumEntitlements;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -33,7 +35,8 @@ public class CommunitiesController : ControllerBase
         IPostEnrichmentService postEnrichment,
         ICommunityPermissionService permission,
         IUserEntitlementService entitlements,
-        ICommunitySubscriptionRepository communitySubscriptions)
+        ICommunitySubscriptionRepository communitySubscriptions,
+        ICommunityPremiumEntitlementService communityPremiumEntitlements)
     {
         _communities = communities;
         _memberships = memberships;
@@ -43,6 +46,7 @@ public class CommunitiesController : ControllerBase
         _permission = permission;
         _entitlements = entitlements;
         _communitySubscriptions = communitySubscriptions;
+        _communityPremiumEntitlements = communityPremiumEntitlements;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -267,9 +271,103 @@ public class CommunitiesController : ControllerBase
         var row = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(me.Value, cid, cancellationToken);
 
         if (row == null)
-            return Ok(new { isMember = false, role = (string?)null });
+            return Ok(new { isMember = false, role = (string?)null, premiumCapabilities = (CommunityPremiumCapabilitiesDto?)null });
 
-        return Ok(new { isMember = true, role = row.Role });
+        var caps = await _communityPremiumEntitlements.GetCapabilitiesAsync(cid, me.Value, cancellationToken);
+        return Ok(new { isMember = true, role = row.Role, premiumCapabilities = caps });
+    }
+
+    /// <summary>Resumo analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
+    [Authorize]
+    [HttpGet("{communityId}/premium/analytics")]
+    public async Task<IActionResult> CommunityPremiumAnalytics(string communityId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var caps = await _communityPremiumEntitlements.GetCapabilitiesAsync(cid, me.Value, cancellationToken);
+        if (!caps.IsStaffForPremiumTools)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "community_staff_required",
+                error = "Só owner ou admin pode consultar analytics desta comunidade."
+            });
+        }
+
+        if (!caps.CommunityPremiumActive)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "community_premium_required",
+                error = "Plano premium ativo da comunidade necessário para analytics."
+            });
+        }
+
+        var c = await _communities.GetByIdWithTagsNoTrackingAsync(cid, cancellationToken);
+        if (c == null)
+            return NotFound();
+
+        var postTotal = await _posts.CountNonDeletedCommunityPostsAsync(cid, cancellationToken);
+
+        return Ok(new
+        {
+            communityId = cid.ToString(),
+            memberCount = c.MemberCount,
+            totalPosts = postTotal,
+            headline = "Resumo da comunidade",
+            note = "Métricas avançadas serão alargadas em versões futuras."
+        });
+    }
+
+    /// <summary>Impulsionar post (staff + premium); base operacional preparada para evolução do produto.</summary>
+    [Authorize]
+    [HttpPost("{communityId}/posts/{postId}/boost")]
+    public async Task<IActionResult> BoostCommunityPost(
+        string communityId,
+        string postId,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid) || !int.TryParse(postId, out var pid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var caps = await _communityPremiumEntitlements.GetCapabilitiesAsync(cid, me.Value, cancellationToken);
+        if (!caps.IsStaffForPremiumTools)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "community_staff_required",
+                error = "Só owner ou admin pode impulsionar posts desta comunidade."
+            });
+        }
+
+        if (!caps.CommunityPremiumActive)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "community_premium_required",
+                error = "Plano premium ativo da comunidade necessário para impulsionar publicações."
+            });
+        }
+
+        var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
+        if (post == null)
+            return NotFound();
+
+        if (post.PublicationContext != PostPublicationContext.Community || post.CommunityId != cid)
+        {
+            return BadRequest(new { error = "Esta publicação não pertence a esta comunidade." });
+        }
+
+        return NoContent();
     }
 
     [Authorize]
