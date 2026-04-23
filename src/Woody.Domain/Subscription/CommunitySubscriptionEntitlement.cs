@@ -5,6 +5,7 @@ namespace Woody.Domain.Subscription;
 
 /// <summary>
 /// Regras de elegibilidade a partir do estado persistido da assinatura da comunidade (sem misturar com membership/role).
+/// O estado é actualizado pelos webhooks Stripe do ramo comunidade (<c>community_subscriptions</c>), não por <c>user_subscriptions</c>.
 /// </summary>
 public static class CommunitySubscriptionEntitlement
 {

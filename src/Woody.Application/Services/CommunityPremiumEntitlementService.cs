@@ -4,6 +4,9 @@ using Woody.Domain.Subscription;
 
 namespace Woody.Application.Services;
 
+/// <summary>
+/// Agrega papel na comunidade + estado de <c>CommunitySubscription</c>. Não acede a <c>UserSubscription</c>.
+/// </summary>
 public class CommunityPremiumEntitlementService : ICommunityPremiumEntitlementService
 {
     private readonly ICommunityRepository _communities;

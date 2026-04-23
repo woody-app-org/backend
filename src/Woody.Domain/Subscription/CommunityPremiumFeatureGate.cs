@@ -3,8 +3,10 @@ using Woody.Domain.Entities;
 namespace Woody.Domain.Subscription;
 
 /// <summary>
-/// Combina estado de assinatura da comunidade com papel da utilizadora (owner/admin) para recursos de administração/crescimento.
-/// O plano da comunidade não substitui o papel: moderador sem premium não acede a extras premium; membro premium-only não acede a ferramentas de staff.
+/// Combina estado de assinatura <b>da comunidade</b> com papel da utilizadora (owner/admin) para recursos de administração/crescimento.
+/// O plano do espaço não substitui o papel: staff sem premium não acede a extras premium; membro com espaço premium não acede a ferramentas de staff.
+/// O Woody Pro da utilizadora não entra nestas funções — mantém-se em regras de utilizadora (ex.: criar comunidade).
+/// Novos tiers de espaço (<see cref="Entities.Enum.CommunityPlan"/>) podem estender-se em <see cref="CommunitySubscriptionEntitlement"/> sem alterar esta matriz staff × espaço.
 /// </summary>
 public static class CommunityPremiumFeatureGate
 {
@@ -25,7 +27,7 @@ public static class CommunityPremiumFeatureGate
         IsCommunityStaff(membership?.Role) &&
         CommunitySubscriptionEntitlement.HasActivePremiumBenefits(subscription, utcNow);
 
-    /// <summary>Impulsionar post no contexto da comunidade: staff + comunidade premium (base para futura feature).</summary>
+    /// <summary>Impulsionar post no contexto da comunidade: staff + espaço premium.</summary>
     public static bool CanBoostCommunityPost(CommunityMembership? membership, CommunitySubscription? subscription,
         DateTime utcNow) =>
         IsCommunityStaff(membership?.Role) &&

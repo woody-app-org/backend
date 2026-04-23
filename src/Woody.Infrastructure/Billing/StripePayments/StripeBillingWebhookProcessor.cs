@@ -128,6 +128,8 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
 
         var now = DateTime.UtcNow;
 
+        // Ramo comunidade: metadata woody_billing_subject=community_premium + woody_community_id; nunca grava em user_subscriptions.
+        // Ramo utilizadora: só quando read.User está preenchido (subscrição Woody Pro). Os dois são mutuamente exclusivos em BillingSubscriptionReadResult.
         if (read.Community != null)
         {
             var communityId = TryResolveCommunityIdFromCheckoutSession(session) ?? read.WoodyCommunityIdFromStripeMetadata;
