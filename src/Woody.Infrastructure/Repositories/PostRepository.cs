@@ -21,7 +21,7 @@ public class PostRepository : IPostRepository
         await _db.Posts.AsNoTracking()
             .Where(p => p.DeletedAt == null)
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
             .ToListAsync(cancellationToken);
@@ -64,7 +64,7 @@ public class PostRepository : IPostRepository
         var rows = await _db.Posts.AsNoTracking()
             .Where(p => idSet.Contains(p.Id) && p.DeletedAt == null)
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
             .ToListAsync(cancellationToken);
@@ -98,7 +98,7 @@ public class PostRepository : IPostRepository
 
         var withNav = visible
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images);
 
@@ -129,7 +129,7 @@ public class PostRepository : IPostRepository
                 && p.DeletedAt == null
                 && p.PublicationContext == PostPublicationContext.Community)
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
             .OrderByDescending(p => p.CreatedAt);
@@ -145,7 +145,7 @@ public class PostRepository : IPostRepository
     public async Task<Post?> GetByIdNonDeletedWithNavAsync(int id, CancellationToken cancellationToken = default) =>
         await _db.Posts.AsNoTracking()
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
@@ -158,7 +158,7 @@ public class PostRepository : IPostRepository
 
     public async Task<Post?> GetByIdNonDeletedForCommentLookupAsync(int id, CancellationToken cancellationToken = default) =>
         await _db.Posts.AsNoTracking()
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
     public void Add(Post post) => _db.Posts.Add(post);
@@ -174,7 +174,7 @@ public class PostRepository : IPostRepository
         await _db.Posts.AsNoTracking()
             .Where(p => p.DeletedAt == null && (p.Title.ToLower().Contains(loweredQuery) || p.Content.ToLower().Contains(loweredQuery)))
             .Include(p => p.User).ThenInclude(u => u.Subscription)
-            .Include(p => p.Community)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
             .Include(p => p.Images)
             .Take(take)

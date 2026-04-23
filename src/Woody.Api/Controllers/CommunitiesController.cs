@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
+using Woody.Application.Billing;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 using Woody.Application.Mapping;
 using Woody.Application.Utilities;
 
@@ -21,6 +23,7 @@ public class CommunitiesController : ControllerBase
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly ICommunityPermissionService _permission;
     private readonly IUserEntitlementService _entitlements;
+    private readonly ICommunitySubscriptionRepository _communitySubscriptions;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -29,7 +32,8 @@ public class CommunitiesController : ControllerBase
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
         ICommunityPermissionService permission,
-        IUserEntitlementService entitlements)
+        IUserEntitlementService entitlements,
+        ICommunitySubscriptionRepository communitySubscriptions)
     {
         _communities = communities;
         _memberships = memberships;
@@ -38,6 +42,7 @@ public class CommunitiesController : ControllerBase
         _postEnrichment = postEnrichment;
         _permission = permission;
         _entitlements = entitlements;
+        _communitySubscriptions = communitySubscriptions;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -97,6 +102,18 @@ public class CommunitiesController : ControllerBase
 
         _communities.Add(community);
         await _communities.SaveChangesAsync(cancellationToken);
+
+        await _communitySubscriptions.AddAsync(new CommunitySubscription
+        {
+            CommunityId = community.Id,
+            Plan = CommunityPlan.Free,
+            Status = SubscriptionStatus.Active,
+            PlanCode = CommunityBillingPlanCodes.Free,
+            BillingProvider = BillingProvider.None,
+            CreatedAt = now,
+            UpdatedAt = now
+        }, cancellationToken);
+        await _communitySubscriptions.SaveChangesAsync(cancellationToken);
 
         foreach (var tag in tags)
             _communities.AddCommunityTag(new CommunityTag { CommunityId = community.Id, Tag = tag });

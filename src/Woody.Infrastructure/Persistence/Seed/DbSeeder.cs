@@ -21,6 +21,8 @@ public static class DbSeeder
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
         SeedCommunitiesAndMemberships(context);
+        EnsureCommunitySubscriptions(context);
+        SeedCommunityPremiumDemo(context);
         SeedPosts(context);
         SeedComments(context);
         SeedFollows(context);
@@ -129,6 +131,52 @@ public static class DbSeeder
 
         if (context.ChangeTracker.HasChanges())
             context.SaveChanges();
+    }
+
+    private static void EnsureCommunitySubscriptions(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+        var communityIds = context.Communities.Select(c => c.Id).ToList();
+        var existing = context.CommunitySubscriptions.Select(s => s.CommunityId).ToHashSet();
+        foreach (var id in communityIds.Where(id => !existing.Contains(id)))
+        {
+            context.CommunitySubscriptions.Add(new CommunitySubscription
+            {
+                CommunityId = id,
+                Plan = CommunityPlan.Free,
+                Status = SubscriptionStatus.Active,
+                PlanCode = CommunityBillingPlanCodes.Free,
+                BillingProvider = BillingProvider.None,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
+    }
+
+    /// <summary>Comunidade de exemplo com plano premium ativo (gates de staff + premium no cliente).</summary>
+    private static void SeedCommunityPremiumDemo(WoodyDbContext context)
+    {
+        var community = context.Communities.AsNoTracking().FirstOrDefault(c => c.Slug == "mulheres-tech");
+        if (community == null)
+            return;
+
+        var sub = context.CommunitySubscriptions.FirstOrDefault(s => s.CommunityId == community.Id);
+        if (sub == null)
+            return;
+
+        var now = DateTime.UtcNow;
+        sub.Plan = CommunityPlan.Premium;
+        sub.Status = SubscriptionStatus.Active;
+        sub.PlanCode = CommunityBillingPlanCodes.PremiumMonthly;
+        sub.BillingProvider = BillingProvider.None;
+        sub.CurrentPeriodStart = now;
+        sub.CurrentPeriodEnd = now.AddDays(30);
+        sub.CancelAtPeriodEnd = false;
+        sub.UpdatedAt = now;
+        context.SaveChanges();
     }
 
     private static void SeedProDemoSubscription(WoodyDbContext context)

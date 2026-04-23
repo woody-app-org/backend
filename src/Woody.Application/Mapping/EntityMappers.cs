@@ -27,14 +27,19 @@ public static class EntityMappers
     public static string ToPublicationContextApi(PostPublicationContext ctx) =>
         ctx == PostPublicationContext.Profile ? "profile" : "community";
 
-    public static PostCommunityPreviewDto ToCommunityPreview(Community c) => new()
+    public static PostCommunityPreviewDto ToCommunityPreview(Community c)
     {
-        Id = c.Id.ToString(),
-        Slug = c.Slug,
-        Name = c.Name,
-        AvatarUrl = c.AvatarUrl,
-        Category = c.Category
-    };
+        var utcNow = DateTime.UtcNow;
+        return new PostCommunityPreviewDto
+        {
+            Id = c.Id.ToString(),
+            Slug = c.Slug,
+            Name = c.Name,
+            AvatarUrl = c.AvatarUrl,
+            Category = c.Category,
+            CommunityPlan = CommunityBillingMapper.ToEffectiveApiPlan(c.Subscription, utcNow)
+        };
+    }
 
     public static PostResponseDto ToPostDto(
         Post p,
@@ -112,7 +117,8 @@ public static class EntityMappers
         CoverUrl = c.CoverUrl,
         OwnerUserId = c.OwnerUserId.ToString(),
         Visibility = c.Visibility,
-        MemberCount = c.MemberCount
+        MemberCount = c.MemberCount,
+        Billing = CommunityBillingMapper.ToBillingStateDto(c.Subscription, DateTime.UtcNow)
     };
 
     public static UserProfileDto ToUserProfile(

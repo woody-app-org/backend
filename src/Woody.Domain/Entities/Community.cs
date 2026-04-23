@@ -19,6 +19,8 @@ public class Community
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    public CommunitySubscription? Subscription { get; set; }
+
     public ICollection<CommunityTag> Tags { get; set; } = new List<CommunityTag>();
     public ICollection<Post> Posts { get; set; } = new List<Post>();
     public ICollection<CommunityMembership> Memberships { get; set; } = new List<CommunityMembership>();

@@ -23,8 +23,8 @@ public class CommunityMembershipRepository : ICommunityMembershipRepository
     public async Task<List<CommunityMembership>> ListActiveWithCommunityAndTagsByUserAsync(int userId, CancellationToken cancellationToken = default) =>
         await _db.CommunityMemberships.AsNoTracking()
             .Where(m => m.UserId == userId && m.Status == "active")
-            .Include(m => m.Community)
-            .ThenInclude(c => c!.Tags)
+            .Include(m => m.Community).ThenInclude(c => c!.Tags)
+            .Include(m => m.Community).ThenInclude(c => c!.Subscription)
             .ToListAsync(cancellationToken);
 
     public async Task<CommunityMembership?> GetForUserAndCommunityAsync(int userId, int communityId, CancellationToken cancellationToken = default) =>

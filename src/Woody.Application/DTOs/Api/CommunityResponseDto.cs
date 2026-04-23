@@ -14,4 +14,7 @@ public class CommunityResponseDto
     public string OwnerUserId { get; set; } = null!;
     public string Visibility { get; set; } = null!;
     public int MemberCount { get; set; }
+
+    /// <summary>Estado de plano/assinatura da comunidade (separado de <c>role</c> na membership).</summary>
+    public CommunityBillingStateDto Billing { get; set; } = null!;
 }
