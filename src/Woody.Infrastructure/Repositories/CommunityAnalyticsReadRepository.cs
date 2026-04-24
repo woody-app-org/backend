@@ -165,16 +165,17 @@ public class CommunityAnalyticsReadRepository : ICommunityAnalyticsReadRepositor
         DateTime toUtcInclusive,
         CancellationToken cancellationToken = default)
     {
+        /* Agrupar por Y/M/D traduz para SQL; evitar DateOnly.FromDateTime + Kind/ToUniversalTime no IQueryable. */
         var rows = await _db.Posts.AsNoTracking()
             .Where(p => p.CommunityId == communityId && p.DeletedAt == null
                                            && p.CreatedAt >= fromUtcInclusive && p.CreatedAt <= toUtcInclusive)
-            .GroupBy(p => DateOnly.FromDateTime(p.CreatedAt.Kind == DateTimeKind.Utc
-                ? p.CreatedAt
-                : p.CreatedAt.ToUniversalTime()))
-            .Select(g => new { Day = g.Key, Count = g.Count() })
+            .GroupBy(p => new { p.CreatedAt.Year, p.CreatedAt.Month, p.CreatedAt.Day })
+            .Select(g => new { g.Key.Year, g.Key.Month, g.Key.Day, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        return rows.ToDictionary(x => x.Day, x => x.Count);
+        return rows.ToDictionary(
+            x => new DateOnly(x.Year, x.Month, x.Day),
+            x => x.Count);
     }
 
     public async Task<IReadOnlyDictionary<DateOnly, int>> CountCommentsPerDayUtcAsync(
@@ -190,13 +191,13 @@ public class CommunityAnalyticsReadRepository : ICommunityAnalyticsReadRepositor
                         && c.Post != null
                         && c.Post.CommunityId == communityId
                         && c.Post.DeletedAt == null)
-            .GroupBy(c => DateOnly.FromDateTime(c.CreatedAt.Kind == DateTimeKind.Utc
-                ? c.CreatedAt
-                : c.CreatedAt.ToUniversalTime()))
-            .Select(g => new { Day = g.Key, Count = g.Count() })
+            .GroupBy(c => new { c.CreatedAt.Year, c.CreatedAt.Month, c.CreatedAt.Day })
+            .Select(g => new { g.Key.Year, g.Key.Month, g.Key.Day, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        return rows.ToDictionary(x => x.Day, x => x.Count);
+        return rows.ToDictionary(
+            x => new DateOnly(x.Year, x.Month, x.Day),
+            x => x.Count);
     }
 
     public async Task<IReadOnlyDictionary<DateOnly, int>> CountNewMembersPerDayUtcAsync(
@@ -211,12 +212,17 @@ public class CommunityAnalyticsReadRepository : ICommunityAnalyticsReadRepositor
                         && m.JoinedAt != null
                         && m.JoinedAt >= fromUtcInclusive
                         && m.JoinedAt <= toUtcInclusive)
-            .GroupBy(m => DateOnly.FromDateTime(m.JoinedAt!.Value.Kind == DateTimeKind.Utc
-                ? m.JoinedAt.Value
-                : m.JoinedAt.Value.ToUniversalTime()))
-            .Select(g => new { Day = g.Key, Count = g.Count() })
+            .GroupBy(m => new
+            {
+                Year = m.JoinedAt!.Value.Year,
+                Month = m.JoinedAt.Value.Month,
+                Day = m.JoinedAt.Value.Day
+            })
+            .Select(g => new { g.Key.Year, g.Key.Month, g.Key.Day, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        return rows.ToDictionary(x => x.Day, x => x.Count);
+        return rows.ToDictionary(
+            x => new DateOnly(x.Year, x.Month, x.Day),
+            x => x.Count);
     }
 }
