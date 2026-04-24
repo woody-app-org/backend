@@ -21,12 +21,14 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();
         builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+        builder.Services.AddScoped<ICommunitySubscriptionRepository, CommunitySubscriptionRepository>();
         builder.Services.AddScoped<IBillingSubscriptionGateway, StripeBillingSubscriptionGateway>();
         builder.Services.AddScoped<IBillingCheckoutGateway, StripeBillingCheckoutGateway>();
         builder.Services.AddScoped<IBillingCustomerPortalGateway, StripeBillingCustomerPortalGateway>();
         builder.Services.AddSingleton<IBillingWebhookSignatureVerifier, StripeBillingWebhookSignatureVerifier>();
         builder.Services.AddScoped<IStripeWebhookBillingProcessor, StripeBillingWebhookProcessor>();
         builder.Services.AddScoped<CreateCheckoutSessionHandler>();
+        builder.Services.AddScoped<CreateCommunityPremiumCheckoutSessionHandler>();
         builder.Services.AddScoped<CreateCustomerPortalSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
@@ -45,6 +47,12 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();
         builder.Services.AddScoped<ICommunityPermissionService, CommunityPermissionService>();
+        builder.Services.AddScoped<ICommunityPremiumEntitlementService, CommunityPremiumEntitlementService>();
+        builder.Services.AddScoped<ICommunityDailyRollupRepository, CommunityDailyRollupRepository>();
+        builder.Services.AddScoped<ICommunityAnalyticsReadRepository, CommunityAnalyticsReadRepository>();
+        builder.Services.AddScoped<ICommunityDashboardAnalyticsService, CommunityDashboardAnalyticsService>();
+        builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
+        builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

@@ -22,6 +22,9 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<PostImage> PostImages { get; set; }
         public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
+        public virtual DbSet<CommunitySubscription> CommunitySubscriptions { get; set; }
+        public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
+        public virtual DbSet<CommunityPostBoost> CommunityPostBoosts { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
@@ -75,6 +78,44 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.OwnedCommunities)
                     .HasForeignKey(c => c.OwnerUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<CommunitySubscription>(e =>
+            {
+                e.ToTable("community_subscriptions");
+                e.HasKey(x => x.CommunityId);
+                e.HasIndex(x => x.ProviderSubscriptionId)
+                    .IsUnique()
+                    .HasFilter("provider_subscription_id IS NOT NULL");
+                e.HasOne(x => x.Community)
+                    .WithOne(c => c.Subscription)
+                    .HasForeignKey<CommunitySubscription>(x => x.CommunityId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CommunityDailyRollup>(e =>
+            {
+                e.HasKey(x => new { x.CommunityId, x.DayUtc });
+                e.HasIndex(x => x.CommunityId);
+                e.HasOne(x => x.Community)
+                    .WithMany(c => c.DailyRollups)
+                    .HasForeignKey(x => x.CommunityId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CommunityPostBoost>(e =>
+            {
+                e.HasIndex(x => x.CommunityId);
+                e.HasIndex(x => x.PostId);
+                e.HasIndex(x => new { x.CommunityId, x.EndsAtUtc });
+                e.HasOne(x => x.Post)
+                    .WithMany(p => p.CommunityPostBoosts)
+                    .HasForeignKey(x => x.PostId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Community)
+                    .WithMany(c => c.PostBoosts)
+                    .HasForeignKey(x => x.CommunityId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<CommunityMembership>(e =>

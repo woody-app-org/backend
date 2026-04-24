@@ -11,6 +11,10 @@ namespace Woody.Infrastructure.Persistence.Seed;
 /// Dados de desenvolvimento. Idempotente por utilizador (username), comunidade (slug) e contagens mínimas.
 /// Para repovoar do zero: apagar a base ou <c>dotnet ef database drop</c> antes de migrar.
 /// </summary>
+/// <remarks>
+/// QA premium comunidade: slug <c>mulheres-tech</c> — <see cref="SeedCommunityPremiumDemo"/> + admin como staff;
+/// impulsionamento de exemplo: <see cref="SeedCommunityPostBoostDemo"/>; painel analytics denso: <see cref="SeedMulheresTechDashboardDemo"/>.
+/// </remarks>
 public static class DbSeeder
 {
     private const string DevPasswordSuffix = "Woody2026!";
@@ -21,10 +25,15 @@ public static class DbSeeder
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
         SeedCommunitiesAndMemberships(context);
+        EnsureCommunitySubscriptions(context);
+        SeedCommunityPremiumDemo(context);
+        EnsureAdminStaffOnPremiumDemoCommunity(context);
         SeedPosts(context);
+        SeedCommunityPostBoostDemo(context);
         SeedComments(context);
         SeedFollows(context);
         SeedLikes(context);
+        SeedMulheresTechDashboardDemo(context);
         SeedUserInterestsAndSocialLinks(context);
         SeedJoinRequests(context);
         SeedContentReports(context);
@@ -129,6 +138,233 @@ public static class DbSeeder
 
         if (context.ChangeTracker.HasChanges())
             context.SaveChanges();
+    }
+
+    private static void EnsureCommunitySubscriptions(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+        var communityIds = context.Communities.Select(c => c.Id).ToList();
+        var existing = context.CommunitySubscriptions.Select(s => s.CommunityId).ToHashSet();
+        foreach (var id in communityIds.Where(id => !existing.Contains(id)))
+        {
+            context.CommunitySubscriptions.Add(new CommunitySubscription
+            {
+                CommunityId = id,
+                Plan = CommunityPlan.Free,
+                Status = SubscriptionStatus.Active,
+                PlanCode = CommunityBillingPlanCodes.Free,
+                BillingProvider = BillingProvider.None,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
+    }
+
+    /// <summary>Comunidade de exemplo com plano premium ativo (gates de staff + premium no cliente).</summary>
+    private static void SeedCommunityPremiumDemo(WoodyDbContext context)
+    {
+        var community = context.Communities.AsNoTracking().FirstOrDefault(c => c.Slug == "mulheres-tech");
+        if (community == null)
+            return;
+
+        var sub = context.CommunitySubscriptions.FirstOrDefault(s => s.CommunityId == community.Id);
+        if (sub == null)
+            return;
+
+        var now = DateTime.UtcNow;
+        sub.Plan = CommunityPlan.Premium;
+        sub.Status = SubscriptionStatus.Active;
+        sub.PlanCode = CommunityBillingPlanCodes.PremiumMonthly;
+        sub.BillingProvider = BillingProvider.None;
+        sub.CurrentPeriodStart = now;
+        sub.CurrentPeriodEnd = now.AddDays(30);
+        sub.CancelAtPeriodEnd = false;
+        sub.UpdatedAt = now;
+        context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Conta <c>admin</c> como <c>admin</c> da comunidade premium de demo (além do owner seed), para testar dashboard e boosts sem usar a owner.
+    /// </summary>
+    private static void EnsureAdminStaffOnPremiumDemoCommunity(WoodyDbContext context)
+    {
+        var admin = context.Users.FirstOrDefault(u => u.Username == "admin");
+        var community = context.Communities.FirstOrDefault(c => c.Slug == "mulheres-tech");
+        if (admin == null || community == null)
+            return;
+
+        var membership = context.CommunityMemberships.FirstOrDefault(m =>
+            m.UserId == admin.Id && m.CommunityId == community.Id && m.Status == "active");
+        if (membership == null)
+            return;
+        if (membership.Role == "owner")
+            return;
+        membership.Role = "admin";
+        context.SaveChanges();
+    }
+
+    /// <summary>Um post em <c>mulheres-tech</c> com impulsionamento activo (feed e painel admin).</summary>
+    private static void SeedCommunityPostBoostDemo(WoodyDbContext context)
+    {
+        var community = context.Communities.AsNoTracking().FirstOrDefault(c => c.Slug == "mulheres-tech");
+        if (community == null)
+            return;
+
+        var post = context.Posts.AsNoTracking()
+            .Where(p => p.CommunityId == community.Id)
+            .OrderBy(p => p.Id)
+            .FirstOrDefault();
+        if (post == null)
+            return;
+
+        var now = DateTime.UtcNow;
+        if (context.CommunityPostBoosts.Any(b =>
+                b.PostId == post.Id && b.CancelledAtUtc == null && b.EndsAtUtc > now))
+            return;
+
+        context.CommunityPostBoosts.Add(new CommunityPostBoost
+        {
+            PostId = post.Id,
+            CommunityId = community.Id,
+            StartedAtUtc = now.AddHours(-2),
+            EndsAtUtc = now.AddDays(5),
+            CancelledAtUtc = null,
+            CreatedAtUtc = now
+        });
+        context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Preenche <see cref="CommunityDailyRollup"/> + posts/comentários/gostos em <c>mulheres-tech</c> ao longo de ~3 meses
+    /// para o painel premium (gráfico diário, top posts, tags). Idempotente.
+    /// </summary>
+    private static void SeedMulheresTechDashboardDemo(WoodyDbContext context)
+    {
+        var tech = context.Communities.AsNoTracking().FirstOrDefault(c => c.Slug == "mulheres-tech");
+        if (tech == null)
+            return;
+
+        const string postPrefix = "[seed-dashboard] ";
+        var techId = tech.Id;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rnd = new Random(90210);
+
+        for (var dayOffset = 0; dayOffset < 120; dayOffset++)
+        {
+            var day = today.AddDays(-dayOffset);
+            if (context.CommunityDailyRollups.Any(r => r.CommunityId == techId && r.DayUtc == day))
+                continue;
+            context.CommunityDailyRollups.Add(new CommunityDailyRollup
+            {
+                CommunityId = techId,
+                DayUtc = day,
+                PageViews = 8 + (dayOffset * 11) % 48,
+                MemberLeaves = (dayOffset * 5) % 6
+            });
+        }
+
+        context.SaveChanges();
+
+        /* StartsWith(prefix, StringComparison) não traduz no Npgsql; usar uma sobrecarga traduzível. */
+        if (context.Posts.Any(p => p.CommunityId == techId && p.Title != null && p.Title.StartsWith(postPrefix)))
+            return;
+
+        var memberIds = context.CommunityMemberships.AsNoTracking()
+            .Where(m => m.CommunityId == techId && m.Status == "active")
+            .OrderBy(m => m.UserId)
+            .Select(m => m.UserId)
+            .Take(18)
+            .ToList();
+        if (memberIds.Count < 4)
+            return;
+
+        var tagPool = new[] { "carreira", "tech", "mentoria", "salário", "entrevista", "onboarding" };
+        var postsBatch = new List<Post>();
+        for (var dayOffset = 0; dayOffset < 96; dayOffset++)
+        {
+            if (dayOffset >= 30 && dayOffset % 3 == 2)
+                continue;
+
+            var day = today.AddDays(-dayOffset);
+            var atUtc = new DateTime(day.Year, day.Month, day.Day, 13, 20, 0, DateTimeKind.Utc)
+                .AddMinutes(rnd.Next(-110, 110));
+            var authorId = memberIds[dayOffset % memberIds.Count];
+            postsBatch.Add(new Post
+            {
+                UserId = authorId,
+                CommunityId = techId,
+                PublicationContext = PostPublicationContext.Community,
+                Title = $"{postPrefix}{day:yyyy-MM-dd}",
+                Content =
+                    $"Conteúdo de seed para o painel premium da comunidade ({day:yyyy-MM-dd}). Inclui métricas de posts, comentários e gostos.",
+                ImageUrl = dayOffset % 9 == 0 ? $"https://picsum.photos/seed/mtdash{dayOffset}/720/400" : null,
+                CreatedAt = atUtc,
+                UpdatedAt = null,
+                DeletedAt = null
+            });
+        }
+
+        context.Posts.AddRange(postsBatch);
+        context.SaveChanges();
+
+        var createdPosts = context.Posts.AsNoTracking()
+            .Where(p => p.CommunityId == techId && p.Title != null && p.Title.StartsWith(postPrefix))
+            .OrderBy(p => p.CreatedAt)
+            .ToList();
+
+        foreach (var post in createdPosts)
+        {
+            var tagCount = 2 + rnd.Next(0, 4);
+            for (var t = 0; t < tagCount; t++)
+            {
+                var tag = tagPool[(post.Id + t) % tagPool.Length];
+                if (context.PostTags.Any(pt => pt.PostId == post.Id && pt.Tag == tag))
+                    continue;
+                context.PostTags.Add(new PostTag { PostId = post.Id, Tag = tag });
+            }
+
+            var authorExcluded = post.UserId;
+            var commentators = memberIds.Where(id => id != authorExcluded).OrderBy(_ => rnd.Next()).Take(8).ToList();
+            if (commentators.Count == 0)
+                continue;
+            var cAt = post.CreatedAt.AddMinutes(18);
+            for (var c = 0; c < 3 + rnd.Next(0, 4); c++)
+            {
+                context.Comments.Add(new Comment
+                {
+                    PostId = post.Id,
+                    AuthorId = commentators[c % commentators.Count],
+                    ParentCommentId = null,
+                    Content = $"Comentário seed #{c + 1} — partilha sobre {tagPool[c % tagPool.Length]}.",
+                    CreatedAt = cAt.AddMinutes(4 * c),
+                    DeletedAt = null,
+                    HiddenByPostAuthorAt = null
+                });
+            }
+
+            var likers = memberIds.Where(id => id != authorExcluded).OrderBy(_ => rnd.Next())
+                .Take(Math.Min(memberIds.Count - 1, 11))
+                .ToList();
+            var lAt = post.CreatedAt.AddMinutes(6);
+            foreach (var uid in likers)
+            {
+                if (context.Likes.Any(l =>
+                        l.UserId == uid && l.TargetType == LikeTargetType.Post && l.TargetId == post.Id))
+                    continue;
+                context.Likes.Add(new Like
+                {
+                    UserId = uid,
+                    TargetType = LikeTargetType.Post,
+                    TargetId = post.Id,
+                    CreatedAt = lAt.AddMinutes(rnd.Next(0, 200))
+                });
+            }
+        }
+
+        context.SaveChanges();
     }
 
     private static void SeedProDemoSubscription(WoodyDbContext context)

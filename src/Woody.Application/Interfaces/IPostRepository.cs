@@ -31,6 +31,9 @@ public interface IPostRepository
         int pageSize,
         CancellationToken cancellationToken = default);
     Task<(List<Post> Items, int Total)> ListByCommunityIdPagedAsync(int communityId, int page, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>Total de posts não apagados no contexto da comunidade (para resumo analytics).</summary>
+    Task<int> CountNonDeletedCommunityPostsAsync(int communityId, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdNonDeletedWithNavAsync(int id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdTrackedAsync(int id, CancellationToken cancellationToken = default);

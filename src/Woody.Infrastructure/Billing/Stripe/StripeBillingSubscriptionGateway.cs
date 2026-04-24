@@ -15,7 +15,7 @@ public class StripeBillingSubscriptionGateway : IBillingSubscriptionGateway
         _options = options;
     }
 
-    public async Task<BillingSubscriptionSnapshot?> GetSubscriptionAsync(string providerSubscriptionId,
+    public async Task<BillingSubscriptionReadResult?> GetSubscriptionAsync(string providerSubscriptionId,
         CancellationToken cancellationToken = default)
     {
         var secretKey = _options.Value.Stripe?.SecretKey;
@@ -28,7 +28,7 @@ public class StripeBillingSubscriptionGateway : IBillingSubscriptionGateway
         try
         {
             var subscription = await service.GetAsync(providerSubscriptionId, cancellationToken: cancellationToken);
-            return StripeSubscriptionStateMapper.ToSnapshot(subscription, _options.Value);
+            return StripeSubscriptionStateMapper.ToReadResult(subscription, _options.Value);
         }
         catch (global::Stripe.StripeException)
         {

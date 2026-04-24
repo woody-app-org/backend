@@ -178,6 +178,33 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("communities", (string)null);
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.CommunityDailyRollup", b =>
+                {
+                    b.Property<int>("CommunityId")
+                        .HasColumnType("integer")
+                        .HasColumnName("community_id");
+
+                    b.Property<DateOnly>("DayUtc")
+                        .HasColumnType("date")
+                        .HasColumnName("day_utc");
+
+                    b.Property<int>("MemberLeaves")
+                        .HasColumnType("integer")
+                        .HasColumnName("member_leaves");
+
+                    b.Property<int>("PageViews")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_views");
+
+                    b.HasKey("CommunityId", "DayUtc")
+                        .HasName("pk_community_daily_rollups");
+
+                    b.HasIndex("CommunityId")
+                        .HasDatabaseName("ix_community_daily_rollups_community_id");
+
+                    b.ToTable("community_daily_rollups", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.CommunityMembership", b =>
                 {
                     b.Property<int>("Id")
@@ -220,6 +247,115 @@ namespace Woody.Infrastructure.Migrations
                         .HasDatabaseName("ix_community_memberships_user_id_community_id");
 
                     b.ToTable("community_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.CommunityPostBoost", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at_utc");
+
+                    b.Property<int>("CommunityId")
+                        .HasColumnType("integer")
+                        .HasColumnName("community_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at_utc");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_id");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_community_post_boosts");
+
+                    b.HasIndex("CommunityId")
+                        .HasDatabaseName("ix_community_post_boosts_community_id");
+
+                    b.HasIndex("PostId")
+                        .HasDatabaseName("ix_community_post_boosts_post_id");
+
+                    b.HasIndex("CommunityId", "EndsAtUtc")
+                        .HasDatabaseName("ix_community_post_boosts_community_id_ends_at_utc");
+
+                    b.ToTable("community_post_boosts", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.CommunitySubscription", b =>
+                {
+                    b.Property<int>("CommunityId")
+                        .HasColumnType("integer")
+                        .HasColumnName("community_id");
+
+                    b.Property<int>("BillingProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("billing_provider");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_at_period_end");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<DateTime?>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_start");
+
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan");
+
+                    b.Property<string>("PlanCode")
+                        .HasColumnType("text")
+                        .HasColumnName("plan_code");
+
+                    b.Property<string>("ProviderCustomerId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_customer_id");
+
+                    b.Property<string>("ProviderSubscriptionId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_subscription_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CommunityId")
+                        .HasName("pk_community_subscriptions");
+
+                    b.HasIndex("ProviderSubscriptionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_community_subscriptions_provider_subscription_id")
+                        .HasFilter("provider_subscription_id IS NOT NULL");
+
+                    b.ToTable("community_subscriptions", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.CommunityTag", b =>
@@ -1031,6 +1167,18 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.CommunityDailyRollup", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Community", "Community")
+                        .WithMany("DailyRollups")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_community_daily_rollups_communities_community_id");
+
+                    b.Navigation("Community");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.CommunityMembership", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.Community", "Community")
@@ -1050,6 +1198,39 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Community");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.CommunityPostBoost", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Community", "Community")
+                        .WithMany("PostBoosts")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_community_post_boosts_communities_community_id");
+
+                    b.HasOne("Woody.Domain.Entities.Post", "Post")
+                        .WithMany("CommunityPostBoosts")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_community_post_boosts_posts_post_id");
+
+                    b.Navigation("Community");
+
+                    b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.CommunitySubscription", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Community", "Community")
+                        .WithOne("Subscription")
+                        .HasForeignKey("Woody.Domain.Entities.CommunitySubscription", "CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_community_subscriptions_communities_community_id");
+
+                    b.Navigation("Community");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.CommunityTag", b =>
@@ -1327,11 +1508,17 @@ namespace Woody.Infrastructure.Migrations
 
             modelBuilder.Entity("Woody.Domain.Entities.Community", b =>
                 {
+                    b.Navigation("DailyRollups");
+
                     b.Navigation("JoinRequests");
 
                     b.Navigation("Memberships");
 
+                    b.Navigation("PostBoosts");
+
                     b.Navigation("Posts");
+
+                    b.Navigation("Subscription");
 
                     b.Navigation("Tags");
                 });
@@ -1351,6 +1538,8 @@ namespace Woody.Infrastructure.Migrations
             modelBuilder.Entity("Woody.Domain.Entities.Post", b =>
                 {
                     b.Navigation("Comments");
+
+                    b.Navigation("CommunityPostBoosts");
 
                     b.Navigation("Images");
 

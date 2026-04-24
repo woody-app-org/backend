@@ -13,6 +13,7 @@ public class FeedService : IFeedService
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _enrichment;
+    private readonly ICommunityPostBoostRepository _communityPostBoosts;
 
     public FeedService(
         IPostRepository posts,
@@ -20,7 +21,8 @@ public class FeedService : IFeedService
         ICommunityMembershipRepository memberships,
         ILikeRepository likes,
         ICommentRepository comments,
-        IPostEnrichmentService enrichment)
+        IPostEnrichmentService enrichment,
+        ICommunityPostBoostRepository communityPostBoosts)
     {
         _posts = posts;
         _follows = follows;
@@ -28,6 +30,7 @@ public class FeedService : IFeedService
         _likes = likes;
         _comments = comments;
         _enrichment = enrichment;
+        _communityPostBoosts = communityPostBoosts;
     }
 
     public async Task<PaginatedResponseDto<PostResponseDto>> GetFeedAsync(
@@ -73,15 +76,19 @@ public class FeedService : IFeedService
         var filteredIds = filtered.Select(c => c.Id).Distinct().ToList();
         var likeCounts = await _likes.GetPostLikeCountsAsync(filteredIds, cancellationToken);
         var commentCounts = await _comments.GetActiveCommentCountsByPostIdsAsync(filteredIds, cancellationToken);
+        var boostedPostIds = await _communityPostBoosts.GetActiveBoostedPostIdsAmongAsync(
+            filteredIds,
+            DateTime.UtcNow,
+            cancellationToken);
 
         int BaseScore(int id) => likeCounts.GetValueOrDefault(id) + 2 * commentCounts.GetValueOrDefault(id);
 
         IEnumerable<int> orderedIds = mode switch
         {
-            FeedMode.Trending => OrderTrending(filtered, BaseScore),
-            FeedMode.ForYou => OrderForYou(filtered, BaseScore, viewerUserId, followed, mine),
-            FeedMode.Following => OrderFollowing(filtered, BaseScore),
-            _ => OrderTrending(filtered, BaseScore)
+            FeedMode.Trending => OrderTrending(filtered, BaseScore, boostedPostIds),
+            FeedMode.ForYou => OrderForYou(filtered, BaseScore, viewerUserId, followed, mine, boostedPostIds),
+            FeedMode.Following => OrderFollowing(filtered, BaseScore, boostedPostIds),
+            _ => OrderTrending(filtered, BaseScore, boostedPostIds)
         };
 
         var ordered = orderedIds.ToList();
@@ -104,10 +111,12 @@ public class FeedService : IFeedService
 
     private static IEnumerable<int> OrderTrending(
         List<PostFeedCandidate> rows,
-        Func<int, int> baseScore)
+        Func<int, int> baseScore,
+        HashSet<int> boostedPostIds)
     {
         return rows
-            .OrderByDescending(c => baseScore(c.Id))
+            .OrderByDescending(c => boostedPostIds.Contains(c.Id) ? 1 : 0)
+            .ThenByDescending(c => baseScore(c.Id))
             .ThenByDescending(c => c.CommunityMemberCountSnapshot)
             .ThenByDescending(c => c.CreatedAt)
             .ThenBy(c => c.Id)
@@ -119,10 +128,12 @@ public class FeedService : IFeedService
     /// </summary>
     private static IEnumerable<int> OrderFollowing(
         List<PostFeedCandidate> rows,
-        Func<int, int> baseScore)
+        Func<int, int> baseScore,
+        HashSet<int> boostedPostIds)
     {
         return rows
-            .OrderByDescending(c => c.CreatedAt)
+            .OrderByDescending(c => boostedPostIds.Contains(c.Id) ? 1 : 0)
+            .ThenByDescending(c => c.CreatedAt)
             .ThenByDescending(c => baseScore(c.Id))
             .ThenBy(c => c.Id)
             .Select(c => c.Id);
@@ -136,10 +147,11 @@ public class FeedService : IFeedService
         Func<int, int> baseScore,
         int? viewerUserId,
         HashSet<int>? followed,
-        HashSet<int>? mine)
+        HashSet<int>? mine,
+        HashSet<int> boostedPostIds)
     {
         return rows
-            .Select(c => (c, Rank: ForYouRank(c, baseScore(c.Id), viewerUserId, followed, mine)))
+            .Select(c => (c, Rank: ForYouRank(c, baseScore(c.Id), viewerUserId, followed, mine, boostedPostIds)))
             .OrderByDescending(x => x.Rank)
             .ThenByDescending(x => x.c.CreatedAt)
             .ThenBy(x => x.c.Id)
@@ -151,13 +163,16 @@ public class FeedService : IFeedService
         int score,
         int? viewerUserId,
         HashSet<int>? followed,
-        HashSet<int>? mine)
+        HashSet<int>? mine,
+        HashSet<int> boostedPostIds)
     {
         var w = 1.0;
         if (followed != null && followed.Contains(c.UserId))
             w *= 1.45;
         if (mine != null && c.CommunityId.HasValue && mine.Contains(c.CommunityId.Value))
             w *= 1.22;
+        if (boostedPostIds.Contains(c.Id))
+            w *= 1.85;
 
         var ageDays = (DateTime.UtcNow - c.CreatedAt).TotalDays;
         if (ageDays <= 7)

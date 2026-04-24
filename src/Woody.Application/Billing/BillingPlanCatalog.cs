@@ -27,6 +27,28 @@ public static class BillingPlanCatalog
         return false;
     }
 
+    public static bool TryResolveCommunityStripePriceId(BillingOptions options, string planCode, out string priceId)
+    {
+        priceId = string.Empty;
+        if (string.IsNullOrWhiteSpace(planCode))
+            return false;
+
+        var t = planCode.Trim();
+        if (string.Equals(t, CommunityBillingPlanCodes.PremiumMonthly, StringComparison.Ordinal))
+        {
+            priceId = options.Stripe?.PriceIds?.CommunityPremiumMonthly?.Trim() ?? string.Empty;
+            return !string.IsNullOrEmpty(priceId);
+        }
+
+        if (string.Equals(t, CommunityBillingPlanCodes.PremiumAnnual, StringComparison.Ordinal))
+        {
+            priceId = options.Stripe?.PriceIds?.CommunityPremiumAnnual?.Trim() ?? string.Empty;
+            return !string.IsNullOrEmpty(priceId);
+        }
+
+        return false;
+    }
+
     public static bool IsKnownCheckoutPlanCode(string planCode)
     {
         var t = planCode?.Trim();
