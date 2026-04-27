@@ -7,6 +7,7 @@ using Woody.Application.Configuration;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
 using Woody.Domain.Entities;
+using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Billing.StripePayments;
 
@@ -27,6 +28,7 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
     private readonly IUserSubscriptionRepository _subscriptions;
     private readonly ICommunitySubscriptionRepository _communitySubscriptions;
     private readonly IBillingSubscriptionGateway _subscriptionGateway;
+    private readonly WoodyDbContext _db;
     private readonly ILogger<StripeBillingWebhookProcessor> _logger;
 
     public StripeBillingWebhookProcessor(
@@ -35,6 +37,7 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         IUserSubscriptionRepository subscriptions,
         ICommunitySubscriptionRepository communitySubscriptions,
         IBillingSubscriptionGateway subscriptionGateway,
+        WoodyDbContext db,
         ILogger<StripeBillingWebhookProcessor> logger)
     {
         _options = options;
@@ -42,6 +45,7 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         _subscriptions = subscriptions;
         _communitySubscriptions = communitySubscriptions;
         _subscriptionGateway = subscriptionGateway;
+        _db = db;
         _logger = logger;
     }
 
@@ -70,11 +74,12 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
         if (!HandledEventTypes.Contains(stripeEvent.Type))
             return StripeWebhookProcessOutcome.IgnoredEventType;
 
-        if (!await _receipts.TryClaimEventAsync(stripeEvent.Id, stripeEvent.Type, cancellationToken))
-            return StripeWebhookProcessOutcome.DuplicateDelivery;
-
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            if (!await _receipts.TryClaimEventAsync(stripeEvent.Id, stripeEvent.Type, cancellationToken))
+                return StripeWebhookProcessOutcome.DuplicateDelivery;
+
             var ok = stripeEvent.Type switch
             {
                 "checkout.session.completed" => await HandleCheckoutSessionCompletedAsync(stripeEvent, cancellationToken),
@@ -88,18 +93,19 @@ public class StripeBillingWebhookProcessor : IStripeWebhookBillingProcessor
 
             if (!ok)
             {
-                await _receipts.ReleaseClaimAsync(stripeEvent.Id, cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
                 return StripeWebhookProcessOutcome.InvalidPayload;
             }
 
             await _subscriptions.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return StripeWebhookProcessOutcome.Processed;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar webhook Stripe {EventId} ({EventType}).", stripeEvent.Id,
                 stripeEvent.Type);
-            await _receipts.ReleaseClaimAsync(stripeEvent.Id, cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
             return StripeWebhookProcessOutcome.TransientFailure;
         }
     }

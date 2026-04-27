@@ -6,6 +6,7 @@ using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Subscription;
+using CheckoutAttemptSubjectKind = Woody.Domain.Entities.Enum.BillingCheckoutAttemptSubjectKind;
 
 namespace Woody.Application.UseCases.Billing;
 
@@ -16,6 +17,7 @@ public class CreateCommunityPremiumCheckoutSessionHandler
     private readonly ICommunitySubscriptionRepository _communitySubscriptions;
     private readonly ICommunityRepository _communities;
     private readonly ICommunityPermissionService _communityPermissions;
+    private readonly IBillingCheckoutAttemptRepository _checkoutAttempts;
     private readonly IBillingCheckoutGateway _checkoutGateway;
     private readonly BillingOptions _billingOptions;
 
@@ -25,6 +27,7 @@ public class CreateCommunityPremiumCheckoutSessionHandler
         ICommunitySubscriptionRepository communitySubscriptions,
         ICommunityRepository communities,
         ICommunityPermissionService communityPermissions,
+        IBillingCheckoutAttemptRepository checkoutAttempts,
         IBillingCheckoutGateway checkoutGateway,
         IOptions<BillingOptions> billingOptions)
     {
@@ -33,6 +36,7 @@ public class CreateCommunityPremiumCheckoutSessionHandler
         _communitySubscriptions = communitySubscriptions;
         _communities = communities;
         _communityPermissions = communityPermissions;
+        _checkoutAttempts = checkoutAttempts;
         _checkoutGateway = checkoutGateway;
         _billingOptions = billingOptions.Value;
     }
@@ -79,11 +83,31 @@ public class CreateCommunityPremiumCheckoutSessionHandler
         var existingCustomer =
             userSub.BillingProvider == BillingProvider.Stripe ? userSub.ProviderCustomerId : null;
 
+        var idempotencyKey = BuildCheckoutIdempotencyKey(
+            user.Id,
+            CheckoutAttemptSubjectKind.CommunityPremium,
+            planCode,
+            request.CommunityId);
+        var existingAttempt = await _checkoutAttempts.GetReusableAsync(idempotencyKey, utcNow, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(existingAttempt?.StripeSessionUrl))
+            return new CreateBillingCheckoutResponseDto { Url = existingAttempt.StripeSessionUrl };
+
+        var attempt = await _checkoutAttempts.ClaimOrGetAsync(
+            idempotencyKey,
+            user.Id,
+            CheckoutAttemptSubjectKind.CommunityPremium,
+            planCode,
+            request.CommunityId,
+            utcNow,
+            utcNow.AddHours(24),
+            cancellationToken);
+
         var gatewayResult = await _checkoutGateway.CreateSubscriptionCheckoutAsync(
             new BillingCheckoutSessionRequest(
                 user.Id,
                 user.Email,
                 existingCustomer,
+                idempotencyKey,
                 priceId,
                 planCode,
                 _billingOptions.Stripe.CheckoutSuccessUrl.Trim(),
@@ -92,8 +116,20 @@ public class CreateCommunityPremiumCheckoutSessionHandler
                 request.CommunityId),
             cancellationToken);
 
-        if (!gatewayResult.Ok || string.IsNullOrEmpty(gatewayResult.Url))
+        if (!gatewayResult.Ok || string.IsNullOrEmpty(gatewayResult.Url) || string.IsNullOrEmpty(gatewayResult.StripeSessionId))
+        {
+            _checkoutAttempts.MarkFailed(attempt, DateTime.UtcNow);
+            await _checkoutAttempts.SaveChangesAsync(cancellationToken);
             throw new InvalidOperationException(gatewayResult.ErrorMessage ?? "Não foi possível iniciar o checkout.");
+        }
+
+        _checkoutAttempts.MarkSessionCreated(
+            attempt,
+            gatewayResult.StripeSessionId,
+            gatewayResult.Url,
+            gatewayResult.StripeCustomerId,
+            DateTime.UtcNow);
+        await _checkoutAttempts.SaveChangesAsync(cancellationToken);
 
         if (!string.IsNullOrEmpty(gatewayResult.StripeCustomerId) &&
             !string.Equals(userSub.ProviderCustomerId, gatewayResult.StripeCustomerId, StringComparison.Ordinal))
@@ -107,4 +143,11 @@ public class CreateCommunityPremiumCheckoutSessionHandler
 
         return new CreateBillingCheckoutResponseDto { Url = gatewayResult.Url };
     }
+
+    private static string BuildCheckoutIdempotencyKey(
+        int userId,
+        CheckoutAttemptSubjectKind subjectKind,
+        string planCode,
+        int? communityId) =>
+        $"woody-checkout:v1:user:{userId}:subject:{subjectKind}:plan:{planCode}:community:{communityId?.ToString() ?? "none"}";
 }

@@ -345,17 +345,7 @@ public class PostsController : ControllerBase
         if (!await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
             return NotFound();
 
-        if (await _likes.ExistsPostLikeAsync(me.Value, pid, cancellationToken))
-            return NoContent();
-
-        _likes.Add(new Like
-        {
-            UserId = me.Value,
-            TargetType = LikeTargetType.Post,
-            TargetId = pid,
-            CreatedAt = DateTime.UtcNow
-        });
-        await _likes.SaveChangesAsync(cancellationToken);
+        await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
         return NoContent();
     }
 

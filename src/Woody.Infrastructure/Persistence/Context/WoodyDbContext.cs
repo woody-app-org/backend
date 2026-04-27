@@ -26,6 +26,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
         public virtual DbSet<CommunityPostBoost> CommunityPostBoosts { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
+        public virtual DbSet<BillingCheckoutAttempt> BillingCheckoutAttempts { get; set; }
         public virtual DbSet<RefreshTokenSession> RefreshTokenSessions { get; set; }
         public virtual DbSet<LoginLockout> LoginLockouts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
@@ -62,6 +63,18 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.ToTable("billing_webhook_receipts");
                 e.HasKey(x => x.EventId);
+            });
+
+            modelBuilder.Entity<BillingCheckoutAttempt>(e =>
+            {
+                e.ToTable("billing_checkout_attempts");
+                e.HasKey(x => x.Id);
+                e.HasIndex(x => x.IdempotencyKey).IsUnique();
+                e.HasIndex(x => new { x.UserId, x.SubjectKind, x.PlanCode, x.CommunityId, x.Status });
+                e.Property(x => x.IdempotencyKey).HasMaxLength(200);
+                e.Property(x => x.PlanCode).HasMaxLength(64);
+                e.Property(x => x.StripeSessionId).HasMaxLength(128);
+                e.Property(x => x.StripeCustomerId).HasMaxLength(128);
             });
 
             modelBuilder.Entity<EmailVerificationCode>(e =>
