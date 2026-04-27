@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -14,6 +15,7 @@ using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
+using Woody.Domain.Media;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -134,6 +136,13 @@ builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Rese
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
 builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection("AuthSecurity"));
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
+builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
+builder.Services.Configure<FormOptions>(options =>
+{
+    var maxImageSize = builder.Configuration.GetValue<long?>("MediaStorage:MaxImageSizeBytes")
+                       ?? UploadedImagePolicy.DefaultMaxSizeBytes;
+    options.MultipartBodyLengthLimit = maxImageSize + 1024 * 1024;
+});
 
 var corsEnabled = ConfigureCors(builder);
 

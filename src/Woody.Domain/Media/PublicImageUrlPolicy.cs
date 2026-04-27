@@ -6,6 +6,16 @@ namespace Woody.Domain.Media;
 public static class PublicImageUrlPolicy
 {
     public const int MaxUrlLength = 2_048;
+    public const string LocalMediaPathPrefix = "/api/media/images/";
+
+    public static bool IsPermittedImageUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return false;
+
+        var trimmed = url.Trim();
+        return IsPermittedLocalMediaPath(trimmed) || IsPermittedExternalImageUrl(trimmed);
+    }
 
     public static bool IsPermittedExternalImageUrl(string url)
     {
@@ -32,6 +42,22 @@ public static class PublicImageUrlPolicy
             return false;
 
         return !IsPrivateOrLocalAddress(uri.Host);
+    }
+
+    private static bool IsPermittedLocalMediaPath(string url)
+    {
+        if (url.Length > MaxUrlLength || url.Any(char.IsControl))
+            return false;
+
+        if (!url.StartsWith(LocalMediaPathPrefix, StringComparison.Ordinal))
+            return false;
+
+        if (url.Contains('?') || url.Contains('#'))
+            return false;
+
+        var storageKey = url[LocalMediaPathPrefix.Length..];
+        return UploadedImagePolicy.GetContentTypeForStorageKey(storageKey) != null
+               && Path.GetFileName(storageKey) == storageKey;
     }
 
     private static bool IsPrivateOrLocalAddress(string host)

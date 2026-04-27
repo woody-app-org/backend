@@ -21,8 +21,8 @@ public static class DirectMessageAttachmentPolicy
         if (t.Contains('\r') || t.Contains('\n') || t.Contains('\0'))
             return false;
 
-        if (t.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return PublicImageUrlPolicy.IsPermittedExternalImageUrl(t);
+        if (PublicImageUrlPolicy.IsPermittedImageUrl(t))
+            return true;
 
         if (!t.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
             return false;

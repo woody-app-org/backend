@@ -6,6 +6,7 @@ public sealed class DirectMessageAttachmentPolicyTests
 {
     [Theory]
     [InlineData("https://cdn.example.com/a.png")]
+    [InlineData("/api/media/images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png")]
     [InlineData("data:image/png;base64,AAAA")]
     [InlineData("data:image/jpeg;charset=utf-8;base64,AAAA")]
     [InlineData("data:image/jpg;base64,AAAA")]

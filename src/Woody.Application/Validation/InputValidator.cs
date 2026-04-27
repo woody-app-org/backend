@@ -76,7 +76,7 @@ public static class InputValidator
         if (value.Length == 0)
             return true;
 
-        if (!PublicImageUrlPolicy.IsPermittedExternalImageUrl(value))
+        if (!PublicImageUrlPolicy.IsPermittedImageUrl(value))
         {
             error = InvalidImageUrlMessage;
             return false;

@@ -32,4 +32,12 @@ public class PublicImageUrlPolicyTests
 
         Assert.False(PublicImageUrlPolicy.IsPermittedExternalImageUrl(url));
     }
+
+    [Fact]
+    public void IsPermittedImageUrl_AllowsServerGeneratedMediaPath()
+    {
+        var url = $"/api/media/images/{new string('a', 32)}.png";
+
+        Assert.True(PublicImageUrlPolicy.IsPermittedImageUrl(url));
+    }
 }

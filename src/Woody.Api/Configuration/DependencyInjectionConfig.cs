@@ -11,6 +11,7 @@ using Woody.Infrastructure.Billing.StripePayments;
 using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
+using Woody.Infrastructure.Storage;
 
 namespace Woody.Api.Configuration;
 
@@ -57,6 +58,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
         builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
+        builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
+        builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
