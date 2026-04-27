@@ -10,10 +10,14 @@ namespace Woody.Api.Controllers;
 public class CommentsController : ControllerBase
 {
     private readonly ICommentRepository _comments;
+    private readonly IResourceAuthorizationService _authorization;
 
-    public CommentsController(ICommentRepository comments)
+    public CommentsController(
+        ICommentRepository comments,
+        IResourceAuthorizationService authorization)
     {
         _comments = comments;
+        _authorization = authorization;
     }
 
     [Authorize]
@@ -27,11 +31,11 @@ public class CommentsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        var comment = await _comments.GetTrackedAsync(cid, cancellationToken);
+        var comment = await _comments.GetTrackedWithPostAsync(cid, cancellationToken);
         if (comment == null || comment.DeletedAt != null)
             return NotFound();
 
-        if (comment.AuthorId != me.Value)
+        if (!await _authorization.CanDeleteCommentAsync(comment, me.Value, cancellationToken))
             return Forbid();
 
         comment.DeletedAt = DateTime.UtcNow;

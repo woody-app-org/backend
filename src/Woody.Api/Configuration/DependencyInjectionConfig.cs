@@ -49,6 +49,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();
         builder.Services.AddScoped<ICommunityPermissionService, CommunityPermissionService>();
+        builder.Services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
         builder.Services.AddScoped<ICommunityPremiumEntitlementService, CommunityPremiumEntitlementService>();
         builder.Services.AddScoped<ICommunityDailyRollupRepository, CommunityDailyRollupRepository>();
         builder.Services.AddScoped<ICommunityAnalyticsReadRepository, CommunityAnalyticsReadRepository>();

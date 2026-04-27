@@ -623,6 +623,8 @@ public class CommunitiesController : ControllerBase
         var m = await _memberships.GetForUserAndCommunityAsync(uid, cid, cancellationToken);
         if (m == null)
             return NoContent();
+        if (string.Equals(m.Role, "owner", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
 
         var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         _memberships.Remove(m);
@@ -661,12 +663,24 @@ public class CommunitiesController : ControllerBase
         var m = await _memberships.GetForUserAndCommunityAsync(uid, cid, cancellationToken);
         if (m == null)
             return NotFound();
+        if (string.Equals(m.Role, "owner", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
 
         var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(body.Status))
-            m.Status = body.Status.Trim();
+        {
+            var status = body.Status.Trim().ToLowerInvariant();
+            if (status is not ("active" or "pending"))
+                return BadRequest(new { error = "Status inválido." });
+            m.Status = status;
+        }
         if (!string.IsNullOrWhiteSpace(body.Role))
-            m.Role = body.Role.Trim();
+        {
+            var role = body.Role.Trim().ToLowerInvariant();
+            if (role is not ("admin" or "member"))
+                return BadRequest(new { error = "Role inválido." });
+            m.Role = role;
+        }
 
         var nowActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
         await _memberships.SaveChangesAsync(cancellationToken);

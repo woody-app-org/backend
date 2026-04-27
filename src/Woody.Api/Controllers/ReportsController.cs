@@ -12,10 +12,20 @@ namespace Woody.Api.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly IContentReportRepository _reports;
+    private readonly IPostRepository _posts;
+    private readonly ICommentRepository _comments;
+    private readonly IResourceAuthorizationService _authorization;
 
-    public ReportsController(IContentReportRepository reports)
+    public ReportsController(
+        IContentReportRepository reports,
+        IPostRepository posts,
+        ICommentRepository comments,
+        IResourceAuthorizationService authorization)
     {
         _reports = reports;
+        _posts = posts;
+        _comments = comments;
+        _authorization = authorization;
     }
 
     [Authorize]
@@ -25,6 +35,9 @@ public class ReportsController : ControllerBase
         var me = User.GetUserId();
         if (me == null)
             return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(body.TargetType) || string.IsNullOrWhiteSpace(body.ReasonCode))
+            return BadRequest();
 
         int? postId = null;
         int? commentId = null;
@@ -38,6 +51,25 @@ public class ReportsController : ControllerBase
             return BadRequest();
         if (target == "comment" && (commentId == null || postId == null))
             return BadRequest();
+
+        if (target == "post")
+        {
+            var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(postId!.Value, cancellationToken);
+            if (!await _authorization.CanReadPostAsync(post, me.Value, cancellationToken))
+                return NotFound();
+        }
+        else if (target == "comment")
+        {
+            var comment = await _comments.GetTrackedWithPostAsync(commentId!.Value, cancellationToken);
+            if (comment == null || comment.DeletedAt != null || comment.PostId != postId!.Value)
+                return NotFound();
+            if (!await _authorization.CanReadPostAsync(comment.Post, me.Value, cancellationToken))
+                return NotFound();
+        }
+        else
+        {
+            return BadRequest();
+        }
 
         _reports.Add(new ContentReport
         {

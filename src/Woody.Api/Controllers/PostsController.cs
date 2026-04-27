@@ -19,51 +19,31 @@ public class PostsController : ControllerBase
 
     private readonly IPostRepository _posts;
     private readonly ICommunityRepository _communities;
-    private readonly ICommunityMembershipRepository _memberships;
     private readonly ICommunityPermissionService _communityPermissions;
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly IContentPinningService _pinning;
+    private readonly IResourceAuthorizationService _authorization;
 
     public PostsController(
         IPostRepository posts,
         ICommunityRepository communities,
-        ICommunityMembershipRepository memberships,
         ICommunityPermissionService communityPermissions,
         ILikeRepository likes,
         ICommentRepository comments,
         IPostEnrichmentService postEnrichment,
-        IContentPinningService pinning)
+        IContentPinningService pinning,
+        IResourceAuthorizationService authorization)
     {
         _posts = posts;
         _communities = communities;
-        _memberships = memberships;
         _communityPermissions = communityPermissions;
         _likes = likes;
         _comments = comments;
         _postEnrichment = postEnrichment;
         _pinning = pinning;
-    }
-
-    /// <summary>Lê conteúdo do post (detalhe, comentários, gosto) só com as mesmas regras que o feed.</summary>
-    private async Task<bool> ViewerCanReadPostAsync(Post? post, int? viewerUserId, CancellationToken cancellationToken)
-    {
-        if (post == null)
-            return false;
-        if (post.PublicationContext == PostPublicationContext.Profile)
-            return true;
-        if (post.CommunityId == null || post.Community == null)
-            return true;
-        if (string.Equals(post.Community.Visibility, "public", StringComparison.OrdinalIgnoreCase))
-            return true;
-        if (viewerUserId == post.UserId)
-            return true;
-        if (viewerUserId == null)
-            return false;
-        return await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(
-                   viewerUserId.Value, post.CommunityId.Value, cancellationToken)
-               != null;
+        _authorization = authorization;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -95,7 +75,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
             return NotFound();
-        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
         var list = await _postEnrichment.ToPostDtosAsync(new[] { post }, viewerId, cancellationToken);
@@ -244,7 +224,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedWithTagsAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanEditPostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
         post.Title = body.Title.Trim();
@@ -284,7 +264,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanDeletePostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
         post.DeletedAt = DateTime.UtcNow;
@@ -304,7 +284,7 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var postForLike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(postForLike, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
             return NotFound();
 
         if (await _likes.ExistsPostLikeAsync(me.Value, pid, cancellationToken))
@@ -333,7 +313,7 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var postForUnlike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(postForUnlike, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(postForUnlike, me, cancellationToken))
             return NotFound();
 
         var row = await _likes.GetPostLikeAsync(me.Value, pid, cancellationToken);
@@ -355,7 +335,7 @@ public class PostsController : ControllerBase
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
-        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
         var postAuthorId = post!.UserId;
@@ -379,14 +359,19 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(post, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, me, cancellationToken))
             return NotFound();
 
         var postAuthorId = post!.UserId;
 
         int? parentId = null;
         if (!string.IsNullOrWhiteSpace(body.ParentCommentId) && int.TryParse(body.ParentCommentId, out var pcid))
+        {
+            var parent = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
+            if (parent == null || parent.PostId != pid)
+                return BadRequest(new { error = "Comentário pai inválido." });
             parentId = pcid;
+        }
 
         var comment = new Comment
         {
@@ -422,7 +407,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
             return Forbid();
 
         var comment = await _comments.GetTrackedWithAuthorAsync(cid, pid, cancellationToken);
