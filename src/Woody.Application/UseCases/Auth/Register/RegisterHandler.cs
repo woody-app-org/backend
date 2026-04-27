@@ -2,7 +2,6 @@ using Woody.Application.Billing;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
-using Woody.Application.Mapping;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 
@@ -15,7 +14,7 @@ public class RegisterHandler
     private readonly IEmailVerificationCodeRepository _emailVerificationCodes;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IDefaultCommunityBootstrap _defaultCommunity;
-    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IAuthSessionService _authSessions;
 
     public RegisterHandler(
         IUserRepository users,
@@ -23,14 +22,14 @@ public class RegisterHandler
         IEmailVerificationCodeRepository emailVerificationCodes,
         IPasswordHasher passwordHasher,
         IDefaultCommunityBootstrap defaultCommunity,
-        IJwtTokenService jwtTokenService)
+        IAuthSessionService authSessions)
     {
         _users = users;
         _subscriptions = subscriptions;
         _emailVerificationCodes = emailVerificationCodes;
         _passwordHasher = passwordHasher;
         _defaultCommunity = defaultCommunity;
-        _jwtTokenService = jwtTokenService;
+        _authSessions = authSessions;
     }
 
     public async Task<LoginResultDTO> HandleAsync(RegisterRequestDTO request, CancellationToken cancellationToken = default)
@@ -39,9 +38,9 @@ public class RegisterHandler
         var email = request.Email.Trim().ToLowerInvariant();
 
         if (await _users.ExistsUsernameAsync(username))
-            throw new InvalidOperationException("Nome de utilizador já existe.");
+            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
         if (await _users.ExistsEmailAsync(email))
-            throw new InvalidOperationException("Email já registado.");
+            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
 
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");
@@ -86,12 +85,6 @@ public class RegisterHandler
 
         await _defaultCommunity.EnsureUserInDefaultCommunityAsync(user.Id, cancellationToken);
 
-        var token = _jwtTokenService.GenerateToken(user, subscription);
-
-        return new LoginResultDTO
-        {
-            Token = token,
-            User = AuthUserMapper.From(user, subscription, now)
-        };
+        return await _authSessions.CreateSessionAsync(user, subscription, cancellationToken);
     }
 }

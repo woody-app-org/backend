@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
 using Woody.Api.Configuration;
 using Woody.Api.Hubs;
 using Woody.Application.Configuration;
@@ -49,6 +51,7 @@ if (!builder.Environment.IsDevelopment() && jwtOptions.Secret.Length < 32)
 
 ValidateResendOptions(resendOptions);
 ValidateEmailVerificationOptions(emailVerificationOptions);
+ValidateJwtOptions(jwtOptions);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -103,6 +106,20 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -115,6 +132,7 @@ WoodyDbConfiguration.ConfigureServices(builder.Services, builder.Configuration, 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
+builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection("AuthSecurity"));
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
 
 var corsEnabled = ConfigureCors(builder);
@@ -148,6 +166,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -260,3 +279,11 @@ static void ValidateEmailVerificationOptions(EmailVerificationOptions options)
     if (options.MaxAttempts <= 0)
         throw new InvalidOperationException("EmailVerification:MaxAttempts deve ser maior que zero.");
 }
+
+static void ValidateJwtOptions(JwtOptions options)
+{
+    if (options.ExpirationMinutes is < 10 or > 15)
+        throw new InvalidOperationException("Jwt:ExpirationMinutes deve estar entre 10 e 15 minutos.");
+}
+
+public partial class Program { }

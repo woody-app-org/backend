@@ -32,6 +32,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<CreateCustomerPortalSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
+        builder.Services.AddScoped<IRefreshTokenSessionRepository, RefreshTokenSessionRepository>();
+        builder.Services.AddScoped<ILoginLockoutRepository, LoginLockoutRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
@@ -54,6 +56,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
         builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
+        builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();

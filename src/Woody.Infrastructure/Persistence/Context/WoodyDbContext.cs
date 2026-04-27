@@ -26,6 +26,8 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
         public virtual DbSet<CommunityPostBoost> CommunityPostBoosts { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
+        public virtual DbSet<RefreshTokenSession> RefreshTokenSessions { get; set; }
+        public virtual DbSet<LoginLockout> LoginLockouts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
@@ -69,6 +71,22 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.EmailVerificationCodes)
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<RefreshTokenSession>(e =>
+            {
+                e.HasIndex(x => x.TokenHash).IsUnique();
+                e.HasIndex(x => new { x.UserId, x.ExpiresAt });
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.RefreshTokenSessions)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<LoginLockout>(e =>
+            {
+                e.HasKey(x => x.NormalizedLogin);
+                e.HasIndex(x => x.LockoutEndAt);
             });
 
             modelBuilder.Entity<Community>(e =>
