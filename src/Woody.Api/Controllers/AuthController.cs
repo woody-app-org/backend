@@ -52,8 +52,15 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDTO request, CancellationToken cancellationToken)
     {
-        var result = await _registerHandler.HandleAsync(request, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _registerHandler.HandleAsync(request, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPost("send-verification")]

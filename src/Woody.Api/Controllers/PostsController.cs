@@ -8,6 +8,7 @@ using Woody.Domain.Entities;
 using Woody.Domain.Posts;
 using Woody.Domain.Entities.Enum;
 using Woody.Application.Mapping;
+using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
 
@@ -90,12 +91,32 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(body.Title) || string.IsNullOrWhiteSpace(body.Content))
-            return BadRequest(new { error = "Título e conteúdo são obrigatórios." });
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Title,
+                "Título",
+                InputValidationLimits.PostTitleMaxLength,
+                out var title,
+                out var error))
+            return BadRequest(new { error });
 
-        var imageUrls = NormalizePostImageUrls(body);
-        if (imageUrls.Count > MaxPostImages)
-            return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Conteúdo",
+                InputValidationLimits.PostContentMaxLength,
+                out var content,
+                out error))
+            return BadRequest(new { error });
+
+        if (!TryNormalizePostImageUrls(body, out var imageUrls, out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeTags(
+                body.Tags,
+                InputValidationLimits.PostTagsMaxCount,
+                InputValidationLimits.TagMaxLength,
+                out var tags,
+                out error))
+            return BadRequest(new { error });
 
         var ctxRaw = (body.PublicationContext ?? string.Empty).Trim().ToLowerInvariant();
         var hasCommunityId = !string.IsNullOrWhiteSpace(body.CommunityId);
@@ -128,8 +149,8 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = null,
                 PublicationContext = PostPublicationContext.Profile,
-                Title = body.Title.Trim(),
-                Content = body.Content.Trim(),
+                Title = title,
+                Content = content,
                 ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
                 CreatedAt = DateTime.UtcNow
             };
@@ -150,8 +171,8 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = communityId,
                 PublicationContext = PostPublicationContext.Community,
-                Title = body.Title.Trim(),
-                Content = body.Content.Trim(),
+                Title = title,
+                Content = content,
                 ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
                 CreatedAt = DateTime.UtcNow
             };
@@ -171,12 +192,10 @@ public class PostsController : ControllerBase
             await _posts.SaveChangesAsync(cancellationToken);
         }
 
-        if (body.Tags != null)
+        if (tags.Count > 0)
         {
-            var tags = body.Tags
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
-            await _posts.AddPostTagsAsync(tags, cancellationToken);
+            var rows = tags.Select(t => new PostTag { PostId = post.Id, Tag = t });
+            await _posts.AddPostTagsAsync(rows, cancellationToken);
             await _posts.SaveChangesAsync(cancellationToken);
         }
 
@@ -187,24 +206,38 @@ public class PostsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
     }
 
-    private static List<string> NormalizePostImageUrls(CreatePostRequestDTO body)
+    private static bool TryNormalizePostImageUrls(
+        CreatePostRequestDTO body,
+        out List<string> normalized,
+        out string? error)
     {
-        var list = new List<string>();
+        normalized = new List<string>();
+        error = null;
+
         if (body.ImageUrls is { Count: > 0 })
         {
             foreach (var u in body.ImageUrls)
             {
-                if (string.IsNullOrWhiteSpace(u))
+                if (!InputValidator.TryNormalizeHttpsImageUrl(u, out var imageUrl, out error))
+                    return false;
+                if (imageUrl == null || normalized.Contains(imageUrl))
                     continue;
-                list.Add(u.Trim());
+                normalized.Add(imageUrl);
+                if (normalized.Count > MaxPostImages)
+                {
+                    error = $"Máximo de {MaxPostImages} imagens por publicação.";
+                    return false;
+                }
             }
 
-            return list;
+            return true;
         }
 
-        if (!string.IsNullOrWhiteSpace(body.ImageUrl))
-            list.Add(body.ImageUrl.Trim());
-        return list;
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var singleImageUrl, out error))
+            return false;
+        if (singleImageUrl != null)
+            normalized.Add(singleImageUrl);
+        return true;
     }
 
     [Authorize]
@@ -227,17 +260,42 @@ public class PostsController : ControllerBase
         if (!await _authorization.CanEditPostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
-        post.Title = body.Title.Trim();
-        post.Content = body.Content.Trim();
-        post.ImageUrl = string.IsNullOrWhiteSpace(body.ImageUrl) ? null : body.ImageUrl.Trim();
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Title,
+                "Título",
+                InputValidationLimits.PostTitleMaxLength,
+                out var title,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Conteúdo",
+                InputValidationLimits.PostContentMaxLength,
+                out var content,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var imageUrl, out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeTags(
+                body.Tags,
+                InputValidationLimits.PostTagsMaxCount,
+                InputValidationLimits.TagMaxLength,
+                out var tags,
+                out error))
+            return BadRequest(new { error });
+
+        post.Title = title;
+        post.Content = content;
+        post.ImageUrl = imageUrl;
         post.UpdatedAt = DateTime.UtcNow;
 
         if (body.Tags != null)
         {
             _posts.RemovePostTags(post.Tags);
-            var newTags = body.Tags
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
+            var newTags = tags.Select(t => new PostTag { PostId = post.Id, Tag = t });
             await _posts.AddPostTagsAsync(newTags, cancellationToken);
         }
 
@@ -364,9 +422,20 @@ public class PostsController : ControllerBase
 
         var postAuthorId = post!.UserId;
 
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Comentário",
+                InputValidationLimits.CommentContentMaxLength,
+                out var commentContent,
+                out var error))
+            return BadRequest(new { error });
+
         int? parentId = null;
-        if (!string.IsNullOrWhiteSpace(body.ParentCommentId) && int.TryParse(body.ParentCommentId, out var pcid))
+        if (!string.IsNullOrWhiteSpace(body.ParentCommentId))
         {
+            if (!int.TryParse(body.ParentCommentId, out var pcid) || pcid <= 0)
+                return BadRequest(new { error = "Comentário pai inválido." });
+
             var parent = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
             if (parent == null || parent.PostId != pid)
                 return BadRequest(new { error = "Comentário pai inválido." });
@@ -378,7 +447,7 @@ public class PostsController : ControllerBase
             PostId = pid,
             AuthorId = me.Value,
             ParentCommentId = parentId,
-            Content = body.Content.Trim(),
+            Content = commentContent,
             CreatedAt = DateTime.UtcNow
         };
         _comments.Add(comment);

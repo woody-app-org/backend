@@ -4,6 +4,7 @@ using Woody.Application.Configuration;
 using Woody.Application.DTOs.Billing;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
+using Woody.Application.Validation;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Subscription;
 
@@ -34,6 +35,9 @@ public class CreateCheckoutSessionHandler
         CancellationToken cancellationToken = default)
     {
         var planCode = request.PlanCode?.Trim() ?? string.Empty;
+        if (planCode.Length > InputValidationLimits.PlanCodeMaxLength)
+            throw new ArgumentException("Plano inválido ou não disponível para checkout.");
+
         if (!BillingPlanCatalog.IsKnownCheckoutPlanCode(planCode))
             throw new ArgumentException("Plano inválido ou não disponível para checkout.");
 

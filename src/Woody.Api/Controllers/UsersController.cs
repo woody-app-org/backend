@@ -6,6 +6,7 @@ using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Application.Mapping;
+using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
 
@@ -142,31 +143,78 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
-        if (!string.Equals(user.Username, body.Username, StringComparison.Ordinal))
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Username,
+                "Nome de utilizador",
+                InputValidationLimits.UsernameMaxLength,
+                out var username,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Name,
+                "Nome",
+                InputValidationLimits.DisplayNameMaxLength,
+                out var displayName,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Bio,
+                "Bio",
+                InputValidationLimits.ProfileBioMaxLength,
+                out var bio,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Pronouns,
+                "Pronomes",
+                InputValidationLimits.ProfilePronounsMaxLength,
+                out var pronouns,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Location,
+                "Localização",
+                InputValidationLimits.ProfileLocationMaxLength,
+                out var location,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.AvatarUrl, out var avatarUrl, out error)
+            || !InputValidator.TryNormalizeHttpsImageUrl(body.BannerUrl, out var bannerUrl, out error))
+            return BadRequest(new { error });
+
+        if (!TryNormalizeInterests(body.Interests, out var interests, out error))
+            return BadRequest(new { error });
+
+        if (!string.Equals(user.Username, username, StringComparison.Ordinal))
         {
-            if (await _users.ExistsUsernameAsync(body.Username.Trim()))
+            if (await _users.ExistsUsernameAsync(username))
                 return Conflict(new { error = "Nome de utilizador já existe." });
-            user.Username = body.Username.Trim();
+            user.Username = username;
         }
 
-        user.DisplayName = body.Name.Trim();
-        user.Bio = body.Bio;
-        user.Pronouns = body.Pronouns;
-        user.Location = body.Location;
-        user.ProfilePic = body.AvatarUrl;
-        user.BannerPic = body.BannerUrl;
+        user.DisplayName = displayName;
+        user.Bio = bio ?? string.Empty;
+        user.Pronouns = pronouns;
+        user.Location = location;
+        user.ProfilePic = avatarUrl;
+        user.BannerPic = bannerUrl;
         user.UpdatedAt = DateTime.UtcNow;
 
         if (body.Interests != null)
         {
             var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
             _users.RemoveUserInterests(existing);
-            foreach (var i in body.Interests)
+            foreach (var interest in interests)
             {
                 _users.AddUserInterest(new UserInterest
                 {
                     UserId = user.Id,
-                    Label = i.Label.Trim()
+                    Label = interest
                 });
             }
         }
@@ -191,14 +239,17 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
+        if (!TryNormalizeInterests(body.Interests, out var interests, out var error))
+            return BadRequest(new { error });
+
         var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
         _users.RemoveUserInterests(existing);
-        foreach (var i in body.Interests)
+        foreach (var interest in interests)
         {
             _users.AddUserInterest(new UserInterest
             {
                 UserId = user.Id,
-                Label = i.Label.Trim()
+                Label = interest
             });
         }
 
@@ -433,5 +484,43 @@ public class UsersController : ControllerBase
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 
         return profile;
+    }
+
+    private static bool TryNormalizeInterests(
+        IEnumerable<InterestItemDto>? raw,
+        out List<string> interests,
+        out string? error)
+    {
+        interests = new List<string>();
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in raw)
+        {
+            if (string.IsNullOrWhiteSpace(item.Label))
+                continue;
+
+            var label = item.Label.Trim();
+            if (label.Length > InputValidationLimits.ProfileInterestLabelMaxLength)
+            {
+                error = $"Cada interesse não pode exceder {InputValidationLimits.ProfileInterestLabelMaxLength} caracteres.";
+                return false;
+            }
+
+            if (!seen.Add(label))
+                continue;
+
+            interests.Add(label);
+            if (interests.Count > InputValidationLimits.ProfileInterestsMaxCount)
+            {
+                error = $"Máximo de {InputValidationLimits.ProfileInterestsMaxCount} interesses.";
+                return false;
+            }
+        }
+
+        return true;
     }
 }

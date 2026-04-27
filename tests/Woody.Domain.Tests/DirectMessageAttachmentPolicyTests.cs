@@ -6,7 +6,6 @@ public sealed class DirectMessageAttachmentPolicyTests
 {
     [Theory]
     [InlineData("https://cdn.example.com/a.png")]
-    [InlineData("HTTP://LOCALHOST/img.jpg")]
     [InlineData("data:image/png;base64,AAAA")]
     [InlineData("data:image/jpeg;charset=utf-8;base64,AAAA")]
     [InlineData("data:image/jpg;base64,AAAA")]
@@ -23,6 +22,8 @@ public sealed class DirectMessageAttachmentPolicyTests
     [InlineData("data:image/svg+xml;base64,PHN2Zy8+")]
     [InlineData("data:image/png,AAAA")] // sem base64
     [InlineData("file:///etc/passwd")]
+    [InlineData("HTTP://LOCALHOST/img.jpg")]
+    [InlineData("http://cdn.example.com/a.png")]
     [InlineData("vbscript:msgbox")]
     [InlineData("data:image/png;base64\n,evil")]
     public void IsPermittedAttachmentUrl_rejects_unsafe_or_invalid(string url) =>

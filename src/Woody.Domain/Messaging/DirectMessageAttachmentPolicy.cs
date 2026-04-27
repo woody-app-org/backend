@@ -1,3 +1,5 @@
+using Woody.Domain.Media;
+
 namespace Woody.Domain.Messaging;
 
 /// <summary>
@@ -20,10 +22,7 @@ public static class DirectMessageAttachmentPolicy
             return false;
 
         if (t.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (t.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            return true;
+            return PublicImageUrlPolicy.IsPermittedExternalImageUrl(t);
 
         if (!t.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
             return false;

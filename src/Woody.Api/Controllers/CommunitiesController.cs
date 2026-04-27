@@ -10,6 +10,7 @@ using Woody.Domain.Entities.Enum;
 using Woody.Application.Mapping;
 using Woody.Application.Services;
 using Woody.Application.Utilities;
+using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
 
@@ -83,6 +84,8 @@ public class CommunitiesController : ControllerBase
             return BadRequest(new { error = validationError });
 
         var tags = CreateCommunityRequestValidator.NormalizeTags(body.Tags);
+        InputValidator.TryNormalizeHttpsImageUrl(body.AvatarUrl, out var avatarUrl, out _);
+        InputValidator.TryNormalizeHttpsImageUrl(body.CoverUrl, out var coverUrl, out _);
         var baseSlug = CommunitySlugHelper.SlugifyBase(body.Name);
         var slug = baseSlug;
         var suffix = 2;
@@ -106,8 +109,8 @@ public class CommunitiesController : ControllerBase
             Rules = string.IsNullOrWhiteSpace(body.Rules) ? string.Empty : body.Rules.Trim(),
             Visibility = visibility,
             OwnerUserId = me.Value,
-            AvatarUrl = string.IsNullOrWhiteSpace(body.AvatarUrl) ? null : body.AvatarUrl.Trim(),
-            CoverUrl = string.IsNullOrWhiteSpace(body.CoverUrl) ? null : body.CoverUrl.Trim(),
+            AvatarUrl = avatarUrl,
+            CoverUrl = coverUrl,
             MemberCount = 1,
             CreatedAt = now,
             UpdatedAt = now
@@ -474,24 +477,31 @@ public class CommunitiesController : ControllerBase
         if (!await _permission.CanModerateCommunityAsync(cid, me.Value, cancellationToken))
             return Forbid();
 
+        var validationError = CreateCommunityRequestValidator.ValidatePatch(body);
+        if (validationError != null)
+            return BadRequest(new { error = validationError });
+
         var c = await _communities.GetByIdTrackedWithTagsAsync(cid, cancellationToken);
         if (c == null)
             return NotFound();
 
-        if (!string.IsNullOrWhiteSpace(body.Name))
+        InputValidator.TryNormalizeHttpsImageUrl(body.AvatarUrl, out var avatarUrl, out _);
+        InputValidator.TryNormalizeHttpsImageUrl(body.CoverUrl, out var coverUrl, out _);
+
+        if (body.Name != null)
             c.Name = body.Name.Trim();
         if (body.Description != null)
-            c.Description = body.Description;
-        if (!string.IsNullOrWhiteSpace(body.Category))
-            c.Category = body.Category.Trim();
+            c.Description = body.Description.Trim();
+        if (body.Category != null)
+            c.Category = body.Category.Trim().ToLowerInvariant();
         if (body.Rules != null)
-            c.Rules = body.Rules;
-        if (!string.IsNullOrWhiteSpace(body.Visibility))
-            c.Visibility = body.Visibility.Trim();
+            c.Rules = body.Rules.Trim();
+        if (body.Visibility != null)
+            c.Visibility = body.Visibility.Trim().ToLowerInvariant();
         if (body.AvatarUrl != null)
-            c.AvatarUrl = string.IsNullOrWhiteSpace(body.AvatarUrl) ? null : body.AvatarUrl.Trim();
+            c.AvatarUrl = avatarUrl;
         if (body.CoverUrl != null)
-            c.CoverUrl = string.IsNullOrWhiteSpace(body.CoverUrl) ? null : body.CoverUrl.Trim();
+            c.CoverUrl = coverUrl;
 
         if (body.Tags != null)
         {
@@ -666,17 +676,33 @@ public class CommunitiesController : ControllerBase
         if (string.Equals(m.Role, "owner", StringComparison.OrdinalIgnoreCase))
             return Forbid();
 
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Status,
+                "Status",
+                InputValidationLimits.MembershipStatusMaxLength,
+                out var normalizedStatus,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Role,
+                "Role",
+                InputValidationLimits.MembershipRoleMaxLength,
+                out var normalizedRole,
+                out error))
+            return BadRequest(new { error });
+
         var wasActive = string.Equals(m.Status, "active", StringComparison.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(body.Status))
+        if (normalizedStatus != null)
         {
-            var status = body.Status.Trim().ToLowerInvariant();
+            var status = normalizedStatus.ToLowerInvariant();
             if (status is not ("active" or "pending"))
                 return BadRequest(new { error = "Status inválido." });
             m.Status = status;
         }
-        if (!string.IsNullOrWhiteSpace(body.Role))
+        if (normalizedRole != null)
         {
-            var role = body.Role.Trim().ToLowerInvariant();
+            var role = normalizedRole.ToLowerInvariant();
             if (role is not ("admin" or "member"))
                 return BadRequest(new { error = "Role inválido." });
             m.Role = role;

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 
 namespace Woody.Api.Controllers;
@@ -36,8 +37,29 @@ public class ReportsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(body.TargetType) || string.IsNullOrWhiteSpace(body.ReasonCode))
-            return BadRequest();
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.TargetType,
+                "Tipo de alvo",
+                maxLength: 20,
+                out var target,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.ReasonCode,
+                "Motivo",
+                InputValidationLimits.ReportReasonCodeMaxLength,
+                out var reasonCode,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Details,
+                "Detalhes",
+                InputValidationLimits.ReportDetailsMaxLength,
+                out var details,
+                out error))
+            return BadRequest(new { error });
 
         int? postId = null;
         int? commentId = null;
@@ -46,7 +68,7 @@ public class ReportsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(body.CommentId) && int.TryParse(body.CommentId, out var cid))
             commentId = cid;
 
-        var target = body.TargetType.Trim().ToLowerInvariant();
+        target = target.ToLowerInvariant();
         if (target == "post" && postId == null)
             return BadRequest();
         if (target == "comment" && (commentId == null || postId == null))
@@ -77,8 +99,8 @@ public class ReportsController : ControllerBase
             TargetType = target,
             PostId = postId,
             CommentId = commentId,
-            ReasonCode = body.ReasonCode.Trim(),
-            Details = string.IsNullOrWhiteSpace(body.Details) ? null : body.Details.Trim(),
+            ReasonCode = reasonCode,
+            Details = details,
             CreatedAt = DateTime.UtcNow
         });
 
