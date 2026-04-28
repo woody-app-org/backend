@@ -13,6 +13,7 @@ public class ProfileSignalResponseDto
     public int Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
+    public string Emoji { get; set; } = string.Empty;
     public string? Message { get; set; }
     public string Status { get; set; } = string.Empty;
     public string CreatedAt { get; set; } = string.Empty;

@@ -39,14 +39,27 @@ public static class EntityMappers
 
     public static string ToProfileSignalLabel(ProfileSignalType type) => type switch
     {
-        ProfileSignalType.TeNotei => "Te notei 👀",
-        ProfileSignalType.Olhadinha => "Olhadinha 😉",
-        ProfileSignalType.ConhecerMais => "Conhecer mais 🍷",
-        ProfileSignalType.QueroConversar => "Quero conversar ✨",
-        ProfileSignalType.CrushFofo => "Crush fofo 🐻",
-        ProfileSignalType.Atracao => "Atração 🔥",
-        ProfileSignalType.SinalVerde => "Sinal verde ✅",
-        ProfileSignalType.Cheguei => "Cheguei 😏",
+        ProfileSignalType.TeNotei => "Te notei",
+        ProfileSignalType.Olhadinha => "Olhadinha",
+        ProfileSignalType.ConhecerMais => "Conhecer mais",
+        ProfileSignalType.QueroConversar => "Quero conversar",
+        ProfileSignalType.CrushFofo => "Crush fofo",
+        ProfileSignalType.Atracao => "Atração",
+        ProfileSignalType.SinalVerde => "Sinal verde",
+        ProfileSignalType.Cheguei => "Cheguei",
+        _ => type.ToString()
+    };
+
+    public static string ToProfileSignalEmoji(ProfileSignalType type) => type switch
+    {
+        ProfileSignalType.TeNotei => "👀",
+        ProfileSignalType.Olhadinha => "😉",
+        ProfileSignalType.ConhecerMais => "🍷",
+        ProfileSignalType.QueroConversar => "✨",
+        ProfileSignalType.CrushFofo => "🐻",
+        ProfileSignalType.Atracao => "🔥",
+        ProfileSignalType.SinalVerde => "✅",
+        ProfileSignalType.Cheguei => "😏",
         _ => type.ToString()
     };
 
@@ -64,6 +77,7 @@ public static class EntityMappers
         Id = signal.Id,
         Type = ToProfileSignalTypeApi(signal.Type),
         Label = ToProfileSignalLabel(signal.Type),
+        Emoji = ToProfileSignalEmoji(signal.Type),
         Message = signal.Message,
         Status = ToProfileSignalStatusApi(signal.Status),
         CreatedAt = Iso(signal.CreatedAt),
