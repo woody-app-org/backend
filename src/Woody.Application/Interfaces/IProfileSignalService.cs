@@ -47,6 +47,10 @@ public interface IProfileSignalService
         string type,
         CancellationToken cancellationToken = default);
 
+    Task<ProfileSignalsUnreadCountDto> GetUnreadReceivedCountAsync(
+        int receiverUserId,
+        CancellationToken cancellationToken = default);
+
     Task<ProfileSignalCommandResult> MarkReadAsync(int actorUserId, int signalId, CancellationToken cancellationToken = default);
     Task<ProfileSignalCommandResult> ArchiveAsync(int actorUserId, int signalId, CancellationToken cancellationToken = default);
     Task<ProfileSignalCommandResult> DismissAsync(int actorUserId, int signalId, CancellationToken cancellationToken = default);

@@ -88,6 +88,12 @@ public class ProfileSignalRepository : IProfileSignalRepository
         return (items, total);
     }
 
+    public Task<int> CountUnreadReceivedAsync(int receiverUserId, CancellationToken cancellationToken = default) =>
+        _db.ProfileSignals.AsNoTracking()
+            .CountAsync(
+                s => s.ReceiverUserId == receiverUserId && s.Status == ProfileSignalStatus.Sent,
+                cancellationToken);
+
     public void Add(ProfileSignal signal) => _db.ProfileSignals.Add(signal);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

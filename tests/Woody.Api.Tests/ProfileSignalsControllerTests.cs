@@ -65,6 +65,22 @@ public class ProfileSignalsControllerTests
     }
 
     [Fact]
+    public async Task GetUnreadReceivedCount_DelegatesToRepository()
+    {
+        var signals = new Mock<IProfileSignalRepository>();
+        signals
+            .Setup(x => x.CountUnreadReceivedAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3);
+
+        var service = CreateService(signals: signals);
+
+        var result = await service.GetUnreadReceivedCountAsync(10, CancellationToken.None);
+
+        Assert.Equal(3, result.UnreadCount);
+        signals.Verify(x => x.CountUnreadReceivedAsync(10, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ListReceived_UsesReceiverUserIdOnly()
     {
         var signals = new Mock<IProfileSignalRepository>();

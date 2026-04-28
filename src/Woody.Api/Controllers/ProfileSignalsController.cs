@@ -52,6 +52,18 @@ public class ProfileSignalsController : ControllerBase
         return Ok(await _profileSignals.ListReceivedAsync(me.Value, page, pageSize, cancellationToken));
     }
 
+    /// <summary>Contagem de sinais recebidos ainda não lidos (estado enviado). Para badge/indicador na área privada.</summary>
+    [HttpGet("received/unread-count")]
+    public async Task<ActionResult<ProfileSignalsUnreadCountDto>> GetReceivedUnreadCount(
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        return Ok(await _profileSignals.GetUnreadReceivedCountAsync(me.Value, cancellationToken));
+    }
+
     [HttpGet("sent")]
     public async Task<ActionResult<PaginatedResponseDto<ProfileSignalResponseDto>>> ListSent(
         [FromQuery] int page = 1,

@@ -31,6 +31,8 @@ public interface IProfileSignalRepository
         int pageSize,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountUnreadReceivedAsync(int receiverUserId, CancellationToken cancellationToken = default);
+
     void Add(ProfileSignal signal);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

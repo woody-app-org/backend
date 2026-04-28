@@ -134,6 +134,14 @@ public class ProfileSignalService : IProfileSignalService
         };
     }
 
+    public async Task<ProfileSignalsUnreadCountDto> GetUnreadReceivedCountAsync(
+        int receiverUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var count = await _signals.CountUnreadReceivedAsync(receiverUserId, cancellationToken);
+        return new ProfileSignalsUnreadCountDto { UnreadCount = count };
+    }
+
     public Task<ProfileSignalCommandResult> MarkReadAsync(
         int actorUserId,
         int signalId,

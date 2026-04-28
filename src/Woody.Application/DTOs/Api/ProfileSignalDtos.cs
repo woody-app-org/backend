@@ -33,3 +33,9 @@ public class ProfileSignalStatusResponseDto
     public string? LastSentAt { get; set; }
     public string? NextAllowedAt { get; set; }
 }
+
+/// <summary>Sinais em estado &quot;Sent&quot; (ainda não lidos pela destinatária).</summary>
+public class ProfileSignalsUnreadCountDto
+{
+    public int UnreadCount { get; set; }
+}
