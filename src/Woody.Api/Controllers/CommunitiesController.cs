@@ -32,6 +32,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityDailyRollupRepository _dailyRollups;
     private readonly ICommunityDashboardAnalyticsService _communityDashboardAnalytics;
     private readonly ICommunityPostBoostService _communityPostBoosts;
+    private readonly IResourceAuthorizationService _authorization;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -45,7 +46,8 @@ public class CommunitiesController : ControllerBase
         ICommunityPremiumEntitlementService communityPremiumEntitlements,
         ICommunityDailyRollupRepository dailyRollups,
         ICommunityDashboardAnalyticsService communityDashboardAnalytics,
-        ICommunityPostBoostService communityPostBoosts)
+        ICommunityPostBoostService communityPostBoosts,
+        IResourceAuthorizationService authorization)
     {
         _communities = communities;
         _memberships = memberships;
@@ -59,6 +61,7 @@ public class CommunitiesController : ControllerBase
         _dailyRollups = dailyRollups;
         _communityDashboardAnalytics = communityDashboardAnalytics;
         _communityPostBoosts = communityPostBoosts;
+        _authorization = authorization;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -282,6 +285,13 @@ public class CommunitiesController : ControllerBase
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+
+        var community = await _communities.GetByIdWithTagsNoTrackingAsync(cid, cancellationToken);
+        if (community == null)
+            return NotFound();
+        if (!await _authorization.CanReadCommunityMembersAsync(community, viewerId, cancellationToken))
+            return Forbid();
 
         var (rows, total) = await _memberships.ListActiveMembersPagedOrderedAsync(cid, page, pageSize, cancellationToken);
 

@@ -4,6 +4,7 @@
 ## Get latest from `dotnet new gitignore`
 
 .cursor/
+.planning/*
 
 # dotenv files
 .env

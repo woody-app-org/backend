@@ -79,6 +79,72 @@ public class ResourceAuthorizationServiceTests
         Assert.False(allowed);
     }
 
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_AllowsPublicCommunityForAnonymousViewer()
+    {
+        var sut = CreateService();
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "public" },
+            viewerUserId: null);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_BlocksAnonymousViewerFromPrivateCommunity()
+    {
+        var sut = CreateService();
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "private", OwnerUserId = 10 },
+            viewerUserId: null);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_BlocksNonMemberFromPrivateCommunity()
+    {
+        var sut = CreateService();
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "private", OwnerUserId = 10 },
+            viewerUserId: 20);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_AllowsActiveMemberForPrivateCommunity()
+    {
+        var sut = CreateService(moderatorUserId: 20, moderatedCommunityId: 5);
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "private", OwnerUserId = 10 },
+            viewerUserId: 20);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_AllowsOwnerForPrivateCommunity()
+    {
+        var sut = CreateService();
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "private", OwnerUserId = 10 },
+            viewerUserId: 10);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanReadCommunityMembersAsync_AllowsGlobalAdminForPrivateCommunity()
+    {
+        var sut = CreateService(adminUserId: 99);
+        var allowed = await sut.CanReadCommunityMembersAsync(
+            new Community { Id = 5, Visibility = "private", OwnerUserId = 10 },
+            viewerUserId: 99);
+
+        Assert.True(allowed);
+    }
+
     private static ResourceAuthorizationService CreateService(
         int? adminUserId = null,
         int? moderatorUserId = null,

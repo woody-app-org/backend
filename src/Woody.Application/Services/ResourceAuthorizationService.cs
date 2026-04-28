@@ -42,6 +42,28 @@ public class ResourceAuthorizationService : IResourceAuthorizationService
             cancellationToken) != null;
     }
 
+    public async Task<bool> CanReadCommunityMembersAsync(
+        Community? community,
+        int? viewerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (community == null)
+            return false;
+        if (string.Equals(community.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (viewerUserId == null)
+            return false;
+        if (community.OwnerUserId == viewerUserId.Value)
+            return true;
+        if (await IsGlobalAdminAsync(viewerUserId.Value, cancellationToken))
+            return true;
+
+        return await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(
+            viewerUserId.Value,
+            community.Id,
+            cancellationToken) != null;
+    }
+
     public async Task<bool> CanEditPostAsync(Post post, int actorUserId, CancellationToken cancellationToken = default) =>
         post.UserId == actorUserId || await IsGlobalAdminAsync(actorUserId, cancellationToken);
 
