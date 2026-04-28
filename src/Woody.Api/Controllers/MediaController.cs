@@ -27,19 +27,19 @@ public class MediaController : ControllerBase
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
-    public async Task<IActionResult> UploadImage([FromForm] IFormFile? file, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadImage([FromForm] ImageUploadRequest? request, CancellationToken cancellationToken)
     {
-        if (file == null)
+        if (request?.File == null)
             return BadRequest(new { error = "Arquivo obrigatório." });
 
         try
         {
-            await using var stream = file.OpenReadStream();
+            await using var stream = request.File.OpenReadStream();
             var result = await _uploads.UploadImageAsync(
                 stream,
-                file.FileName,
-                file.ContentType,
-                file.Length,
+                request.File.FileName,
+                request.File.ContentType,
+                request.File.Length,
                 cancellationToken);
             return Created(result.Url, result);
         }
@@ -63,4 +63,9 @@ public class MediaController : ControllerBase
         Response.Headers.CacheControl = "public, max-age=31536000, immutable";
         return File(result.Content, result.ContentType, enableRangeProcessing: false);
     }
+}
+
+public sealed class ImageUploadRequest
+{
+    public IFormFile? File { get; set; }
 }

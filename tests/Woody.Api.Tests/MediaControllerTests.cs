@@ -19,7 +19,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile("original.png", "image/png", ValidPng());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         var created = Assert.IsType<CreatedResult>(actionResult);
         var dto = Assert.IsType<MediaUploadResponseDto>(created.Value);
@@ -36,7 +36,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile("large.png", "image/png", ValidPng().Concat(new byte[64]).ToArray());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
@@ -53,7 +53,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile(fileName, contentType, ValidPng());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
@@ -65,7 +65,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile("image.png", "image/jpeg", ValidPng());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
@@ -77,7 +77,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile("image.png", "image/png", "<html>not an image</html>"u8.ToArray());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
@@ -89,7 +89,7 @@ public class MediaControllerTests
         var controller = fixture.CreateController();
         var file = CreateFormFile("../image.png", "image/png", ValidPng());
 
-        var actionResult = await controller.UploadImage(file, CancellationToken.None);
+        var actionResult = await controller.UploadImage(CreateUploadRequest(file), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(actionResult);
     }
@@ -100,7 +100,7 @@ public class MediaControllerTests
         using var fixture = new MediaControllerFixture();
         var controller = fixture.CreateController();
         var uploadResult = await controller.UploadImage(
-            CreateFormFile("image.webp", "image/webp", ValidWebp()),
+            CreateUploadRequest(CreateFormFile("image.webp", "image/webp", ValidWebp())),
             CancellationToken.None);
         var created = Assert.IsType<CreatedResult>(uploadResult);
         var dto = Assert.IsType<MediaUploadResponseDto>(created.Value);
@@ -123,6 +123,8 @@ public class MediaControllerTests
             ContentType = contentType
         };
     }
+
+    private static ImageUploadRequest CreateUploadRequest(IFormFile file) => new() { File = file };
 
     private static byte[] ValidPng() =>
         new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00 };
