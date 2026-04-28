@@ -45,6 +45,9 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
+                e.Property(u => u.ProfileSignalsIncomingPreference)
+                    .HasConversion<int>()
+                    .HasDefaultValue(ProfileSignalsIncomingPreference.All);
             });
 
             modelBuilder.Entity<UserSubscription>(e =>

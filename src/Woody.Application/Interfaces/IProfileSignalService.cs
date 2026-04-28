@@ -11,8 +11,16 @@ public enum ProfileSignalOperationOutcome
     ReceiverNotFound,
     CooldownActive,
     NotFound,
-    Forbidden
+    Forbidden,
+    /// <summary>Bloqueio entre utilizadoras (quando existir infraestrutura).</summary>
+    InteractionBlocked,
+    /// <summary>Destinatária não aceita sinais de ninguém.</summary>
+    ReceiverDeclinesSignals,
+    /// <summary>Destinatária só aceita subconjunto social e remetente não se enquadra.</summary>
+    SenderNotEligibleBySocialRules
 }
+
+public sealed record ProfileSignalsIncomingPreferenceUpdateResult(bool Ok, string? Error);
 
 public sealed record ProfileSignalCommandResult(
     ProfileSignalOperationOutcome Outcome,
@@ -49,6 +57,15 @@ public interface IProfileSignalService
 
     Task<ProfileSignalsUnreadCountDto> GetUnreadReceivedCountAsync(
         int receiverUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProfileSignalsIncomingPreferenceResponseDto> GetMyIncomingPreferenceAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProfileSignalsIncomingPreferenceUpdateResult> UpdateMyIncomingPreferenceAsync(
+        int userId,
+        string rawPreference,
         CancellationToken cancellationToken = default);
 
     Task<ProfileSignalCommandResult> MarkReadAsync(int actorUserId, int signalId, CancellationToken cancellationToken = default);

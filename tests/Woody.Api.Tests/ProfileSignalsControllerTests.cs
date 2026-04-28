@@ -9,6 +9,80 @@ namespace Woody.Api.Tests;
 public class ProfileSignalsControllerTests
 {
     [Fact]
+    public async Task Send_RejectsWhenReceiverPreferenceIsNobody()
+    {
+        var signals = new Mock<IProfileSignalRepository>();
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdNoTrackingAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Id = 20,
+                Username = "bia",
+                Email = "bia@example.com",
+                Role = "User",
+                ProfileSignalsIncomingPreference = ProfileSignalsIncomingPreference.Nobody
+            });
+
+        var service = CreateService(signals, users);
+
+        var result = await service.SendAsync(10, 20, "te_notei", null, CancellationToken.None);
+
+        Assert.Equal(ProfileSignalOperationOutcome.ReceiverDeclinesSignals, result.Outcome);
+        signals.Verify(x => x.Add(It.IsAny<ProfileSignal>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_RejectsWhenUsersBlockedEitherWay()
+    {
+        var signals = new Mock<IProfileSignalRepository>();
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdNoTrackingAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Id = 20, Username = "bia", Email = "bia@example.com", Role = "User" });
+
+        var gate = new Mock<IProfileSignalSocialGate>();
+        gate
+            .Setup(x => x.AreUsersBlockedEitherWayAsync(10, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var service = CreateService(signals, users, gate: gate);
+
+        var result = await service.SendAsync(10, 20, "te_notei", null, CancellationToken.None);
+
+        Assert.Equal(ProfileSignalOperationOutcome.InteractionBlocked, result.Outcome);
+        signals.Verify(x => x.Add(It.IsAny<ProfileSignal>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_RejectsFollowingOnlyWhenReceiverDoesNotFollowSender()
+    {
+        var signals = new Mock<IProfileSignalRepository>();
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdNoTrackingAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Id = 20,
+                Username = "bia",
+                Email = "bia@example.com",
+                Role = "User",
+                ProfileSignalsIncomingPreference = ProfileSignalsIncomingPreference.FollowingOnly
+            });
+
+        var follows = new Mock<IFollowRepository>();
+        follows.Setup(x => x.ExistsAsync(20, 10, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        follows.Setup(x => x.ExistsAsync(10, 20, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var service = CreateService(signals, users, follows);
+
+        var result = await service.SendAsync(10, 20, "te_notei", null, CancellationToken.None);
+
+        Assert.Equal(ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules, result.Outcome);
+        signals.Verify(x => x.Add(It.IsAny<ProfileSignal>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Send_RejectsSelfSignalBeforePersistence()
     {
         var signals = new Mock<IProfileSignalRepository>();
@@ -208,10 +282,29 @@ public class ProfileSignalsControllerTests
 
     private static ProfileSignalService CreateService(
         Mock<IProfileSignalRepository>? signals = null,
-        Mock<IUserRepository>? users = null)
-        => new(
+        Mock<IUserRepository>? users = null,
+        Mock<IFollowRepository>? follows = null,
+        Mock<IProfileSignalSocialGate>? gate = null)
+    {
+        var f = follows ?? new Mock<IFollowRepository>();
+        if (follows == null)
+        {
+            f.Setup(x => x.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        }
+
+        var g = gate ?? new Mock<IProfileSignalSocialGate>();
+        if (gate == null)
+        {
+            g.Setup(x => x.AreUsersBlockedEitherWayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+        }
+
+        return new ProfileSignalService(
             (signals ?? new Mock<IProfileSignalRepository>()).Object,
-            (users ?? new Mock<IUserRepository>()).Object);
+            (users ?? new Mock<IUserRepository>()).Object,
+            f.Object,
+            g.Object);
+    }
 
     private static ProfileSignal TestSignal(
         int receiverUserId,

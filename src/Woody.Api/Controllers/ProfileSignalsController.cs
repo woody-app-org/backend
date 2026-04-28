@@ -23,7 +23,8 @@ public class ProfileSignalsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<ProfileSignalResponseDto>> Send(
+    [ProducesResponseType(typeof(ProfileSignalResponseDto), StatusCodes.Status201Created)]
+    public async Task<IActionResult> Send(
         [FromBody] SendProfileSignalRequestDto body,
         CancellationToken cancellationToken)
     {
@@ -34,7 +35,7 @@ public class ProfileSignalsController : ControllerBase
         var receiverUserId = ResolveReceiverUserId(body);
         var result = await _profileSignals.SendAsync(me.Value, receiverUserId, body.Type, body.Message, cancellationToken);
         if (result.Outcome != ProfileSignalOperationOutcome.Success)
-            return ToActionResult(result);
+            return SendFailureResult(result);
 
         return CreatedAtAction(nameof(GetStatus), new { receiverUserId, type = body.Type }, result.Signal);
     }
@@ -92,6 +93,35 @@ public class ProfileSignalsController : ControllerBase
         return Ok(await _profileSignals.GetSendStatusAsync(me.Value, resolvedReceiverUserId, type, cancellationToken));
     }
 
+    /// <summary>Preferência da utilizadora autenticada sobre quem pode enviar-lhe sinais.</summary>
+    [HttpGet("me/incoming-preference")]
+    public async Task<ActionResult<ProfileSignalsIncomingPreferenceResponseDto>> GetMyIncomingPreference(
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        return Ok(await _profileSignals.GetMyIncomingPreferenceAsync(me.Value, cancellationToken));
+    }
+
+    /// <summary>Atualiza preferência de entrada de sinais (UI de definições pode vir mais tarde).</summary>
+    [HttpPatch("me/incoming-preference")]
+    public async Task<ActionResult<ProfileSignalsIncomingPreferenceResponseDto>> PatchMyIncomingPreference(
+        [FromBody] UpdateProfileSignalsIncomingPreferenceDto body,
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var updated = await _profileSignals.UpdateMyIncomingPreferenceAsync(me.Value, body.IncomingPreference, cancellationToken);
+        if (!updated.Ok)
+            return BadRequest(new { error = updated.Error });
+
+        return Ok(await _profileSignals.GetMyIncomingPreferenceAsync(me.Value, cancellationToken));
+    }
+
     [HttpPatch("{signalId:int}/archive")]
     public async Task<ActionResult<ProfileSignalResponseDto>> Archive(int signalId, CancellationToken cancellationToken)
     {
@@ -124,6 +154,27 @@ public class ProfileSignalsController : ControllerBase
         var result = await _profileSignals.DismissAsync(me.Value, signalId, cancellationToken);
         return ToActionResult(result);
     }
+
+    private IActionResult SendFailureResult(ProfileSignalCommandResult result) =>
+        result.Outcome switch
+        {
+            ProfileSignalOperationOutcome.InvalidType => BadRequest(new { error = result.Error }),
+            ProfileSignalOperationOutcome.InvalidReceiver => BadRequest(new { error = result.Error }),
+            ProfileSignalOperationOutcome.SelfSignal => BadRequest(new { error = result.Error }),
+            ProfileSignalOperationOutcome.ReceiverNotFound => NotFound(new { error = result.Error }),
+            ProfileSignalOperationOutcome.CooldownActive => Conflict(new
+            {
+                error = result.Error,
+                code = "cooldown",
+                nextAllowedAt = result.NextAllowedAt.HasValue ? EntityMappers.Iso(result.NextAllowedAt.Value) : null
+            }),
+            ProfileSignalOperationOutcome.InteractionBlocked => StatusCode(403, new { error = result.Error, code = "blocked" }),
+            ProfileSignalOperationOutcome.ReceiverDeclinesSignals => StatusCode(403, new { error = result.Error, code = "receiver_unavailable" }),
+            ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules => StatusCode(403, new { error = result.Error, code = "social_mismatch" }),
+            ProfileSignalOperationOutcome.NotFound => NotFound(new { error = result.Error }),
+            ProfileSignalOperationOutcome.Forbidden => Forbid(),
+            _ => BadRequest(new { error = result.Error ?? "Não foi possível concluir a operação." })
+        };
 
     private ActionResult<ProfileSignalResponseDto> ToActionResult(ProfileSignalCommandResult result) =>
         result.Outcome switch

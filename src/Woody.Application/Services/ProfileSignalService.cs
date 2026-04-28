@@ -11,13 +11,25 @@ public class ProfileSignalService : IProfileSignalService
     private static readonly TimeSpan SendCooldown = TimeSpan.FromHours(24);
     private const int MaxMessageLength = 160;
 
+    private const string MsgCooldown = "Você já enviou esse sinal recentemente.";
+    private const string MsgReceiverUnavailable = "Essa pessoa não está recebendo sinais no momento.";
+    private const string MsgInteractionBlocked = "Não foi possível enviar agora. Tente novamente mais tarde.";
+
     private readonly IProfileSignalRepository _signals;
     private readonly IUserRepository _users;
+    private readonly IFollowRepository _follows;
+    private readonly IProfileSignalSocialGate _socialGate;
 
-    public ProfileSignalService(IProfileSignalRepository signals, IUserRepository users)
+    public ProfileSignalService(
+        IProfileSignalRepository signals,
+        IUserRepository users,
+        IFollowRepository follows,
+        IProfileSignalSocialGate socialGate)
     {
         _signals = signals;
         _users = users;
+        _follows = follows;
+        _socialGate = socialGate;
     }
 
     public async Task<ProfileSignalCommandResult> SendAsync(
@@ -36,8 +48,13 @@ public class ProfileSignalService : IProfileSignalService
         if (receiverUserId == senderUserId)
             return Failure(ProfileSignalOperationOutcome.SelfSignal, "Não podes enviar sinal para ti própria.");
 
-        if (await _users.GetByIdNoTrackingAsync(receiverUserId, cancellationToken) == null)
+        var receiver = await _users.GetByIdNoTrackingAsync(receiverUserId, cancellationToken);
+        if (receiver == null)
             return Failure(ProfileSignalOperationOutcome.ReceiverNotFound, "Utilizadora não encontrada.");
+
+        var gateOutcome = await EvaluateSendGateAsync(senderUserId, receiverUserId, receiver, cancellationToken);
+        if (gateOutcome != null)
+            return Failure(gateOutcome.Value, MessageForGateOutcome(gateOutcome.Value));
 
         var now = DateTime.UtcNow;
         var since = now.Subtract(SendCooldown);
@@ -47,7 +64,7 @@ public class ProfileSignalService : IProfileSignalService
             var nextAllowedAt = latest?.CreatedAt.Add(SendCooldown);
             return Failure(
                 ProfileSignalOperationOutcome.CooldownActive,
-                "Já enviaste este tipo de sinal para esta pessoa nas últimas 24 horas.",
+                MsgCooldown,
                 nextAllowedAt);
         }
 
@@ -100,38 +117,57 @@ public class ProfileSignalService : IProfileSignalService
         string type,
         CancellationToken cancellationToken = default)
     {
+        var dto = new ProfileSignalStatusResponseDto
+        {
+            ReceiverUserId = receiverUserId,
+            RecipientUserId = receiverUserId,
+            CanSend = false
+        };
+
         if (!TryParseSignalType(type, out var signalType))
         {
-            return new ProfileSignalStatusResponseDto
-            {
-                ReceiverUserId = receiverUserId,
-                RecipientUserId = receiverUserId,
-                CanSend = false
-            };
+            dto.SenderEligible = false;
+            return dto;
         }
 
         if (receiverUserId <= 0 || receiverUserId == senderUserId)
         {
-            return new ProfileSignalStatusResponseDto
-            {
-                ReceiverUserId = receiverUserId,
-                RecipientUserId = receiverUserId,
-                CanSend = false
-            };
+            dto.SenderEligible = false;
+            return dto;
         }
+
+        var receiver = await _users.GetByIdNoTrackingAsync(receiverUserId, cancellationToken);
+        if (receiver == null)
+        {
+            dto.SenderEligible = false;
+            return dto;
+        }
+
+        var gateOutcome = await EvaluateSendGateAsync(senderUserId, receiverUserId, receiver, cancellationToken);
+        if (gateOutcome != null)
+        {
+            var code = MapGateOutcomeToRestrictionCode(gateOutcome.Value);
+            dto.CanSend = false;
+            dto.SenderEligible = false;
+            dto.EligibilityRestrictionCode = code;
+            dto.RestrictionCode = code;
+            dto.LastSentAt = null;
+            dto.NextAllowedAt = null;
+            return dto;
+        }
+
+        dto.SenderEligible = true;
+        dto.EligibilityRestrictionCode = null;
 
         var latest = await _signals.GetLatestOfTypeBetweenAsync(senderUserId, receiverUserId, signalType, cancellationToken);
         var nextAllowedAt = latest?.CreatedAt.Add(SendCooldown);
         var canSend = nextAllowedAt == null || nextAllowedAt <= DateTime.UtcNow;
 
-        return new ProfileSignalStatusResponseDto
-        {
-            ReceiverUserId = receiverUserId,
-            RecipientUserId = receiverUserId,
-            CanSend = canSend,
-            LastSentAt = latest != null ? EntityMappers.Iso(latest.CreatedAt) : null,
-            NextAllowedAt = !canSend && nextAllowedAt.HasValue ? EntityMappers.Iso(nextAllowedAt.Value) : null
-        };
+        dto.CanSend = canSend;
+        dto.RestrictionCode = canSend ? null : "cooldown";
+        dto.LastSentAt = latest != null ? EntityMappers.Iso(latest.CreatedAt) : null;
+        dto.NextAllowedAt = !canSend && nextAllowedAt.HasValue ? EntityMappers.Iso(nextAllowedAt.Value) : null;
+        return dto;
     }
 
     public async Task<ProfileSignalsUnreadCountDto> GetUnreadReceivedCountAsync(
@@ -140,6 +176,38 @@ public class ProfileSignalService : IProfileSignalService
     {
         var count = await _signals.CountUnreadReceivedAsync(receiverUserId, cancellationToken);
         return new ProfileSignalsUnreadCountDto { UnreadCount = count };
+    }
+
+    public async Task<ProfileSignalsIncomingPreferenceResponseDto> GetMyIncomingPreferenceAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _users.GetByIdNoTrackingAsync(userId, cancellationToken);
+        if (user == null)
+            return new ProfileSignalsIncomingPreferenceResponseDto { IncomingPreference = "all" };
+
+        return new ProfileSignalsIncomingPreferenceResponseDto
+        {
+            IncomingPreference = ProfileSignalSendRules.ToApiString(user.ProfileSignalsIncomingPreference)
+        };
+    }
+
+    public async Task<ProfileSignalsIncomingPreferenceUpdateResult> UpdateMyIncomingPreferenceAsync(
+        int userId,
+        string rawPreference,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ProfileSignalSendRules.TryParseIncomingPreference(rawPreference, out var pref))
+            return new ProfileSignalsIncomingPreferenceUpdateResult(false, "Preferência inválida.");
+
+        var user = await _users.GetByIdTrackedAsync(userId, cancellationToken);
+        if (user == null)
+            return new ProfileSignalsIncomingPreferenceUpdateResult(false, "Utilizadora não encontrada.");
+
+        user.ProfileSignalsIncomingPreference = pref;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _users.SaveChangesAsync();
+        return new ProfileSignalsIncomingPreferenceUpdateResult(true, null);
     }
 
     public Task<ProfileSignalCommandResult> MarkReadAsync(
@@ -159,6 +227,47 @@ public class ProfileSignalService : IProfileSignalService
         int signalId,
         CancellationToken cancellationToken = default) =>
         MutateReceiverSignalAsync(actorUserId, signalId, ProfileSignalStatus.Dismissed, cancellationToken);
+
+    private async Task<ProfileSignalOperationOutcome?> EvaluateSendGateAsync(
+        int senderUserId,
+        int receiverUserId,
+        User receiver,
+        CancellationToken cancellationToken)
+    {
+        if (await _socialGate.AreUsersBlockedEitherWayAsync(senderUserId, receiverUserId, cancellationToken))
+            return ProfileSignalOperationOutcome.InteractionBlocked;
+
+        var senderFollowsReceiver = await _follows.ExistsAsync(senderUserId, receiverUserId, cancellationToken);
+        var receiverFollowsSender = await _follows.ExistsAsync(receiverUserId, senderUserId, cancellationToken);
+
+        if (ProfileSignalSendRules.MeetsIncomingPreference(
+                receiver.ProfileSignalsIncomingPreference,
+                senderFollowsReceiver,
+                receiverFollowsSender))
+            return null;
+
+        return receiver.ProfileSignalsIncomingPreference == ProfileSignalsIncomingPreference.Nobody
+            ? ProfileSignalOperationOutcome.ReceiverDeclinesSignals
+            : ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules;
+    }
+
+    private static string MessageForGateOutcome(ProfileSignalOperationOutcome outcome) =>
+        outcome switch
+        {
+            ProfileSignalOperationOutcome.InteractionBlocked => MsgInteractionBlocked,
+            ProfileSignalOperationOutcome.ReceiverDeclinesSignals => MsgReceiverUnavailable,
+            ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules => MsgReceiverUnavailable,
+            _ => MsgReceiverUnavailable
+        };
+
+    private static string? MapGateOutcomeToRestrictionCode(ProfileSignalOperationOutcome outcome) =>
+        outcome switch
+        {
+            ProfileSignalOperationOutcome.InteractionBlocked => "blocked",
+            ProfileSignalOperationOutcome.ReceiverDeclinesSignals => "receiver_unavailable",
+            ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules => "social_mismatch",
+            _ => null
+        };
 
     private async Task<ProfileSignalCommandResult> MutateReceiverSignalAsync(
         int actorUserId,
@@ -239,12 +348,12 @@ public class ProfileSignalService : IProfileSignalService
         int total,
         int page,
         int pageSize) => new()
-        {
-            Items = items.Select(EntityMappers.ToProfileSignalDto).ToList(),
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = total,
-            HasNextPage = page * pageSize < total,
-            HasPreviousPage = page > 1
-        };
+    {
+        Items = items.Select(EntityMappers.ToProfileSignalDto).ToList(),
+        Page = page,
+        PageSize = pageSize,
+        TotalCount = total,
+        HasNextPage = page * pageSize < total,
+        HasPreviousPage = page > 1
+    };
 }
