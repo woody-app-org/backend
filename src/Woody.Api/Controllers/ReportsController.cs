@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
@@ -31,6 +33,7 @@ public class ReportsController : ControllerBase
 
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimitPolicyNames.ReportCreate)]
     public async Task<IActionResult> Create([FromBody] ReportRequestDTO body, CancellationToken cancellationToken)
     {
         var me = User.GetUserId();

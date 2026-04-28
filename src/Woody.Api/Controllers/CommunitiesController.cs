@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
@@ -62,6 +64,7 @@ public class CommunitiesController : ControllerBase
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
     public async Task<ActionResult<CommunityResponseDto>> Create(
         [FromBody] CreateCommunityRequestDTO body,
         CancellationToken cancellationToken)
@@ -152,6 +155,7 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<List<CommunityResponseDto>>> List(CancellationToken cancellationToken)
     {
         var list = await _communities.ListWithTagsOrderedByNameAsync(cancellationToken);
@@ -160,6 +164,7 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{id:int}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<CommunityResponseDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var c = await _communities.GetByIdWithTagsNoTrackingAsync(id, cancellationToken);
@@ -179,6 +184,7 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("by-slug/{slug}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<CommunityResponseDto>> BySlug(string slug, CancellationToken cancellationToken)
     {
         var c = await _communities.GetBySlugWithTagsNoTrackingAsync(slug, cancellationToken);
@@ -198,6 +204,7 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{id:int}/posts")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> CommunityPosts(
         int id,
         [FromQuery] int page = 1,
@@ -238,6 +245,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpGet("{id:int}/join-requests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> PendingJoinRequests(int id, CancellationToken cancellationToken)
     {
         var me = User.GetUserId();
@@ -262,6 +270,7 @@ public class CommunitiesController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{communityId}/members")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<CommunityMemberItemDto>>> Members(
         string communityId,
         [FromQuery] int page = 1,
@@ -293,6 +302,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpGet("{communityId}/members/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> MyMembership(string communityId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(communityId, out var cid))
@@ -314,6 +324,7 @@ public class CommunitiesController : ControllerBase
     /// <summary>Dashboard analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
     [Authorize]
     [HttpGet("{communityId}/premium/analytics")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityPremiumDashboardAnalyticsDto>> CommunityPremiumAnalytics(
         string communityId,
         [FromQuery] int days = 30,
@@ -356,6 +367,7 @@ public class CommunitiesController : ControllerBase
     /// <summary>Activa impulsionamento (owner/admin + premium da comunidade).</summary>
     [Authorize]
     [HttpPost("{communityId}/posts/{postId}/boost")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityPostBoostResponseDto>> BoostCommunityPost(
         string communityId,
         string postId,
@@ -393,6 +405,7 @@ public class CommunitiesController : ControllerBase
     /// <summary>Cancela impulsionamento activo do post nesta comunidade.</summary>
     [Authorize]
     [HttpDelete("{communityId}/posts/{postId}/boost")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> UnboostCommunityPost(
         string communityId,
         string postId,
@@ -432,6 +445,7 @@ public class CommunitiesController : ControllerBase
     /// <summary>Lista impulsionamentos activos (staff + premium).</summary>
     [Authorize]
     [HttpGet("{communityId}/post-boosts")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<IReadOnlyList<CommunityPostBoostListItemDto>>> ListCommunityPostBoosts(
         string communityId,
         CancellationToken cancellationToken)
@@ -462,6 +476,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpPatch("{communityId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityResponseDto>> Patch(
         string communityId,
         [FromBody] CommunityUpdateRequestDTO body,
@@ -520,6 +535,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpPost("{communityId}/members")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> JoinPublic(string communityId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(communityId, out var cid))
@@ -542,6 +558,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpPost("{communityId}/join-requests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> RequestJoin(string communityId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(communityId, out var cid))
@@ -581,11 +598,13 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpPost("{communityId}/join")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public Task<IActionResult> JoinAlias(string communityId, CancellationToken cancellationToken) =>
         RequestJoin(communityId, cancellationToken);
 
     [Authorize]
     [HttpDelete("{communityId}/members/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Leave(string communityId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(communityId, out var cid))
@@ -618,6 +637,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpDelete("{communityId}/members/{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> RemoveMember(string communityId, string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(communityId, out var cid) || !int.TryParse(userId, out var uid))
@@ -654,6 +674,7 @@ public class CommunitiesController : ControllerBase
 
     [Authorize]
     [HttpPatch("{communityId}/members/{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> PatchMember(
         string communityId,
         string userId,

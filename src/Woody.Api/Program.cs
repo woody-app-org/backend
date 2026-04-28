@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Woody.Api.Configuration;
 using Woody.Api.Hubs;
@@ -111,16 +112,30 @@ builder.Services.AddSignalR();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("auth", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
-            }));
+    options.AddPolicy(RateLimitPolicyNames.AuthLogin, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 5, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.AuthRegister, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.AuthEmail, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.AuthRefresh, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.Upload, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 10, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.ContentCreate, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 10, window: TimeSpan.FromMinutes(5)));
+    options.AddPolicy(RateLimitPolicyNames.ContentComment, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(5)));
+    options.AddPolicy(RateLimitPolicyNames.ReportCreate, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 5, window: TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimitPolicyNames.PublicApi, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.PublicRead, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 300, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.AuthenticatedApi, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.StripeWebhook, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
 });
 
 if (builder.Environment.IsDevelopment())
@@ -175,9 +190,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseRateLimiter();
-
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -214,6 +228,34 @@ static void ConfigureRailwayPort(WebApplicationBuilder builder)
 
     builder.WebHost.UseUrls($"http://0.0.0.0:{portNumber}");
 }
+
+static RateLimitPartition<string> FixedWindowByIp(HttpContext httpContext, int permitLimit, TimeSpan window) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: $"ip:{GetClientIp(httpContext)}",
+        factory: _ => CreateFixedWindowOptions(permitLimit, window));
+
+static RateLimitPartition<string> FixedWindowByUser(HttpContext httpContext, int permitLimit, TimeSpan window)
+{
+    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var key = !string.IsNullOrWhiteSpace(userId)
+        ? $"user:{userId}"
+        : $"ip:{GetClientIp(httpContext)}";
+
+    return RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: key,
+        factory: _ => CreateFixedWindowOptions(permitLimit, window));
+}
+
+static FixedWindowRateLimiterOptions CreateFixedWindowOptions(int permitLimit, TimeSpan window) => new()
+{
+    PermitLimit = permitLimit,
+    Window = window,
+    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+    QueueLimit = 0
+};
+
+static string GetClientIp(HttpContext httpContext) =>
+    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 static bool ConfigureCors(WebApplicationBuilder builder)
 {

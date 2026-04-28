@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.Interfaces;
 
@@ -22,6 +24,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{commentId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Delete(string commentId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(commentId, out var cid))

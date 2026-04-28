@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
@@ -30,6 +32,7 @@ public class SearchController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<IActionResult> Search(
         [FromQuery] string q,
         [FromQuery] string mode = "posts",

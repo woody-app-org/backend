@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
@@ -36,6 +38,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/communities")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<string>>> GetMyCommunityIds(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
@@ -48,6 +51,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/following")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -75,6 +79,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/suggestions")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<UserPublicDto>>> GetSuggestions(
         [FromQuery] int take = 8,
         CancellationToken cancellationToken = default)
@@ -96,6 +101,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/communities")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<List<UserCommunityMembershipDto>>> GetUserCommunities(
         string userId,
         CancellationToken cancellationToken = default)
@@ -119,6 +125,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> GetMe(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
@@ -131,6 +138,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPatch("me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchMe(
         [FromBody] UpdateProfileRequestDTO body,
         CancellationToken cancellationToken)
@@ -227,6 +235,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPatch("me/interests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchInterests(
         [FromBody] UpdateInterestsRequestDTO body,
         CancellationToken cancellationToken)
@@ -261,6 +270,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserProfileDto>> GetById(
         string userId,
         CancellationToken cancellationToken)
@@ -274,6 +284,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userId}/posts")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<ProfilePostsPageResponseDto>> GetUserPosts(
         string userId,
         [FromQuery] int page = 1,
@@ -308,6 +319,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/follow/status")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserFollowStatusResponseDto>> GetFollowStatus(
         string userId,
         CancellationToken cancellationToken)
@@ -337,6 +349,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/followers")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetFollowers(
         string userId,
         [FromQuery] int page = 1,
@@ -367,6 +380,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/following")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetUserFollowingList(
         string userId,
         [FromQuery] int page = 1,
@@ -397,6 +411,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPost("{userId}/follow")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Follow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))
@@ -429,6 +444,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId}/follow")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Unfollow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))

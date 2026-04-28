@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
@@ -66,6 +68,7 @@ public class PostsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PostResponseDto>> GetById(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -85,6 +88,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
     public async Task<ActionResult<PostResponseDto>> Create([FromBody] CreatePostRequestDTO body, CancellationToken cancellationToken)
     {
         var me = User.GetUserId();
@@ -242,6 +246,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPatch("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PostResponseDto>> Update(
         string postId,
         [FromBody] UpdatePostRequestDTO body,
@@ -310,6 +315,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Delete(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -332,6 +338,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{postId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Like(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -351,6 +358,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{postId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Unlike(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -376,6 +384,7 @@ public class PostsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{postId}/comments")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<List<CommentResponseDto>>> GetComments(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -394,6 +403,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{postId}/comments")]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentComment)]
     public async Task<ActionResult<CommentResponseDto>> CreateComment(
         string postId,
         [FromBody] CreateCommentRequestDTO body,

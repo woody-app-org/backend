@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
@@ -11,7 +12,6 @@ namespace Woody.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly LoginHandler _loginHandler;
@@ -35,6 +35,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthLogin)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDTO request, CancellationToken cancellationToken)
     {
         try
@@ -50,6 +51,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRegister)]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDTO request, CancellationToken cancellationToken)
     {
         try
@@ -64,6 +66,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("send-verification")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
     public async Task<IActionResult> SendVerificationCode(
         [FromBody] SendEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)
@@ -73,6 +76,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("resend-verification")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
     public async Task<IActionResult> ResendVerificationCode(
         [FromBody] SendEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)
@@ -82,6 +86,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-email")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
     public async Task<IActionResult> VerifyEmailCode(
         [FromBody] ConfirmEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)
@@ -91,6 +96,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRefresh)]
     public async Task<IActionResult> Refresh(
         [FromBody] RefreshTokenRequestDTO request,
         CancellationToken cancellationToken)
@@ -107,6 +113,7 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpPost("logout")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Logout(
         [FromBody] RefreshTokenRequestDTO? request,
         CancellationToken cancellationToken)

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Application.Interfaces;
 using Woody.Domain.Media;
 
@@ -21,6 +23,7 @@ public class MediaController : ControllerBase
 
     [Authorize]
     [HttpPost("images")]
+    [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
@@ -48,6 +51,7 @@ public class MediaController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("images/{storageKey}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicRead)]
     public async Task<IActionResult> GetImage(string storageKey, CancellationToken cancellationToken)
     {
         var result = await _storage.OpenReadAsync(storageKey, cancellationToken);

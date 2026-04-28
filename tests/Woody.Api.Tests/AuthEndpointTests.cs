@@ -83,7 +83,7 @@ public class AuthEndpointTests
         var client = factory.CreateClient();
 
         HttpResponseMessage? response = null;
-        for (var i = 0; i < 11; i++)
+        for (var i = 0; i < 6; i++)
         {
             response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequestDTO
             {

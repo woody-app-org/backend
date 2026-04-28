@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
@@ -19,6 +21,7 @@ public class FeedController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> GetFeed(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
