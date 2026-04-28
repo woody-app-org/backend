@@ -46,5 +46,7 @@ namespace Woody.Domain.Entities
         public ICollection<Conversation> InitiatedConversations { get; set; } = new List<Conversation>();
         public ICollection<ConversationParticipant> ConversationParticipations { get; set; } = new List<ConversationParticipant>();
         public ICollection<Message> SentMessages { get; set; } = new List<Message>();
+        public ICollection<ProfileSignal> SentProfileSignals { get; set; } = new List<ProfileSignal>();
+        public ICollection<ProfileSignal> ReceivedProfileSignals { get; set; } = new List<ProfileSignal>();
     }
 }
