@@ -18,7 +18,7 @@ Na raiz deste repositório (`backend/`):
 docker compose up -d
 ```
 
-Credenciais **de desenvolvimento** (definidas em `docker-compose.yml`):
+Credenciais **de desenvolvimento local** (definidas em `docker-compose.yml`). Não reutilize estes valores em produção; o compose faz bind do Postgres apenas em `127.0.0.1:5432`.
 
 | Campo    | Valor        |
 |----------|--------------|
@@ -57,6 +57,7 @@ Defina também:
 - `Resend__ApiKey` (chave da API Resend)
 - `Resend__FromEmail` (remetente usado no envio do código)
 - `Resend__FromName` (opcional, nome do remetente)
+- `CORS_ORIGINS` em produção, com as origens exatas do frontend separadas por vírgula
 
 Parâmetros de verificação de e-mail (com valores padrão no `appsettings.json`, sobrescrevíveis por env vars):
 
@@ -86,7 +87,7 @@ dotnet ef database update --project .\Woody.Infrastructure\
 **Opção C — variáveis já exportadas**  
 Se `DATABASE_URL` ou `ConnectionStrings__DefaultConnection` já estiverem definidas no sistema, basta `dotnet ef database update` com os mesmos `--project` / `--startup-project` acima, a partir de `src/`.
 
-O `WoodyDbContextFactory` (design-time) também carrega `appsettings.json` de `Woody.Api` se encontrar a árvore do repositório; mesmo assim, para migrar costuma ser mais simples usar `.env` + `run-migrations.ps1` ou `DATABASE_URL` na sessão.
+O `WoodyDbContextFactory` (design-time) também carrega `appsettings.json` de `Woody.Api` se encontrar a árvore do repositório; mesmo assim, para migrar costuma ser mais simples usar `.env` + `run-migrations.ps1` ou `DATABASE_URL` na sessão. Logging sensível do EF em design-time só é ativado com `WOODY_EF_ENABLE_SENSITIVE_LOGGING=true`; não use essa flag em CI ou produção.
 
 ### 4. Executar a API
 
@@ -117,9 +118,9 @@ No projeto **woody-frontend**:
 
 ## Seed de desenvolvimento
 
-Com `ASPNETCORE_ENVIRONMENT=Development`, ao iniciar a API pode executar-se o `DbSeeder` (dados fictícios para testes: utilizadoras, comunidades, posts, etc.). Em outros ambientes, só corre se definir `WOODY_ENABLE_DEV_SEED=true`.
+Com `ASPNETCORE_ENVIRONMENT=Development`, ao iniciar a API pode executar-se o `DbSeeder` (dados fictícios para testes: utilizadoras, comunidades, posts, etc.). Em outros ambientes não produtivos, só corre se definir `WOODY_ENABLE_DEV_SEED=true`. Em `Production`, a API falha ao iniciar se essa flag estiver ativa.
 
-Contas de exemplo (ver também `DbSeeder.cs`): `admin` / `admin123`, `user1`…`user4` com as palavras-passe documentadas no código de seed, e `user5`–`user20` com palavra-passe de seed comum.
+Contas de exemplo (ver também `DbSeeder.cs`): `admin` / `admin123`, `user1`…`user4` com as palavras-passe documentadas no código de seed, e `user5`–`user20` com palavra-passe de seed comum. Essas credenciais são públicas e devem existir apenas em bancos locais descartáveis.
 
 ## Comandos EF úteis
 

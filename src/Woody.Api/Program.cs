@@ -39,6 +39,8 @@ var resendOptions = builder.Configuration.GetSection("Resend").Get<ResendOptions
     ?? throw new InvalidOperationException("Seção Resend ausente na configuração.");
 var emailVerificationOptions = builder.Configuration.GetSection("EmailVerification").Get<EmailVerificationOptions>()
     ?? throw new InvalidOperationException("Seção EmailVerification ausente na configuração.");
+var billingOptions = builder.Configuration.GetSection("Billing").Get<BillingOptions>()
+    ?? throw new InvalidOperationException("Seção Billing ausente na configuração.");
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
 {
@@ -160,6 +162,7 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 var corsEnabled = ConfigureCors(builder);
+ValidateProductionDeployment(builder, billingOptions, corsEnabled);
 
 builder.ResolveDependencyInjection();
 
@@ -303,12 +306,69 @@ static bool ConfigureCors(WebApplicationBuilder builder)
     return true;
 }
 
+static void ValidateProductionDeployment(WebApplicationBuilder builder, BillingOptions billingOptions, bool corsEnabled)
+{
+    if (!builder.Environment.IsProduction())
+        return;
+
+    if (!corsEnabled)
+    {
+        throw new InvalidOperationException(
+            "CORS_ORIGINS deve ser definido em produção com as origens exatas do frontend.");
+    }
+
+    var devSeedFlag = Environment.GetEnvironmentVariable("WOODY_ENABLE_DEV_SEED");
+    if (!string.IsNullOrWhiteSpace(devSeedFlag)
+        && devSeedFlag.Equals("true", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("WOODY_ENABLE_DEV_SEED não pode estar ativo em produção.");
+    }
+
+    ValidateProductionStripeOptions(billingOptions);
+}
+
+static void ValidateProductionStripeOptions(BillingOptions billingOptions)
+{
+    var stripe = billingOptions.Stripe;
+    var hasStripeConfig =
+        !string.IsNullOrWhiteSpace(stripe.SecretKey)
+        || !string.IsNullOrWhiteSpace(stripe.WebhookSecret)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProMonthly)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProAnnual)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumMonthly)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumAnnual);
+
+    if (!hasStripeConfig)
+        return;
+
+    if (string.IsNullOrWhiteSpace(stripe.SecretKey))
+        throw new InvalidOperationException("Billing:Stripe:SecretKey deve ser definido em produção quando Stripe estiver configurado.");
+
+    if (string.IsNullOrWhiteSpace(stripe.WebhookSecret))
+        throw new InvalidOperationException("Billing:Stripe:WebhookSecret deve ser definido em produção quando Stripe estiver configurado.");
+
+    RequireHttpsUrl(stripe.CheckoutSuccessUrl, "Billing:Stripe:CheckoutSuccessUrl");
+    RequireHttpsUrl(stripe.CheckoutCancelUrl, "Billing:Stripe:CheckoutCancelUrl");
+    RequireHttpsUrl(stripe.CustomerPortalReturnUrl, "Billing:Stripe:CustomerPortalReturnUrl");
+}
+
+static void RequireHttpsUrl(string value, string settingName)
+{
+    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        throw new InvalidOperationException($"{settingName} deve ser uma URL HTTPS absoluta em produção.");
+}
+
 static bool ShouldRunDevSeed(IHostEnvironment environment)
 {
     if (environment.IsDevelopment())
         return true;
 
     var flag = Environment.GetEnvironmentVariable("WOODY_ENABLE_DEV_SEED");
+    if (!string.IsNullOrWhiteSpace(flag)
+        && flag.Equals("true", StringComparison.OrdinalIgnoreCase)
+        && environment.IsProduction())
+        throw new InvalidOperationException("WOODY_ENABLE_DEV_SEED não pode estar ativo em produção.");
+
     return !string.IsNullOrWhiteSpace(flag)
            && flag.Equals("true", StringComparison.OrdinalIgnoreCase);
 }
