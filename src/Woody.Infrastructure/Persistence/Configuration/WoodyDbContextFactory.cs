@@ -20,10 +20,19 @@ public class WoodyDbContextFactory : IDesignTimeDbContextFactory<WoodyDbContext>
                 x => x
                     .MigrationsHistoryTable(HistoryRepository.DefaultTableName, "public")
                     .MigrationsAssembly("Woody.Infrastructure"))
-            .UseSnakeCaseNamingConvention()
-            .EnableSensitiveDataLogging();
+            .UseSnakeCaseNamingConvention();
+
+        if (SensitiveDesignTimeLoggingEnabled())
+            optionsBuilder.EnableSensitiveDataLogging();
 
         return new WoodyDbContext(optionsBuilder.Options);
+    }
+
+    private static bool SensitiveDesignTimeLoggingEnabled()
+    {
+        var flag = Environment.GetEnvironmentVariable("WOODY_EF_ENABLE_SENSITIVE_LOGGING");
+        return !string.IsNullOrWhiteSpace(flag)
+               && flag.Equals("true", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IConfiguration BuildDesignTimeConfiguration()

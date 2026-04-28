@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
@@ -9,6 +11,7 @@ namespace Woody.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/conversations")]
+[EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class ConversationsController : ControllerBase
 {
     private readonly IDirectMessagingService _directMessaging;

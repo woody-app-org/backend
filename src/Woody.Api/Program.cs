@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Woody.Api.Configuration;
 using Woody.Api.Hubs;
 using Woody.Application.Configuration;
@@ -12,6 +16,7 @@ using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
+using Woody.Domain.Media;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +39,8 @@ var resendOptions = builder.Configuration.GetSection("Resend").Get<ResendOptions
     ?? throw new InvalidOperationException("Seção Resend ausente na configuração.");
 var emailVerificationOptions = builder.Configuration.GetSection("EmailVerification").Get<EmailVerificationOptions>()
     ?? throw new InvalidOperationException("Seção EmailVerification ausente na configuração.");
+var billingOptions = builder.Configuration.GetSection("Billing").Get<BillingOptions>()
+    ?? throw new InvalidOperationException("Seção Billing ausente na configuração.");
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
 {
@@ -49,6 +56,7 @@ if (!builder.Environment.IsDevelopment() && jwtOptions.Secret.Length < 32)
 
 ValidateResendOptions(resendOptions);
 ValidateEmailVerificationOptions(emailVerificationOptions);
+ValidateJwtOptions(jwtOptions);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -103,6 +111,34 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitPolicyNames.AuthLogin, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 5, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.AuthRegister, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.AuthEmail, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.AuthRefresh, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.Upload, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 10, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.ContentCreate, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 10, window: TimeSpan.FromMinutes(5)));
+    options.AddPolicy(RateLimitPolicyNames.ContentComment, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(5)));
+    options.AddPolicy(RateLimitPolicyNames.ReportCreate, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 5, window: TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimitPolicyNames.PublicApi, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.PublicRead, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 300, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.AuthenticatedApi, httpContext =>
+        FixedWindowByUser(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.StripeWebhook, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -115,9 +151,18 @@ WoodyDbConfiguration.ConfigureServices(builder.Services, builder.Configuration, 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
+builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection("AuthSecurity"));
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
+builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
+builder.Services.Configure<FormOptions>(options =>
+{
+    var maxImageSize = builder.Configuration.GetValue<long?>("MediaStorage:MaxImageSizeBytes")
+                       ?? UploadedImagePolicy.DefaultMaxSizeBytes;
+    options.MultipartBodyLengthLimit = maxImageSize + 1024 * 1024;
+});
 
 var corsEnabled = ConfigureCors(builder);
+ValidateProductionDeployment(builder, billingOptions, corsEnabled);
 
 builder.ResolveDependencyInjection();
 
@@ -148,8 +193,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -186,6 +231,34 @@ static void ConfigureRailwayPort(WebApplicationBuilder builder)
 
     builder.WebHost.UseUrls($"http://0.0.0.0:{portNumber}");
 }
+
+static RateLimitPartition<string> FixedWindowByIp(HttpContext httpContext, int permitLimit, TimeSpan window) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: $"ip:{GetClientIp(httpContext)}",
+        factory: _ => CreateFixedWindowOptions(permitLimit, window));
+
+static RateLimitPartition<string> FixedWindowByUser(HttpContext httpContext, int permitLimit, TimeSpan window)
+{
+    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var key = !string.IsNullOrWhiteSpace(userId)
+        ? $"user:{userId}"
+        : $"ip:{GetClientIp(httpContext)}";
+
+    return RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: key,
+        factory: _ => CreateFixedWindowOptions(permitLimit, window));
+}
+
+static FixedWindowRateLimiterOptions CreateFixedWindowOptions(int permitLimit, TimeSpan window) => new()
+{
+    PermitLimit = permitLimit,
+    Window = window,
+    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+    QueueLimit = 0
+};
+
+static string GetClientIp(HttpContext httpContext) =>
+    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 static bool ConfigureCors(WebApplicationBuilder builder)
 {
@@ -233,12 +306,69 @@ static bool ConfigureCors(WebApplicationBuilder builder)
     return true;
 }
 
+static void ValidateProductionDeployment(WebApplicationBuilder builder, BillingOptions billingOptions, bool corsEnabled)
+{
+    if (!builder.Environment.IsProduction())
+        return;
+
+    if (!corsEnabled)
+    {
+        throw new InvalidOperationException(
+            "CORS_ORIGINS deve ser definido em produção com as origens exatas do frontend.");
+    }
+
+    var devSeedFlag = Environment.GetEnvironmentVariable("WOODY_ENABLE_DEV_SEED");
+    if (!string.IsNullOrWhiteSpace(devSeedFlag)
+        && devSeedFlag.Equals("true", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("WOODY_ENABLE_DEV_SEED não pode estar ativo em produção.");
+    }
+
+    ValidateProductionStripeOptions(billingOptions);
+}
+
+static void ValidateProductionStripeOptions(BillingOptions billingOptions)
+{
+    var stripe = billingOptions.Stripe;
+    var hasStripeConfig =
+        !string.IsNullOrWhiteSpace(stripe.SecretKey)
+        || !string.IsNullOrWhiteSpace(stripe.WebhookSecret)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProMonthly)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProAnnual)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumMonthly)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumAnnual);
+
+    if (!hasStripeConfig)
+        return;
+
+    if (string.IsNullOrWhiteSpace(stripe.SecretKey))
+        throw new InvalidOperationException("Billing:Stripe:SecretKey deve ser definido em produção quando Stripe estiver configurado.");
+
+    if (string.IsNullOrWhiteSpace(stripe.WebhookSecret))
+        throw new InvalidOperationException("Billing:Stripe:WebhookSecret deve ser definido em produção quando Stripe estiver configurado.");
+
+    RequireHttpsUrl(stripe.CheckoutSuccessUrl, "Billing:Stripe:CheckoutSuccessUrl");
+    RequireHttpsUrl(stripe.CheckoutCancelUrl, "Billing:Stripe:CheckoutCancelUrl");
+    RequireHttpsUrl(stripe.CustomerPortalReturnUrl, "Billing:Stripe:CustomerPortalReturnUrl");
+}
+
+static void RequireHttpsUrl(string value, string settingName)
+{
+    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        throw new InvalidOperationException($"{settingName} deve ser uma URL HTTPS absoluta em produção.");
+}
+
 static bool ShouldRunDevSeed(IHostEnvironment environment)
 {
     if (environment.IsDevelopment())
         return true;
 
     var flag = Environment.GetEnvironmentVariable("WOODY_ENABLE_DEV_SEED");
+    if (!string.IsNullOrWhiteSpace(flag)
+        && flag.Equals("true", StringComparison.OrdinalIgnoreCase)
+        && environment.IsProduction())
+        throw new InvalidOperationException("WOODY_ENABLE_DEV_SEED não pode estar ativo em produção.");
+
     return !string.IsNullOrWhiteSpace(flag)
            && flag.Equals("true", StringComparison.OrdinalIgnoreCase);
 }
@@ -260,3 +390,11 @@ static void ValidateEmailVerificationOptions(EmailVerificationOptions options)
     if (options.MaxAttempts <= 0)
         throw new InvalidOperationException("EmailVerification:MaxAttempts deve ser maior que zero.");
 }
+
+static void ValidateJwtOptions(JwtOptions options)
+{
+    if (options.ExpirationMinutes is < 10 or > 15)
+        throw new InvalidOperationException("Jwt:ExpirationMinutes deve estar entre 10 e 15 minutos.");
+}
+
+public partial class Program { }

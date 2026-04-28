@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
@@ -26,6 +28,7 @@ public class JoinRequestsController : ControllerBase
 
     [Authorize]
     [HttpPost("{joinRequestId}/approve")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Approve(string joinRequestId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(joinRequestId, out var jrid))
@@ -71,6 +74,7 @@ public class JoinRequestsController : ControllerBase
 
     [Authorize]
     [HttpPost("{joinRequestId}/reject")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Reject(string joinRequestId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(joinRequestId, out var jrid))

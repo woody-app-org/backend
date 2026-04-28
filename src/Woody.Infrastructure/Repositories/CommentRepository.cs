@@ -40,6 +40,11 @@ public class CommentRepository : ICommentRepository
     public async Task<Comment?> GetTrackedAsync(int commentId, CancellationToken cancellationToken = default) =>
         await _db.Comments.FirstOrDefaultAsync(c => c.Id == commentId, cancellationToken);
 
+    public async Task<Comment?> GetTrackedWithPostAsync(int commentId, CancellationToken cancellationToken = default) =>
+        await _db.Comments
+            .Include(c => c.Post).ThenInclude(p => p.Community)
+            .FirstOrDefaultAsync(c => c.Id == commentId, cancellationToken);
+
     public void Add(Comment comment) => _db.Comments.Add(comment);
 
     public async Task<Comment?> GetByIdNonDeletedWithAuthorAsync(int id, CancellationToken cancellationToken = default) =>

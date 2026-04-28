@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
@@ -8,6 +10,7 @@ using Woody.Domain.Entities;
 using Woody.Domain.Posts;
 using Woody.Domain.Entities.Enum;
 using Woody.Application.Mapping;
+using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
 
@@ -19,51 +22,31 @@ public class PostsController : ControllerBase
 
     private readonly IPostRepository _posts;
     private readonly ICommunityRepository _communities;
-    private readonly ICommunityMembershipRepository _memberships;
     private readonly ICommunityPermissionService _communityPermissions;
     private readonly ILikeRepository _likes;
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly IContentPinningService _pinning;
+    private readonly IResourceAuthorizationService _authorization;
 
     public PostsController(
         IPostRepository posts,
         ICommunityRepository communities,
-        ICommunityMembershipRepository memberships,
         ICommunityPermissionService communityPermissions,
         ILikeRepository likes,
         ICommentRepository comments,
         IPostEnrichmentService postEnrichment,
-        IContentPinningService pinning)
+        IContentPinningService pinning,
+        IResourceAuthorizationService authorization)
     {
         _posts = posts;
         _communities = communities;
-        _memberships = memberships;
         _communityPermissions = communityPermissions;
         _likes = likes;
         _comments = comments;
         _postEnrichment = postEnrichment;
         _pinning = pinning;
-    }
-
-    /// <summary>Lê conteúdo do post (detalhe, comentários, gosto) só com as mesmas regras que o feed.</summary>
-    private async Task<bool> ViewerCanReadPostAsync(Post? post, int? viewerUserId, CancellationToken cancellationToken)
-    {
-        if (post == null)
-            return false;
-        if (post.PublicationContext == PostPublicationContext.Profile)
-            return true;
-        if (post.CommunityId == null || post.Community == null)
-            return true;
-        if (string.Equals(post.Community.Visibility, "public", StringComparison.OrdinalIgnoreCase))
-            return true;
-        if (viewerUserId == post.UserId)
-            return true;
-        if (viewerUserId == null)
-            return false;
-        return await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(
-                   viewerUserId.Value, post.CommunityId.Value, cancellationToken)
-               != null;
+        _authorization = authorization;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -85,6 +68,7 @@ public class PostsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PostResponseDto>> GetById(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -95,7 +79,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
             return NotFound();
-        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
         var list = await _postEnrichment.ToPostDtosAsync(new[] { post }, viewerId, cancellationToken);
@@ -104,18 +88,39 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
     public async Task<ActionResult<PostResponseDto>> Create([FromBody] CreatePostRequestDTO body, CancellationToken cancellationToken)
     {
         var me = User.GetUserId();
         if (me == null)
             return Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(body.Title) || string.IsNullOrWhiteSpace(body.Content))
-            return BadRequest(new { error = "Título e conteúdo são obrigatórios." });
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Title,
+                "Título",
+                InputValidationLimits.PostTitleMaxLength,
+                out var title,
+                out var error))
+            return BadRequest(new { error });
 
-        var imageUrls = NormalizePostImageUrls(body);
-        if (imageUrls.Count > MaxPostImages)
-            return BadRequest(new { error = $"Máximo de {MaxPostImages} imagens por publicação." });
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Conteúdo",
+                InputValidationLimits.PostContentMaxLength,
+                out var content,
+                out error))
+            return BadRequest(new { error });
+
+        if (!TryNormalizePostImageUrls(body, out var imageUrls, out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeTags(
+                body.Tags,
+                InputValidationLimits.PostTagsMaxCount,
+                InputValidationLimits.TagMaxLength,
+                out var tags,
+                out error))
+            return BadRequest(new { error });
 
         var ctxRaw = (body.PublicationContext ?? string.Empty).Trim().ToLowerInvariant();
         var hasCommunityId = !string.IsNullOrWhiteSpace(body.CommunityId);
@@ -148,8 +153,8 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = null,
                 PublicationContext = PostPublicationContext.Profile,
-                Title = body.Title.Trim(),
-                Content = body.Content.Trim(),
+                Title = title,
+                Content = content,
                 ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
                 CreatedAt = DateTime.UtcNow
             };
@@ -170,8 +175,8 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = communityId,
                 PublicationContext = PostPublicationContext.Community,
-                Title = body.Title.Trim(),
-                Content = body.Content.Trim(),
+                Title = title,
+                Content = content,
                 ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
                 CreatedAt = DateTime.UtcNow
             };
@@ -191,12 +196,10 @@ public class PostsController : ControllerBase
             await _posts.SaveChangesAsync(cancellationToken);
         }
 
-        if (body.Tags != null)
+        if (tags.Count > 0)
         {
-            var tags = body.Tags
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
-            await _posts.AddPostTagsAsync(tags, cancellationToken);
+            var rows = tags.Select(t => new PostTag { PostId = post.Id, Tag = t });
+            await _posts.AddPostTagsAsync(rows, cancellationToken);
             await _posts.SaveChangesAsync(cancellationToken);
         }
 
@@ -207,28 +210,43 @@ public class PostsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
     }
 
-    private static List<string> NormalizePostImageUrls(CreatePostRequestDTO body)
+    private static bool TryNormalizePostImageUrls(
+        CreatePostRequestDTO body,
+        out List<string> normalized,
+        out string? error)
     {
-        var list = new List<string>();
+        normalized = new List<string>();
+        error = null;
+
         if (body.ImageUrls is { Count: > 0 })
         {
             foreach (var u in body.ImageUrls)
             {
-                if (string.IsNullOrWhiteSpace(u))
+                if (!InputValidator.TryNormalizeHttpsImageUrl(u, out var imageUrl, out error))
+                    return false;
+                if (imageUrl == null || normalized.Contains(imageUrl))
                     continue;
-                list.Add(u.Trim());
+                normalized.Add(imageUrl);
+                if (normalized.Count > MaxPostImages)
+                {
+                    error = $"Máximo de {MaxPostImages} imagens por publicação.";
+                    return false;
+                }
             }
 
-            return list;
+            return true;
         }
 
-        if (!string.IsNullOrWhiteSpace(body.ImageUrl))
-            list.Add(body.ImageUrl.Trim());
-        return list;
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var singleImageUrl, out error))
+            return false;
+        if (singleImageUrl != null)
+            normalized.Add(singleImageUrl);
+        return true;
     }
 
     [Authorize]
     [HttpPatch("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PostResponseDto>> Update(
         string postId,
         [FromBody] UpdatePostRequestDTO body,
@@ -244,20 +262,45 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedWithTagsAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanEditPostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
-        post.Title = body.Title.Trim();
-        post.Content = body.Content.Trim();
-        post.ImageUrl = string.IsNullOrWhiteSpace(body.ImageUrl) ? null : body.ImageUrl.Trim();
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Title,
+                "Título",
+                InputValidationLimits.PostTitleMaxLength,
+                out var title,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Conteúdo",
+                InputValidationLimits.PostContentMaxLength,
+                out var content,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var imageUrl, out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeTags(
+                body.Tags,
+                InputValidationLimits.PostTagsMaxCount,
+                InputValidationLimits.TagMaxLength,
+                out var tags,
+                out error))
+            return BadRequest(new { error });
+
+        post.Title = title;
+        post.Content = content;
+        post.ImageUrl = imageUrl;
         post.UpdatedAt = DateTime.UtcNow;
 
         if (body.Tags != null)
         {
             _posts.RemovePostTags(post.Tags);
-            var newTags = body.Tags
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(t => new PostTag { PostId = post.Id, Tag = t.Trim() });
+            var newTags = tags.Select(t => new PostTag { PostId = post.Id, Tag = t });
             await _posts.AddPostTagsAsync(newTags, cancellationToken);
         }
 
@@ -272,6 +315,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{postId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Delete(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -284,7 +328,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanDeletePostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
         post.DeletedAt = DateTime.UtcNow;
@@ -294,6 +338,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{postId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Like(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -304,25 +349,16 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var postForLike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(postForLike, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
             return NotFound();
 
-        if (await _likes.ExistsPostLikeAsync(me.Value, pid, cancellationToken))
-            return NoContent();
-
-        _likes.Add(new Like
-        {
-            UserId = me.Value,
-            TargetType = LikeTargetType.Post,
-            TargetId = pid,
-            CreatedAt = DateTime.UtcNow
-        });
-        await _likes.SaveChangesAsync(cancellationToken);
+        await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
         return NoContent();
     }
 
     [Authorize]
     [HttpDelete("{postId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Unlike(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -333,7 +369,7 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var postForUnlike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(postForUnlike, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(postForUnlike, me, cancellationToken))
             return NotFound();
 
         var row = await _likes.GetPostLikeAsync(me.Value, pid, cancellationToken);
@@ -348,6 +384,7 @@ public class PostsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{postId}/comments")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<List<CommentResponseDto>>> GetComments(string postId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(postId, out var pid))
@@ -355,7 +392,7 @@ public class PostsController : ControllerBase
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
-        if (!await ViewerCanReadPostAsync(post, viewerId, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
         var postAuthorId = post!.UserId;
@@ -366,6 +403,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{postId}/comments")]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentComment)]
     public async Task<ActionResult<CommentResponseDto>> CreateComment(
         string postId,
         [FromBody] CreateCommentRequestDTO body,
@@ -379,21 +417,37 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await ViewerCanReadPostAsync(post, me, cancellationToken))
+        if (!await _authorization.CanReadPostAsync(post, me, cancellationToken))
             return NotFound();
 
         var postAuthorId = post!.UserId;
 
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Content,
+                "Comentário",
+                InputValidationLimits.CommentContentMaxLength,
+                out var commentContent,
+                out var error))
+            return BadRequest(new { error });
+
         int? parentId = null;
-        if (!string.IsNullOrWhiteSpace(body.ParentCommentId) && int.TryParse(body.ParentCommentId, out var pcid))
+        if (!string.IsNullOrWhiteSpace(body.ParentCommentId))
+        {
+            if (!int.TryParse(body.ParentCommentId, out var pcid) || pcid <= 0)
+                return BadRequest(new { error = "Comentário pai inválido." });
+
+            var parent = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
+            if (parent == null || parent.PostId != pid)
+                return BadRequest(new { error = "Comentário pai inválido." });
             parentId = pcid;
+        }
 
         var comment = new Comment
         {
             PostId = pid,
             AuthorId = me.Value,
             ParentCommentId = parentId,
-            Content = body.Content.Trim(),
+            Content = commentContent,
             CreatedAt = DateTime.UtcNow
         };
         _comments.Add(comment);
@@ -422,7 +476,7 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByIdTrackedAsync(pid, cancellationToken);
         if (post == null || post.DeletedAt != null)
             return NotFound();
-        if (post.UserId != me.Value)
+        if (!await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
             return Forbid();
 
         var comment = await _comments.GetTrackedWithAuthorAsync(cid, pid, cancellationToken);

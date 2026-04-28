@@ -2,6 +2,8 @@ using System.IO;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Application.Interfaces.Billing;
 
 namespace Woody.Api.Controllers;
@@ -13,6 +15,7 @@ public class StripeBillingWebhooksController : ControllerBase
 {
     [HttpPost("webhook")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.StripeWebhook)]
     public async Task<IActionResult> Post(
         [FromServices] IStripeWebhookBillingProcessor processor,
         CancellationToken cancellationToken)

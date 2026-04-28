@@ -2,7 +2,7 @@ using Woody.Application.Billing;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
-using Woody.Application.Mapping;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 
@@ -15,7 +15,7 @@ public class RegisterHandler
     private readonly IEmailVerificationCodeRepository _emailVerificationCodes;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IDefaultCommunityBootstrap _defaultCommunity;
-    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IAuthSessionService _authSessions;
 
     public RegisterHandler(
         IUserRepository users,
@@ -23,25 +23,59 @@ public class RegisterHandler
         IEmailVerificationCodeRepository emailVerificationCodes,
         IPasswordHasher passwordHasher,
         IDefaultCommunityBootstrap defaultCommunity,
-        IJwtTokenService jwtTokenService)
+        IAuthSessionService authSessions)
     {
         _users = users;
         _subscriptions = subscriptions;
         _emailVerificationCodes = emailVerificationCodes;
         _passwordHasher = passwordHasher;
         _defaultCommunity = defaultCommunity;
-        _jwtTokenService = jwtTokenService;
+        _authSessions = authSessions;
     }
 
     public async Task<LoginResultDTO> HandleAsync(RegisterRequestDTO request, CancellationToken cancellationToken = default)
     {
-        var username = request.Username.Trim();
-        var email = request.Email.Trim().ToLowerInvariant();
+        if (!InputValidator.TryNormalizeRequiredText(
+                request.Username,
+                "Nome de utilizador",
+                InputValidationLimits.UsernameMaxLength,
+                out var username,
+                out var error))
+            throw new ArgumentException(error);
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                request.Email,
+                "E-mail",
+                InputValidationLimits.EmailMaxLength,
+                out var email,
+                out error))
+            throw new ArgumentException(error);
+        email = email.ToLowerInvariant();
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                request.Password,
+                "Senha",
+                InputValidationLimits.PasswordMaxLength,
+                out var password,
+                out error,
+                minLength: 8))
+            throw new ArgumentException(error);
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                request.Cpf,
+                "CPF",
+                InputValidationLimits.CpfMaxLength,
+                out var cpf,
+                out error))
+            throw new ArgumentException(error);
+
+        if (!InputValidator.TryNormalizeHttpsImageUrl(request.AvatarUrl, out var avatarUrl, out error))
+            throw new ArgumentException(error);
 
         if (await _users.ExistsUsernameAsync(username))
-            throw new InvalidOperationException("Nome de utilizador já existe.");
+            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
         if (await _users.ExistsEmailAsync(email))
-            throw new InvalidOperationException("Email já registado.");
+            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
 
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");
@@ -56,12 +90,12 @@ public class RegisterHandler
         {
             Username = username,
             Email = email,
-            Password = _passwordHasher.HashPassword(request.Password),
+            Password = _passwordHasher.HashPassword(password),
             Role = "User",
             DisplayName = username,
-            Cpf = request.Cpf.Trim(),
+            Cpf = cpf,
             BirthDate = birthDate,
-            ProfilePic = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim(),
+            ProfilePic = avatarUrl,
             IsEmailVerified = isEmailVerified,
             EmailVerifiedAt = isEmailVerified ? now : null,
             CreatedAt = now,
@@ -86,12 +120,6 @@ public class RegisterHandler
 
         await _defaultCommunity.EnsureUserInDefaultCommunityAsync(user.Id, cancellationToken);
 
-        var token = _jwtTokenService.GenerateToken(user, subscription);
-
-        return new LoginResultDTO
-        {
-            Token = token,
-            User = AuthUserMapper.From(user, subscription, now)
-        };
+        return await _authSessions.CreateSessionAsync(user, subscription, cancellationToken);
     }
 }

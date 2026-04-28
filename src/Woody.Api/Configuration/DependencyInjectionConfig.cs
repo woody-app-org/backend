@@ -11,6 +11,7 @@ using Woody.Infrastructure.Billing.StripePayments;
 using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
+using Woody.Infrastructure.Storage;
 
 namespace Woody.Api.Configuration;
 
@@ -20,6 +21,7 @@ public static class DependencyInjectionConfig
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();
+        builder.Services.AddScoped<IBillingCheckoutAttemptRepository, BillingCheckoutAttemptRepository>();
         builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         builder.Services.AddScoped<ICommunitySubscriptionRepository, CommunitySubscriptionRepository>();
         builder.Services.AddScoped<IBillingSubscriptionGateway, StripeBillingSubscriptionGateway>();
@@ -32,6 +34,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<CreateCustomerPortalSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
+        builder.Services.AddScoped<IRefreshTokenSessionRepository, RefreshTokenSessionRepository>();
+        builder.Services.AddScoped<ILoginLockoutRepository, LoginLockoutRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
@@ -47,6 +51,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IPostEnrichmentService, PostEnrichmentService>();
         builder.Services.AddScoped<IFeedService, FeedService>();
         builder.Services.AddScoped<ICommunityPermissionService, CommunityPermissionService>();
+        builder.Services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
         builder.Services.AddScoped<ICommunityPremiumEntitlementService, CommunityPremiumEntitlementService>();
         builder.Services.AddScoped<ICommunityDailyRollupRepository, CommunityDailyRollupRepository>();
         builder.Services.AddScoped<ICommunityAnalyticsReadRepository, CommunityAnalyticsReadRepository>();
@@ -54,6 +59,9 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
         builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
+        builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
+        builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
+        builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();

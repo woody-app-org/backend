@@ -4,6 +4,7 @@ using Woody.Application.Interfaces;
 using Woody.Application.Mapping;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Media;
 using Woody.Domain.Messaging;
 
 namespace Woody.Application.Services;
@@ -13,7 +14,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private const int MaxMessageBodyLength = 16_000;
     private const int MaxMessageAttachments = 10;
     /// <summary>Permite data URLs de imagem (mesmo padrão conceptual dos posts) até ~450KB ficheiro.</summary>
-    private const int MaxAttachmentUrlLength = 900_000;
+    private const int MaxDataImageAttachmentUrlLength = 900_000;
+    private const int MaxExternalAttachmentUrlLength = PublicImageUrlPolicy.MaxUrlLength;
 
     private readonly IConversationRepository _conversations;
     private readonly IMessageRepository _messages;
@@ -452,11 +454,13 @@ public sealed class DirectMessagingService : IDirectMessagingService
             if (string.IsNullOrWhiteSpace(u))
                 continue;
             var t = u.Trim();
-            if (t.Length > MaxAttachmentUrlLength)
-                throw new ArgumentException($"Cada URL de anexo não pode exceder {MaxAttachmentUrlLength} caracteres.");
+            var isDataImage = t.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+            var maxLength = isDataImage ? MaxDataImageAttachmentUrlLength : MaxExternalAttachmentUrlLength;
+            if (t.Length > maxLength)
+                throw new ArgumentException($"Cada URL de anexo não pode exceder {maxLength} caracteres.");
             if (!DirectMessageAttachmentPolicy.IsPermittedAttachmentUrl(t))
                 throw new ArgumentException(
-                    "Cada anexo tem de ser uma imagem: URL http(s) ou data:image (png, jpeg, gif ou webp) em base64.");
+                    "Cada anexo tem de ser uma imagem: URL https válida ou data:image (png, jpeg, gif ou webp) em base64.");
             if (list.Contains(t))
                 continue;
             list.Add(t);

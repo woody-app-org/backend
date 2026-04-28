@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Application.Mapping;
+using Woody.Domain.Entities;
 
 namespace Woody.Api.Controllers;
 
@@ -15,21 +18,25 @@ public class SearchController : ControllerBase
     private readonly ICommunityRepository _communities;
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
+    private readonly IResourceAuthorizationService _authorization;
 
     public SearchController(
         IUserRepository users,
         ICommunityRepository communities,
         IPostRepository posts,
-        IPostEnrichmentService postEnrichment)
+        IPostEnrichmentService postEnrichment,
+        IResourceAuthorizationService authorization)
     {
         _users = users;
         _communities = communities;
         _posts = posts;
         _postEnrichment = postEnrichment;
+        _authorization = authorization;
     }
 
     [AllowAnonymous]
     [HttpGet]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<IActionResult> Search(
         [FromQuery] string q,
         [FromQuery] string mode = "posts",
@@ -61,8 +68,17 @@ public class SearchController : ControllerBase
             return Ok(new { communities = list.Select(EntityMappers.ToCommunityDto).ToList() });
         }
 
-        var posts = await _posts.SearchNonDeletedWithNavAsync(n, 80, cancellationToken);
-        var dtos = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
+        var posts = await _posts.SearchNonDeletedWithNavAsync(n, 200, cancellationToken);
+        var visiblePosts = new List<Post>();
+        foreach (var post in posts)
+        {
+            if (await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
+                visiblePosts.Add(post);
+            if (visiblePosts.Count >= 80)
+                break;
+        }
+
+        var dtos = await _postEnrichment.ToPostDtosAsync(visiblePosts, viewerId, cancellationToken);
         return Ok(new { posts = dtos });
     }
 }

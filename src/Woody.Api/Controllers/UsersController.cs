@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Application.Mapping;
+using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
 
@@ -35,6 +38,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/communities")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<string>>> GetMyCommunityIds(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
@@ -47,6 +51,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/following")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -74,6 +79,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me/suggestions")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<UserPublicDto>>> GetSuggestions(
         [FromQuery] int take = 8,
         CancellationToken cancellationToken = default)
@@ -95,6 +101,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/communities")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<List<UserCommunityMembershipDto>>> GetUserCommunities(
         string userId,
         CancellationToken cancellationToken = default)
@@ -118,6 +125,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpGet("me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> GetMe(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
@@ -130,6 +138,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPatch("me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchMe(
         [FromBody] UpdateProfileRequestDTO body,
         CancellationToken cancellationToken)
@@ -142,31 +151,78 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
-        if (!string.Equals(user.Username, body.Username, StringComparison.Ordinal))
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Username,
+                "Nome de utilizador",
+                InputValidationLimits.UsernameMaxLength,
+                out var username,
+                out var error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeRequiredText(
+                body.Name,
+                "Nome",
+                InputValidationLimits.DisplayNameMaxLength,
+                out var displayName,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Bio,
+                "Bio",
+                InputValidationLimits.ProfileBioMaxLength,
+                out var bio,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Pronouns,
+                "Pronomes",
+                InputValidationLimits.ProfilePronounsMaxLength,
+                out var pronouns,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Location,
+                "Localização",
+                InputValidationLimits.ProfileLocationMaxLength,
+                out var location,
+                out error))
+            return BadRequest(new { error });
+
+        if (!InputValidator.TryNormalizeHttpsImageUrl(body.AvatarUrl, out var avatarUrl, out error)
+            || !InputValidator.TryNormalizeHttpsImageUrl(body.BannerUrl, out var bannerUrl, out error))
+            return BadRequest(new { error });
+
+        if (!TryNormalizeInterests(body.Interests, out var interests, out error))
+            return BadRequest(new { error });
+
+        if (!string.Equals(user.Username, username, StringComparison.Ordinal))
         {
-            if (await _users.ExistsUsernameAsync(body.Username.Trim()))
+            if (await _users.ExistsUsernameAsync(username))
                 return Conflict(new { error = "Nome de utilizador já existe." });
-            user.Username = body.Username.Trim();
+            user.Username = username;
         }
 
-        user.DisplayName = body.Name.Trim();
-        user.Bio = body.Bio;
-        user.Pronouns = body.Pronouns;
-        user.Location = body.Location;
-        user.ProfilePic = body.AvatarUrl;
-        user.BannerPic = body.BannerUrl;
+        user.DisplayName = displayName;
+        user.Bio = bio ?? string.Empty;
+        user.Pronouns = pronouns;
+        user.Location = location;
+        user.ProfilePic = avatarUrl;
+        user.BannerPic = bannerUrl;
         user.UpdatedAt = DateTime.UtcNow;
 
         if (body.Interests != null)
         {
             var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
             _users.RemoveUserInterests(existing);
-            foreach (var i in body.Interests)
+            foreach (var interest in interests)
             {
                 _users.AddUserInterest(new UserInterest
                 {
                     UserId = user.Id,
-                    Label = i.Label.Trim()
+                    Label = interest
                 });
             }
         }
@@ -179,6 +235,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPatch("me/interests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchInterests(
         [FromBody] UpdateInterestsRequestDTO body,
         CancellationToken cancellationToken)
@@ -191,14 +248,17 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
+        if (!TryNormalizeInterests(body.Interests, out var interests, out var error))
+            return BadRequest(new { error });
+
         var existing = await _users.GetInterestsTrackedByUserIdAsync(user.Id, cancellationToken);
         _users.RemoveUserInterests(existing);
-        foreach (var i in body.Interests)
+        foreach (var interest in interests)
         {
             _users.AddUserInterest(new UserInterest
             {
                 UserId = user.Id,
-                Label = i.Label.Trim()
+                Label = interest
             });
         }
 
@@ -210,6 +270,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserProfileDto>> GetById(
         string userId,
         CancellationToken cancellationToken)
@@ -223,6 +284,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{userId}/posts")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<ProfilePostsPageResponseDto>> GetUserPosts(
         string userId,
         [FromQuery] int page = 1,
@@ -257,6 +319,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/follow/status")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserFollowStatusResponseDto>> GetFollowStatus(
         string userId,
         CancellationToken cancellationToken)
@@ -286,6 +349,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/followers")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetFollowers(
         string userId,
         [FromQuery] int page = 1,
@@ -316,6 +380,7 @@ public class UsersController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("{userId}/following")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetUserFollowingList(
         string userId,
         [FromQuery] int page = 1,
@@ -346,6 +411,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPost("{userId}/follow")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Follow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))
@@ -378,6 +444,7 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId}/follow")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Unfollow(string userId, CancellationToken cancellationToken)
     {
         if (!int.TryParse(userId, out var targetId))
@@ -433,5 +500,43 @@ public class UsersController : ControllerBase
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 
         return profile;
+    }
+
+    private static bool TryNormalizeInterests(
+        IEnumerable<InterestItemDto>? raw,
+        out List<string> interests,
+        out string? error)
+    {
+        interests = new List<string>();
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in raw)
+        {
+            if (string.IsNullOrWhiteSpace(item.Label))
+                continue;
+
+            var label = item.Label.Trim();
+            if (label.Length > InputValidationLimits.ProfileInterestLabelMaxLength)
+            {
+                error = $"Cada interesse não pode exceder {InputValidationLimits.ProfileInterestLabelMaxLength} caracteres.";
+                return false;
+            }
+
+            if (!seen.Add(label))
+                continue;
+
+            interests.Add(label);
+            if (interests.Count > InputValidationLimits.ProfileInterestsMaxCount)
+            {
+                error = $"Máximo de {InputValidationLimits.ProfileInterestsMaxCount} interesses.";
+                return false;
+            }
+        }
+
+        return true;
     }
 }

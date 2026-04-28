@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs.Billing;
 using Woody.Application.UseCases.Billing;
@@ -9,6 +11,7 @@ namespace Woody.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
+[EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class BillingController : ControllerBase
 {
     private readonly CreateCheckoutSessionHandler _createCheckoutSession;

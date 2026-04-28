@@ -26,6 +26,9 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<CommunityDailyRollup> CommunityDailyRollups { get; set; }
         public virtual DbSet<CommunityPostBoost> CommunityPostBoosts { get; set; }
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
+        public virtual DbSet<BillingCheckoutAttempt> BillingCheckoutAttempts { get; set; }
+        public virtual DbSet<RefreshTokenSession> RefreshTokenSessions { get; set; }
+        public virtual DbSet<LoginLockout> LoginLockouts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
@@ -62,6 +65,18 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasKey(x => x.EventId);
             });
 
+            modelBuilder.Entity<BillingCheckoutAttempt>(e =>
+            {
+                e.ToTable("billing_checkout_attempts");
+                e.HasKey(x => x.Id);
+                e.HasIndex(x => x.IdempotencyKey).IsUnique();
+                e.HasIndex(x => new { x.UserId, x.SubjectKind, x.PlanCode, x.CommunityId, x.Status });
+                e.Property(x => x.IdempotencyKey).HasMaxLength(200);
+                e.Property(x => x.PlanCode).HasMaxLength(64);
+                e.Property(x => x.StripeSessionId).HasMaxLength(128);
+                e.Property(x => x.StripeCustomerId).HasMaxLength(128);
+            });
+
             modelBuilder.Entity<EmailVerificationCode>(e =>
             {
                 e.HasIndex(x => new { x.Email, x.CreatedAt });
@@ -69,6 +84,22 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.EmailVerificationCodes)
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<RefreshTokenSession>(e =>
+            {
+                e.HasIndex(x => x.TokenHash).IsUnique();
+                e.HasIndex(x => new { x.UserId, x.ExpiresAt });
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.RefreshTokenSessions)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<LoginLockout>(e =>
+            {
+                e.HasKey(x => x.NormalizedLogin);
+                e.HasIndex(x => x.LockoutEndAt);
             });
 
             modelBuilder.Entity<Community>(e =>

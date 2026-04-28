@@ -52,7 +52,7 @@ public class EmailVerificationService : IEmailVerificationService
         var code = NormalizeCode(request.Code);
         var user = await _users.GetByEmailAsync(email);
         if (user is not null && user.IsEmailVerified)
-            throw new InvalidOperationException("E-mail já verificado.");
+            throw new ArgumentException("Código inválido.");
 
         var now = DateTime.UtcNow;
         var latestCode = await _codes.GetLatestByEmailAsync(email, cancellationToken);
@@ -109,7 +109,7 @@ public class EmailVerificationService : IEmailVerificationService
         var email = NormalizeEmail(request.Email);
         var user = await _users.GetByEmailAsync(email);
         if (user is not null && user.IsEmailVerified)
-            throw new InvalidOperationException("E-mail já verificado.");
+            return BuildGenericSendResponse();
 
         var now = DateTime.UtcNow;
         await _codes.InvalidateActiveByEmailAsync(email, now, cancellationToken);
@@ -181,6 +181,16 @@ public class EmailVerificationService : IEmailVerificationService
 
     private static string GenerateSixDigitCode() =>
         RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
+    private SendEmailVerificationCodeResponseDTO BuildGenericSendResponse()
+    {
+        var expiresAt = DateTime.UtcNow.AddMinutes(_options.ExpirationMinutes);
+        return new SendEmailVerificationCodeResponseDTO
+        {
+            RequestId = Guid.NewGuid().ToString(),
+            ExpiresAt = expiresAt
+        };
+    }
 
     private static string BuildTextBody(string code, int expirationMinutes) =>
         $"Seu código de verificação da Woody é: {code}. Este código expira em {expirationMinutes} minutos.";

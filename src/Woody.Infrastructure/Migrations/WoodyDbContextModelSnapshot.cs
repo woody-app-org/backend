@@ -22,6 +22,82 @@ namespace Woody.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Woody.Domain.Entities.BillingCheckoutAttempt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CommunityId")
+                        .HasColumnType("integer")
+                        .HasColumnName("community_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("PlanCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("plan_code");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("stripe_customer_id");
+
+                    b.Property<string>("StripeSessionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("stripe_session_id");
+
+                    b.Property<string>("StripeSessionUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("stripe_session_url");
+
+                    b.Property<int>("SubjectKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_checkout_attempts");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_checkout_attempts_idempotency_key");
+
+                    b.HasIndex("UserId", "SubjectKind", "PlanCode", "CommunityId", "Status")
+                        .HasDatabaseName("ix_billing_checkout_attempts_user_id_subject_kind_plan_code_co");
+
+                    b.ToTable("billing_checkout_attempts", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.BillingWebhookReceipt", b =>
                 {
                     b.Property<string>("EventId")
@@ -687,6 +763,37 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("likes", (string)null);
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.LoginLockout", b =>
+                {
+                    b.Property<string>("NormalizedLogin")
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_login");
+
+                    b.Property<int>("FailedAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_attempt_count");
+
+                    b.Property<DateTime>("FirstFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_failed_at");
+
+                    b.Property<DateTime>("LastFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_failed_at");
+
+                    b.Property<DateTime?>("LockoutEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lockout_end_at");
+
+                    b.HasKey("NormalizedLogin")
+                        .HasName("pk_login_lockouts");
+
+                    b.HasIndex("LockoutEndAt")
+                        .HasDatabaseName("ix_login_lockouts_lockout_end_at");
+
+                    b.ToTable("login_lockouts", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.Message", b =>
                 {
                     b.Property<int>("Id")
@@ -904,6 +1011,57 @@ namespace Woody.Infrastructure.Migrations
                         .HasDatabaseName("ix_post_tags_post_id");
 
                     b.ToTable("post_tags", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.RefreshTokenSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("ReplacedByTokenHash")
+                        .HasColumnType("text")
+                        .HasColumnName("replaced_by_token_hash");
+
+                    b.Property<string>("RevocationReason")
+                        .HasColumnType("text")
+                        .HasColumnName("revocation_reason");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token_hash");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refresh_token_sessions");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_refresh_token_sessions_token_hash");
+
+                    b.HasIndex("UserId", "ExpiresAt")
+                        .HasDatabaseName("ix_refresh_token_sessions_user_id_expires_at");
+
+                    b.ToTable("refresh_token_sessions", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.User", b =>
@@ -1465,6 +1623,18 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Post");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.RefreshTokenSession", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.User", "User")
+                        .WithMany("RefreshTokenSessions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_refresh_token_sessions_users_user_id");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.UserInterest", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.User", "User")
@@ -1577,6 +1747,8 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("OwnedCommunities");
 
                     b.Navigation("Posts");
+
+                    b.Navigation("RefreshTokenSessions");
 
                     b.Navigation("SentMessages");
 
