@@ -1,3 +1,5 @@
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Domain.Entities
 {
     public class User
@@ -25,6 +27,9 @@ namespace Woody.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
+        /// <summary>Quem pode enviar sinais de perfil para esta utilizadora.</summary>
+        public ProfileSignalsIncomingPreference ProfileSignalsIncomingPreference { get; set; }
+
         public ICollection<Post> Posts { get; set; } = new List<Post>();
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public ICollection<Like> Likes { get; set; } = new List<Like>();
@@ -46,5 +51,7 @@ namespace Woody.Domain.Entities
         public ICollection<Conversation> InitiatedConversations { get; set; } = new List<Conversation>();
         public ICollection<ConversationParticipant> ConversationParticipations { get; set; } = new List<ConversationParticipant>();
         public ICollection<Message> SentMessages { get; set; } = new List<Message>();
+        public ICollection<ProfileSignal> SentProfileSignals { get; set; } = new List<ProfileSignal>();
+        public ICollection<ProfileSignal> ReceivedProfileSignals { get; set; } = new List<ProfileSignal>();
     }
 }

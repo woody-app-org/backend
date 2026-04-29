@@ -33,6 +33,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<MessageAttachment> MessageAttachments { get; set; }
+        public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -44,6 +45,9 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
+                e.Property(u => u.ProfileSignalsIncomingPreference)
+                    .HasConversion<int>()
+                    .HasDefaultValue(ProfileSignalsIncomingPreference.All);
             });
 
             modelBuilder.Entity<UserSubscription>(e =>
@@ -301,6 +305,28 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(m => m.Attachments)
                     .HasForeignKey(a => a.MessageId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ProfileSignal>(e =>
+            {
+                e.ToTable("profile_signals");
+                e.HasIndex(s => s.ReceiverUserId);
+                e.HasIndex(s => s.SenderUserId);
+                e.HasIndex(s => s.CreatedAt);
+                e.HasIndex(s => new { s.SenderUserId, s.ReceiverUserId, s.Type, s.CreatedAt });
+                e.HasIndex(s => new { s.ReceiverUserId, s.Status, s.CreatedAt });
+                e.HasIndex(s => new { s.SenderUserId, s.CreatedAt });
+                e.Property(s => s.Message).HasMaxLength(160);
+
+                e.HasOne(s => s.SenderUser)
+                    .WithMany(u => u.SentProfileSignals)
+                    .HasForeignKey(s => s.SenderUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.ReceiverUser)
+                    .WithMany(u => u.ReceivedProfileSignals)
+                    .HasForeignKey(s => s.ReceiverUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             base.OnModelCreating(modelBuilder);

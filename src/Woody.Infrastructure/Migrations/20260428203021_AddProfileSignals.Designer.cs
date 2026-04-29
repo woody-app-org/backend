@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Woody.Infrastructure.Persistence.Context;
@@ -11,9 +12,11 @@ using Woody.Infrastructure.Persistence.Context;
 namespace Woody.Infrastructure.Migrations
 {
     [DbContext(typeof(WoodyDbContext))]
-    partial class WoodyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428203021_AddProfileSignals")]
+    partial class AddProfileSignals
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1192,12 +1195,6 @@ namespace Woody.Infrastructure.Migrations
                     b.Property<string>("ProfilePic")
                         .HasColumnType("text")
                         .HasColumnName("profile_pic");
-
-                    b.Property<int>("ProfileSignalsIncomingPreference")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("profile_signals_incoming_preference");
 
                     b.Property<string>("Pronouns")
                         .HasColumnType("text")

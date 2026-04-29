@@ -24,6 +24,71 @@ public static class EntityMappers
         };
     }
 
+    public static string ToProfileSignalTypeApi(ProfileSignalType type) => type switch
+    {
+        ProfileSignalType.TeNotei => "te_notei",
+        ProfileSignalType.Olhadinha => "olhadinha",
+        ProfileSignalType.ConhecerMais => "conhecer_mais",
+        ProfileSignalType.QueroConversar => "quero_conversar",
+        ProfileSignalType.CrushFofo => "crush_fofo",
+        ProfileSignalType.Atracao => "atracao",
+        ProfileSignalType.SinalVerde => "sinal_verde",
+        ProfileSignalType.Cheguei => "cheguei",
+        _ => type.ToString()
+    };
+
+    public static string ToProfileSignalLabel(ProfileSignalType type) => type switch
+    {
+        ProfileSignalType.TeNotei => "Te notei",
+        ProfileSignalType.Olhadinha => "Olhadinha",
+        ProfileSignalType.ConhecerMais => "Conhecer mais",
+        ProfileSignalType.QueroConversar => "Quero conversar",
+        ProfileSignalType.CrushFofo => "Crush fofo",
+        ProfileSignalType.Atracao => "Atração",
+        ProfileSignalType.SinalVerde => "Sinal verde",
+        ProfileSignalType.Cheguei => "Cheguei",
+        _ => type.ToString()
+    };
+
+    public static string ToProfileSignalEmoji(ProfileSignalType type) => type switch
+    {
+        ProfileSignalType.TeNotei => "👀",
+        ProfileSignalType.Olhadinha => "😉",
+        ProfileSignalType.ConhecerMais => "🍷",
+        ProfileSignalType.QueroConversar => "✨",
+        ProfileSignalType.CrushFofo => "🐻",
+        ProfileSignalType.Atracao => "🔥",
+        ProfileSignalType.SinalVerde => "✅",
+        ProfileSignalType.Cheguei => "😏",
+        _ => type.ToString()
+    };
+
+    public static string ToProfileSignalStatusApi(ProfileSignalStatus status) => status switch
+    {
+        ProfileSignalStatus.Sent => "sent",
+        ProfileSignalStatus.Read => "read",
+        ProfileSignalStatus.Archived => "archived",
+        ProfileSignalStatus.Dismissed => "dismissed",
+        _ => status.ToString()
+    };
+
+    public static ProfileSignalResponseDto ToProfileSignalDto(ProfileSignal signal) => new()
+    {
+        Id = signal.Id,
+        Type = ToProfileSignalTypeApi(signal.Type),
+        Label = ToProfileSignalLabel(signal.Type),
+        Emoji = ToProfileSignalEmoji(signal.Type),
+        Message = signal.Message,
+        Status = ToProfileSignalStatusApi(signal.Status),
+        CreatedAt = Iso(signal.CreatedAt),
+        ReadAt = signal.ReadAt.HasValue ? Iso(signal.ReadAt.Value) : null,
+        ArchivedAt = signal.ArchivedAt.HasValue ? Iso(signal.ArchivedAt.Value) : null,
+        DismissedAt = signal.DismissedAt.HasValue ? Iso(signal.DismissedAt.Value) : null,
+        Sender = ToUserPublicDto(signal.SenderUser),
+        Receiver = ToUserPublicDto(signal.ReceiverUser),
+        Recipient = ToUserPublicDto(signal.ReceiverUser)
+    };
+
     public static string ToPublicationContextApi(PostPublicationContext ctx) =>
         ctx == PostPublicationContext.Profile ? "profile" : "community";
 
