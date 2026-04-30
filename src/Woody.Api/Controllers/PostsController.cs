@@ -28,6 +28,7 @@ public class PostsController : ControllerBase
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly IContentPinningService _pinning;
     private readonly IResourceAuthorizationService _authorization;
+    private readonly IUserNotificationService _userNotifications;
 
     public PostsController(
         IPostRepository posts,
@@ -37,7 +38,8 @@ public class PostsController : ControllerBase
         ICommentRepository comments,
         IPostEnrichmentService postEnrichment,
         IContentPinningService pinning,
-        IResourceAuthorizationService authorization)
+        IResourceAuthorizationService authorization,
+        IUserNotificationService userNotifications)
     {
         _posts = posts;
         _communities = communities;
@@ -47,6 +49,7 @@ public class PostsController : ControllerBase
         _postEnrichment = postEnrichment;
         _pinning = pinning;
         _authorization = authorization;
+        _userNotifications = userNotifications;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -349,10 +352,12 @@ public class PostsController : ControllerBase
             return Unauthorized();
 
         var postForLike = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
-        if (!await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
+        if (postForLike == null || !await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
             return NotFound();
 
-        await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
+        var added = await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
+        if (added)
+            await _userNotifications.NotifyPostLikedAsync(me.Value, postForLike.UserId, pid, cancellationToken);
         return NoContent();
     }
 
@@ -431,13 +436,14 @@ public class PostsController : ControllerBase
             return BadRequest(new { error });
 
         int? parentId = null;
+        Comment? parentComment = null;
         if (!string.IsNullOrWhiteSpace(body.ParentCommentId))
         {
             if (!int.TryParse(body.ParentCommentId, out var pcid) || pcid <= 0)
                 return BadRequest(new { error = "Comentário pai inválido." });
 
-            var parent = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
-            if (parent == null || parent.PostId != pid)
+            parentComment = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
+            if (parentComment == null || parentComment.PostId != pid)
                 return BadRequest(new { error = "Comentário pai inválido." });
             parentId = pcid;
         }
@@ -452,6 +458,21 @@ public class PostsController : ControllerBase
         };
         _comments.Add(comment);
         await _comments.SaveChangesAsync(cancellationToken);
+
+        if (parentId == null)
+        {
+            await _userNotifications.NotifyPostCommentAsync(me.Value, postAuthorId, pid, comment.Id, cancellationToken);
+        }
+        else if (parentComment != null)
+        {
+            await _userNotifications.NotifyCommentReplyAsync(
+                me.Value,
+                parentComment.AuthorId,
+                pid,
+                parentComment.Id,
+                comment.Id,
+                cancellationToken);
+        }
 
         comment = await _comments.GetByIdNonDeletedWithAuthorAsync(comment.Id, cancellationToken)
                   ?? throw new InvalidOperationException("Comment not found after create.");

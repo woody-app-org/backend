@@ -303,7 +303,8 @@ public class ProfileSignalsControllerTests
             (signals ?? new Mock<IProfileSignalRepository>()).Object,
             (users ?? new Mock<IUserRepository>()).Object,
             f.Object,
-            g.Object);
+            g.Object,
+            new Mock<IUserNotificationService>().Object);
     }
 
     private static ProfileSignal TestSignal(

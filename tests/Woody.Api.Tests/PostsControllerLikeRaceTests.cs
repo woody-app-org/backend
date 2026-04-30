@@ -48,7 +48,8 @@ public class PostsControllerLikeRaceTests
             new Mock<ICommentRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
             new Mock<IContentPinningService>().Object,
-            authorization.Object)
+            authorization.Object,
+            new Mock<IUserNotificationService>().Object)
         {
             ControllerContext = new ControllerContext
             {

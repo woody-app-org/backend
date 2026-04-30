@@ -34,6 +34,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<MessageAttachment> MessageAttachments { get; set; }
         public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
+        public virtual DbSet<UserNotification> UserNotifications { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -305,6 +306,25 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(m => m.Attachments)
                     .HasForeignKey(a => a.MessageId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<UserNotification>(e =>
+            {
+                e.ToTable("user_notifications");
+                e.HasIndex(n => new { n.RecipientUserId, n.CreatedAtUtc });
+                e.HasIndex(n => new { n.RecipientUserId, n.ReadAtUtc });
+                e.Property(n => n.Type).HasMaxLength(48).IsRequired();
+                e.Property(n => n.PayloadJson).HasMaxLength(4000).IsRequired();
+
+                e.HasOne(n => n.RecipientUser)
+                    .WithMany()
+                    .HasForeignKey(n => n.RecipientUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(n => n.ActorUser)
+                    .WithMany()
+                    .HasForeignKey(n => n.ActorUserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ProfileSignal>(e =>

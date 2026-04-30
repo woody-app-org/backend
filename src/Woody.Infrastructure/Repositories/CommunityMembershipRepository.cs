@@ -59,6 +59,17 @@ public class CommunityMembershipRepository : ICommunityMembershipRepository
     public Task<int> CountActiveInCommunityAsync(int communityId, CancellationToken cancellationToken = default) =>
         _db.CommunityMemberships.CountAsync(x => x.CommunityId == communityId && x.Status == "active", cancellationToken);
 
+    public async Task<List<int>> ListActiveModeratorUserIdsForCommunityAsync(
+        int communityId,
+        CancellationToken cancellationToken = default) =>
+        await _db.CommunityMemberships.AsNoTracking()
+            .Where(m => m.CommunityId == communityId
+                        && m.Status == "active"
+                        && (m.Role == "owner" || m.Role == "admin"))
+            .Select(m => m.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
     public void Add(CommunityMembership membership) => _db.CommunityMemberships.Add(membership);
 
     public void Remove(CommunityMembership membership) => _db.CommunityMemberships.Remove(membership);

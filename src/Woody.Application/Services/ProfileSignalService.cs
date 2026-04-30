@@ -19,17 +19,20 @@ public class ProfileSignalService : IProfileSignalService
     private readonly IUserRepository _users;
     private readonly IFollowRepository _follows;
     private readonly IProfileSignalSocialGate _socialGate;
+    private readonly IUserNotificationService _userNotifications;
 
     public ProfileSignalService(
         IProfileSignalRepository signals,
         IUserRepository users,
         IFollowRepository follows,
-        IProfileSignalSocialGate socialGate)
+        IProfileSignalSocialGate socialGate,
+        IUserNotificationService userNotifications)
     {
         _signals = signals;
         _users = users;
         _follows = follows;
         _socialGate = socialGate;
+        _userNotifications = userNotifications;
     }
 
     public async Task<ProfileSignalCommandResult> SendAsync(
@@ -82,6 +85,12 @@ public class ProfileSignalService : IProfileSignalService
         await _signals.SaveChangesAsync(cancellationToken);
 
         var created = await _signals.GetByIdWithUsersAsync(signal.Id, cancellationToken) ?? signal;
+        await _userNotifications.NotifyProfileSignalAsync(
+            senderUserId,
+            receiverUserId,
+            created.Id,
+            EntityMappers.ToProfileSignalTypeApi(signalType),
+            cancellationToken);
         return new ProfileSignalCommandResult(ProfileSignalOperationOutcome.Success, EntityMappers.ToProfileSignalDto(created));
     }
 

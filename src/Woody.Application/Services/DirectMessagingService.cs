@@ -22,19 +22,22 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private readonly IFollowRepository _follows;
     private readonly IUserRepository _users;
     private readonly IDirectMessageRealtimePublisher _realtime;
+    private readonly IUserNotificationService _userNotifications;
 
     public DirectMessagingService(
         IConversationRepository conversations,
         IMessageRepository messages,
         IFollowRepository follows,
         IUserRepository users,
-        IDirectMessageRealtimePublisher realtime)
+        IDirectMessageRealtimePublisher realtime,
+        IUserNotificationService userNotifications)
     {
         _conversations = conversations;
         _messages = messages;
         _follows = follows;
         _users = users;
         _realtime = realtime;
+        _userNotifications = userNotifications;
     }
 
     public async Task<ConversationResponseDto> StartOrGetConversationAsync(
@@ -57,6 +60,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (existing != null)
         {
             var changed = false;
+            var notifyMessageRequest = false;
 
             if (existing.Status == ConversationStatus.Rejected)
             {
@@ -69,6 +73,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
                 {
                     existing.Status = ConversationStatus.Pending;
                     existing.InitiatorUserId = actorUserId;
+                    notifyMessageRequest = true;
                 }
 
                 existing.RespondedAt = null;
@@ -85,6 +90,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
             if (changed)
                 await _conversations.SaveChangesAsync(cancellationToken);
+
+            if (notifyMessageRequest)
+                await TryNotifyMessageRequestIfPendingAsync(existing, cancellationToken);
 
             var existingDto = ConversationDtoMapper.ToResponse(existing, actorUserId);
             await EnrichConversationPreviewsAsync(new[] { existingDto }, cancellationToken);
@@ -114,6 +122,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         var tracked = await _conversations.GetTrackedByPairAsync(low, high, cancellationToken)
                       ?? conversation;
+
+        if (tracked.Status == ConversationStatus.Pending)
+            await TryNotifyMessageRequestIfPendingAsync(tracked, cancellationToken);
 
         var createdDto = ConversationDtoMapper.ToResponse(tracked, actorUserId);
         await EnrichConversationPreviewsAsync(new[] { createdDto }, cancellationToken);
@@ -423,6 +434,23 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     cancellationToken);
             }
         }
+    }
+
+    private static int? RecipientUserIdForPendingConversation(Conversation c)
+    {
+        if (c.Status != ConversationStatus.Pending || c.InitiatorUserId is not int ini)
+            return null;
+        return c.UserLowId == ini ? c.UserHighId : c.UserLowId;
+    }
+
+    private async Task TryNotifyMessageRequestIfPendingAsync(Conversation c, CancellationToken cancellationToken = default)
+    {
+        if (c.Status != ConversationStatus.Pending || c.InitiatorUserId is not int initiator)
+            return;
+        var recipient = RecipientUserIdForPendingConversation(c);
+        if (recipient is not int rid)
+            return;
+        await _userNotifications.NotifyMessageRequestAsync(initiator, rid, c.Id, cancellationToken);
     }
 
     private async Task EnrichConversationPreviewsAsync(

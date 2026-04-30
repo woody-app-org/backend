@@ -10,6 +10,9 @@ public interface ICommunityMembershipRepository
     Task<CommunityMembership?> GetActiveForUserAndCommunityNoTrackingAsync(int userId, int communityId, CancellationToken cancellationToken = default);
     Task<(List<CommunityMembership> Rows, int Total)> ListActiveMembersPagedOrderedAsync(int communityId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<int> CountActiveInCommunityAsync(int communityId, CancellationToken cancellationToken = default);
+
+    /// <summary>Donas e administradoras ativas da comunidade (para notificações de pedido de entrada).</summary>
+    Task<List<int>> ListActiveModeratorUserIdsForCommunityAsync(int communityId, CancellationToken cancellationToken = default);
     void Add(CommunityMembership membership);
     void Remove(CommunityMembership membership);
     Task<List<int>> GetActiveCommunityIdsForUserAsync(int userId, CancellationToken cancellationToken = default);

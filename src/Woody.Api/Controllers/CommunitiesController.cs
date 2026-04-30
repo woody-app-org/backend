@@ -33,6 +33,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityDashboardAnalyticsService _communityDashboardAnalytics;
     private readonly ICommunityPostBoostService _communityPostBoosts;
     private readonly IResourceAuthorizationService _authorization;
+    private readonly IUserNotificationService _userNotifications;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -47,7 +48,8 @@ public class CommunitiesController : ControllerBase
         ICommunityDailyRollupRepository dailyRollups,
         ICommunityDashboardAnalyticsService communityDashboardAnalytics,
         ICommunityPostBoostService communityPostBoosts,
-        IResourceAuthorizationService authorization)
+        IResourceAuthorizationService authorization,
+        IUserNotificationService userNotifications)
     {
         _communities = communities;
         _memberships = memberships;
@@ -62,6 +64,7 @@ public class CommunitiesController : ControllerBase
         _communityDashboardAnalytics = communityDashboardAnalytics;
         _communityPostBoosts = communityPostBoosts;
         _authorization = authorization;
+        _userNotifications = userNotifications;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -595,14 +598,24 @@ public class CommunitiesController : ControllerBase
         if (await _joinRequests.ExistsPendingAsync(cid, me.Value, cancellationToken))
             return NoContent();
 
-        _joinRequests.Add(new JoinRequest
+        var jr = new JoinRequest
         {
             CommunityId = cid,
             UserId = me.Value,
             Status = "pending",
             RequestedAt = DateTime.UtcNow
-        });
+        };
+        _joinRequests.Add(jr);
         await _joinRequests.SaveChangesAsync(cancellationToken);
+
+        var mods = await _memberships.ListActiveModeratorUserIdsForCommunityAsync(cid, cancellationToken);
+        await _userNotifications.NotifyCommunityJoinRequestAsync(
+            me.Value,
+            cid,
+            c.Slug,
+            jr.Id,
+            mods,
+            cancellationToken);
         return NoContent();
     }
 

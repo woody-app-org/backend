@@ -98,7 +98,8 @@ public class InputValidationControllerTests
             new Mock<ICommentRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
             new Mock<IContentPinningService>().Object,
-            new Mock<IResourceAuthorizationService>().Object);
+            new Mock<IResourceAuthorizationService>().Object,
+            new Mock<IUserNotificationService>().Object);
         SetUser(controller);
         return controller;
     }
@@ -121,7 +122,8 @@ public class InputValidationControllerTests
             new Mock<ICommunityMembershipRepository>().Object,
             new Mock<IFollowRepository>().Object,
             new Mock<IPostRepository>().Object,
-            new Mock<IPostEnrichmentService>().Object);
+            new Mock<IPostEnrichmentService>().Object,
+            new Mock<IUserNotificationService>().Object);
         SetUser(controller);
         return controller;
     }

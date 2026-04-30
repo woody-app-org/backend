@@ -15,15 +15,18 @@ public class JoinRequestsController : ControllerBase
     private readonly IJoinRequestRepository _joinRequests;
     private readonly ICommunityMembershipRepository _memberships;
     private readonly ICommunityPermissionService _permission;
+    private readonly IUserNotificationService _userNotifications;
 
     public JoinRequestsController(
         IJoinRequestRepository joinRequests,
         ICommunityMembershipRepository memberships,
-        ICommunityPermissionService permission)
+        ICommunityPermissionService permission,
+        IUserNotificationService userNotifications)
     {
         _joinRequests = joinRequests;
         _memberships = memberships;
         _permission = permission;
+        _userNotifications = userNotifications;
     }
 
     [Authorize]
@@ -69,6 +72,13 @@ public class JoinRequestsController : ControllerBase
         jr.Community.UpdatedAt = DateTime.UtcNow;
 
         await _joinRequests.SaveChangesAsync(cancellationToken);
+        await _userNotifications.NotifyCommunityRequestApprovedAsync(
+            jr.UserId,
+            me.Value,
+            jr.CommunityId,
+            jr.Community.Slug,
+            jr.Id,
+            cancellationToken);
         return NoContent();
     }
 
