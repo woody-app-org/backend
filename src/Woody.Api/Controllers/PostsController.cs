@@ -28,7 +28,7 @@ public class PostsController : ControllerBase
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly IContentPinningService _pinning;
     private readonly IResourceAuthorizationService _authorization;
-    private readonly IUserNotificationService _userNotifications;
+    private readonly INotificationService _notificationService;
 
     public PostsController(
         IPostRepository posts,
@@ -39,7 +39,7 @@ public class PostsController : ControllerBase
         IPostEnrichmentService postEnrichment,
         IContentPinningService pinning,
         IResourceAuthorizationService authorization,
-        IUserNotificationService userNotifications)
+        INotificationService notificationService)
     {
         _posts = posts;
         _communities = communities;
@@ -49,7 +49,7 @@ public class PostsController : ControllerBase
         _postEnrichment = postEnrichment;
         _pinning = pinning;
         _authorization = authorization;
-        _userNotifications = userNotifications;
+        _notificationService = notificationService;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -357,7 +357,7 @@ public class PostsController : ControllerBase
 
         var added = await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
         if (added)
-            await _userNotifications.NotifyPostLikedAsync(me.Value, postForLike.UserId, pid, cancellationToken);
+            await _notificationService.NotifyPostLikedAsync(me.Value, postForLike.UserId, pid, cancellationToken);
         return NoContent();
     }
 
@@ -461,11 +461,11 @@ public class PostsController : ControllerBase
 
         if (parentId == null)
         {
-            await _userNotifications.NotifyPostCommentAsync(me.Value, postAuthorId, pid, comment.Id, cancellationToken);
+            await _notificationService.NotifyPostCommentAsync(me.Value, postAuthorId, pid, comment.Id, cancellationToken);
         }
         else if (parentComment != null)
         {
-            await _userNotifications.NotifyCommentReplyAsync(
+            await _notificationService.NotifyCommentReplyAsync(
                 me.Value,
                 parentComment.AuthorId,
                 pid,

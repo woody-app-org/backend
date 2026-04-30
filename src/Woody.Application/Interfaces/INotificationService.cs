@@ -2,9 +2,9 @@ using Woody.Application.DTOs.Api;
 
 namespace Woody.Application.Interfaces;
 
-public interface IUserNotificationService
+public interface INotificationService
 {
-    Task<UserNotificationListResponseDto> ListMineAsync(
+    Task<NotificationListResponseDto> ListMineAsync(
         int recipientUserId,
         int page,
         int pageSize,

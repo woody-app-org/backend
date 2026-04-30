@@ -22,7 +22,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private readonly IFollowRepository _follows;
     private readonly IUserRepository _users;
     private readonly IDirectMessageRealtimePublisher _realtime;
-    private readonly IUserNotificationService _userNotifications;
+    private readonly INotificationService _notificationService;
 
     public DirectMessagingService(
         IConversationRepository conversations,
@@ -30,14 +30,14 @@ public sealed class DirectMessagingService : IDirectMessagingService
         IFollowRepository follows,
         IUserRepository users,
         IDirectMessageRealtimePublisher realtime,
-        IUserNotificationService userNotifications)
+        INotificationService notificationService)
     {
         _conversations = conversations;
         _messages = messages;
         _follows = follows;
         _users = users;
         _realtime = realtime;
-        _userNotifications = userNotifications;
+        _notificationService = notificationService;
     }
 
     public async Task<ConversationResponseDto> StartOrGetConversationAsync(
@@ -450,7 +450,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         var recipient = RecipientUserIdForPendingConversation(c);
         if (recipient is not int rid)
             return;
-        await _userNotifications.NotifyMessageRequestAsync(initiator, rid, c.Id, cancellationToken);
+        await _notificationService.NotifyMessageRequestAsync(initiator, rid, c.Id, cancellationToken);
     }
 
     private async Task EnrichConversationPreviewsAsync(

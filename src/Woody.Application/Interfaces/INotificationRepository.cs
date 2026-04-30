@@ -2,13 +2,13 @@ using Woody.Domain.Entities;
 
 namespace Woody.Application.Interfaces;
 
-public interface IUserNotificationRepository
+public interface INotificationRepository
 {
-    void Add(UserNotification row);
+    void Add(Notification row);
 
-    void AddRange(IEnumerable<UserNotification> rows);
+    void AddRange(IEnumerable<Notification> rows);
 
-    Task<(List<UserNotification> Items, int Total)> ListForRecipientPagedAsync(
+    Task<(List<Notification> Items, int Total)> ListForRecipientPagedAsync(
         int recipientUserId,
         int page,
         int pageSize,
@@ -16,7 +16,7 @@ public interface IUserNotificationRepository
 
     Task<int> CountUnreadForRecipientAsync(int recipientUserId, CancellationToken cancellationToken = default);
 
-    Task<UserNotification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default);
+    Task<Notification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default);
 
     Task MarkAllReadForRecipientAsync(int recipientUserId, DateTime readAtUtc, CancellationToken cancellationToken = default);
 

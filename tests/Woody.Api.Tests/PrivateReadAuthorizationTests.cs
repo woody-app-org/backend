@@ -211,7 +211,7 @@ public class PrivateReadAuthorizationTests
             Mock.Of<ICommunityDashboardAnalyticsService>(),
             Mock.Of<ICommunityPostBoostService>(),
             authorization.Object,
-            Mock.Of<IUserNotificationService>());
+            Mock.Of<INotificationService>());
 
         SetUser(controller, viewerUserId);
         return controller;

@@ -1,0 +1,164 @@
+using System.Text.Json;
+using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
+
+namespace Woody.Application.Notifications;
+
+/// <summary>
+/// Constrói instâncias de <see cref="Notification"/> e metadados JSON — único sítio para regras de preenchimento.
+/// </summary>
+public static class NotificationComposer
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public static Notification PostLiked(int recipientUserId, int actorUserId, int postId, DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = actorUserId,
+            Type = NotificationType.PostLike,
+            TargetKind = NotificationTargetKind.Post,
+            TargetId = postId,
+            MetadataJson = Meta(new Dictionary<string, object?> { ["postId"] = postId }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification PostCommented(int recipientUserId, int actorUserId, int postId, int commentId, DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = actorUserId,
+            Type = NotificationType.PostComment,
+            TargetKind = NotificationTargetKind.Post,
+            TargetId = postId,
+            MetadataJson = Meta(new Dictionary<string, object?> { ["postId"] = postId, ["commentId"] = commentId }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification CommentReplied(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        int parentCommentId,
+        int replyCommentId,
+        DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = actorUserId,
+            Type = NotificationType.CommentReply,
+            TargetKind = NotificationTargetKind.Comment,
+            TargetId = parentCommentId,
+            MetadataJson = Meta(new Dictionary<string, object?>
+            {
+                ["postId"] = postId,
+                ["parentCommentId"] = parentCommentId,
+                ["commentId"] = replyCommentId
+            }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification NewFollower(int recipientUserId, int actorUserId, DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = actorUserId,
+            Type = NotificationType.NewFollower,
+            TargetKind = NotificationTargetKind.User,
+            TargetId = actorUserId,
+            MetadataJson = Meta(new Dictionary<string, object?> { ["profileUserId"] = actorUserId }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification ProfileSignalReceived(
+        int recipientUserId,
+        int senderUserId,
+        int profileSignalId,
+        string profileSignalTypeApi,
+        DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = senderUserId,
+            Type = NotificationType.ProfileSignal,
+            TargetKind = NotificationTargetKind.ProfileSignal,
+            TargetId = profileSignalId,
+            MetadataJson = Meta(new Dictionary<string, object?>
+            {
+                ["profileUserId"] = senderUserId,
+                ["profileSignalId"] = profileSignalId,
+                ["profileSignalType"] = profileSignalTypeApi
+            }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification MessageRequest(int recipientUserId, int initiatorUserId, int conversationId, DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = initiatorUserId,
+            Type = NotificationType.MessageRequest,
+            TargetKind = NotificationTargetKind.Conversation,
+            TargetId = conversationId,
+            MetadataJson = Meta(new Dictionary<string, object?>
+            {
+                ["conversationId"] = conversationId,
+                ["profileUserId"] = initiatorUserId
+            }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification CommunityJoinRequest(
+        int moderatorUserId,
+        int requesterUserId,
+        int communityId,
+        string communitySlug,
+        int joinRequestId,
+        DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = moderatorUserId,
+            ActorUserId = requesterUserId,
+            Type = NotificationType.CommunityRequest,
+            TargetKind = NotificationTargetKind.JoinRequest,
+            TargetId = joinRequestId,
+            MetadataJson = Meta(new Dictionary<string, object?>
+            {
+                ["communityId"] = communityId,
+                ["communitySlug"] = communitySlug,
+                ["joinRequestId"] = joinRequestId,
+                ["profileUserId"] = requesterUserId
+            }),
+            CreatedAt = createdAtUtc
+        };
+
+    public static Notification CommunityRequestApproved(
+        int applicantUserId,
+        int? approverUserId,
+        int communityId,
+        string communitySlug,
+        int joinRequestId,
+        DateTime createdAtUtc) =>
+        new()
+        {
+            RecipientUserId = applicantUserId,
+            ActorUserId = approverUserId is > 0 and var aid && aid != applicantUserId ? aid : null,
+            Type = NotificationType.CommunityRequestApproved,
+            TargetKind = NotificationTargetKind.Community,
+            TargetId = communityId,
+            MetadataJson = Meta(new Dictionary<string, object?>
+            {
+                ["communityId"] = communityId,
+                ["communitySlug"] = communitySlug,
+                ["joinRequestId"] = joinRequestId
+            }),
+            CreatedAt = createdAtUtc
+        };
+
+    private static string Meta(Dictionary<string, object?> values) =>
+        JsonSerializer.Serialize(values, JsonOptions);
+}

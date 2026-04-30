@@ -1013,7 +1013,7 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("post_tags", (string)null);
                 });
 
-            modelBuilder.Entity("Woody.Domain.Entities.UserNotification", b =>
+            modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1026,40 +1026,62 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("actor_user_id");
 
-                    b.Property<DateTime>("CreatedAtUtc")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at");
 
-                    b.Property<string>("PayloadJson")
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("MetadataJson")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
-                        .HasColumnName("payload_json");
+                        .HasColumnName("metadata_json");
 
-                    b.Property<DateTime?>("ReadAtUtc")
+                    b.Property<DateTime?>("ReadAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("read_at_utc");
+                        .HasColumnName("read_at");
 
                     b.Property<int>("RecipientUserId")
                         .HasColumnType("integer")
                         .HasColumnName("recipient_user_id");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(48)
-                        .HasColumnType("character varying(48)")
+                    b.Property<int?>("TargetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_id");
+
+                    b.Property<int>("TargetKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_kind");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("title");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
                         .HasColumnName("type");
 
                     b.HasKey("Id")
-                        .HasName("pk_user_notifications");
+                        .HasName("pk_notifications");
 
-                    b.HasIndex("RecipientUserId", "CreatedAtUtc")
-                        .HasDatabaseName("ix_user_notifications_recipient_user_id_created_at_utc");
+                    b.HasIndex("Type")
+                        .HasDatabaseName("ix_notifications_type");
 
-                    b.HasIndex("RecipientUserId", "ReadAtUtc")
-                        .HasDatabaseName("ix_user_notifications_recipient_user_id_read_at_utc");
+                    b.HasIndex("RecipientUserId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_recipient_user_id_created_at");
 
-                    b.ToTable("user_notifications", (string)null);
+                    b.HasIndex("RecipientUserId", "ReadAt")
+                        .HasDatabaseName("ix_notifications_recipient_user_id_read_at");
+
+                    b.HasIndex("TargetKind", "TargetId")
+                        .HasDatabaseName("ix_notifications_target_kind_target_id");
+
+                    b.ToTable("notifications", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.ProfileSignal", b =>
@@ -1748,20 +1770,20 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Post");
                 });
 
-            modelBuilder.Entity("Woody.Domain.Entities.UserNotification", b =>
+            modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.User", "ActorUser")
                         .WithMany()
                         .HasForeignKey("ActorUserId")
                         .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_user_notifications_users_actor_user_id");
+                        .HasConstraintName("fk_notifications_users_actor_user_id");
 
                     b.HasOne("Woody.Domain.Entities.User", "RecipientUser")
                         .WithMany()
                         .HasForeignKey("RecipientUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_user_notifications_users_recipient_user_id");
+                        .HasConstraintName("fk_notifications_users_recipient_user_id");
 
                     b.Navigation("ActorUser");
 

@@ -34,7 +34,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<MessageAttachment> MessageAttachments { get; set; }
         public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
-        public virtual DbSet<UserNotification> UserNotifications { get; set; }
+        public virtual DbSet<Notification> Notifications { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -308,13 +308,18 @@ namespace Woody.Infrastructure.Persistence.Context
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            modelBuilder.Entity<UserNotification>(e =>
+            modelBuilder.Entity<Notification>(e =>
             {
-                e.ToTable("user_notifications");
-                e.HasIndex(n => new { n.RecipientUserId, n.CreatedAtUtc });
-                e.HasIndex(n => new { n.RecipientUserId, n.ReadAtUtc });
-                e.Property(n => n.Type).HasMaxLength(48).IsRequired();
-                e.Property(n => n.PayloadJson).HasMaxLength(4000).IsRequired();
+                e.ToTable("notifications");
+                e.HasIndex(n => new { n.RecipientUserId, n.CreatedAt });
+                e.HasIndex(n => new { n.RecipientUserId, n.ReadAt });
+                e.HasIndex(n => n.Type);
+                e.HasIndex(n => new { n.TargetKind, n.TargetId });
+                e.Property(n => n.Type).HasConversion<int>();
+                e.Property(n => n.TargetKind).HasConversion<int>();
+                e.Property(n => n.Title).HasMaxLength(256);
+                e.Property(n => n.Message).HasMaxLength(1000);
+                e.Property(n => n.MetadataJson).HasMaxLength(4000).IsRequired();
 
                 e.HasOne(n => n.RecipientUser)
                     .WithMany()

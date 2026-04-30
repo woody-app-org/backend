@@ -33,7 +33,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityDashboardAnalyticsService _communityDashboardAnalytics;
     private readonly ICommunityPostBoostService _communityPostBoosts;
     private readonly IResourceAuthorizationService _authorization;
-    private readonly IUserNotificationService _userNotifications;
+    private readonly INotificationService _notificationService;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -49,7 +49,7 @@ public class CommunitiesController : ControllerBase
         ICommunityDashboardAnalyticsService communityDashboardAnalytics,
         ICommunityPostBoostService communityPostBoosts,
         IResourceAuthorizationService authorization,
-        IUserNotificationService userNotifications)
+        INotificationService notificationService)
     {
         _communities = communities;
         _memberships = memberships;
@@ -64,7 +64,7 @@ public class CommunitiesController : ControllerBase
         _communityDashboardAnalytics = communityDashboardAnalytics;
         _communityPostBoosts = communityPostBoosts;
         _authorization = authorization;
-        _userNotifications = userNotifications;
+        _notificationService = notificationService;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -609,7 +609,7 @@ public class CommunitiesController : ControllerBase
         await _joinRequests.SaveChangesAsync(cancellationToken);
 
         var mods = await _memberships.ListActiveModeratorUserIdsForCommunityAsync(cid, cancellationToken);
-        await _userNotifications.NotifyCommunityJoinRequestAsync(
+        await _notificationService.NotifyCommunityJoinRequestAsync(
             me.Value,
             cid,
             c.Slug,

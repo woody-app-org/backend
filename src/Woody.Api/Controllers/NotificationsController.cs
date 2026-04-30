@@ -14,16 +14,16 @@ namespace Woody.Api.Controllers;
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class NotificationsController : ControllerBase
 {
-    private readonly IUserNotificationService _notifications;
+    private readonly INotificationService _notifications;
 
-    public NotificationsController(IUserNotificationService notifications)
+    public NotificationsController(INotificationService notifications)
     {
         _notifications = notifications;
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(UserNotificationListResponseDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<UserNotificationListResponseDto>> List(
+    [ProducesResponseType(typeof(NotificationListResponseDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<NotificationListResponseDto>> List(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -37,15 +37,15 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpGet("unread-count")]
-    [ProducesResponseType(typeof(UserNotificationUnreadCountDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<UserNotificationUnreadCountDto>> UnreadCount(CancellationToken cancellationToken = default)
+    [ProducesResponseType(typeof(NotificationUnreadCountDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<NotificationUnreadCountDto>> UnreadCount(CancellationToken cancellationToken = default)
     {
         var me = User.GetUserId();
         if (me == null)
             return Unauthorized();
 
         var count = await _notifications.GetUnreadCountAsync(me.Value, cancellationToken);
-        return Ok(new UserNotificationUnreadCountDto { Count = count });
+        return Ok(new NotificationUnreadCountDto { Count = count });
     }
 
     [HttpPost("{notificationId}/read")]

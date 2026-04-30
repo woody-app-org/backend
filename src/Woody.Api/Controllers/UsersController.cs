@@ -21,7 +21,7 @@ public class UsersController : ControllerBase
     private readonly IFollowRepository _follows;
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
-    private readonly IUserNotificationService _userNotifications;
+    private readonly INotificationService _notificationService;
 
     public UsersController(
         IUserRepository users,
@@ -29,14 +29,14 @@ public class UsersController : ControllerBase
         IFollowRepository follows,
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
-        IUserNotificationService userNotifications)
+        INotificationService notificationService)
     {
         _users = users;
         _memberships = memberships;
         _follows = follows;
         _posts = posts;
         _postEnrichment = postEnrichment;
-        _userNotifications = userNotifications;
+        _notificationService = notificationService;
     }
 
     [Authorize]
@@ -439,7 +439,7 @@ public class UsersController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             });
             await _follows.SaveChangesAsync(cancellationToken);
-            await _userNotifications.NotifyNewFollowerAsync(me.Value, targetId, cancellationToken);
+            await _notificationService.NotifyNewFollowerAsync(me.Value, targetId, cancellationToken);
         }
 
         var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);

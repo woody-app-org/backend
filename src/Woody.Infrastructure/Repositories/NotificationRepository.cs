@@ -5,20 +5,20 @@ using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Repositories;
 
-public class UserNotificationRepository : IUserNotificationRepository
+public class NotificationRepository : INotificationRepository
 {
     private readonly WoodyDbContext _db;
 
-    public UserNotificationRepository(WoodyDbContext db)
+    public NotificationRepository(WoodyDbContext db)
     {
         _db = db;
     }
 
-    public void Add(UserNotification row) => _db.UserNotifications.Add(row);
+    public void Add(Notification row) => _db.Notifications.Add(row);
 
-    public void AddRange(IEnumerable<UserNotification> rows) => _db.UserNotifications.AddRange(rows);
+    public void AddRange(IEnumerable<Notification> rows) => _db.Notifications.AddRange(rows);
 
-    public async Task<(List<UserNotification> Items, int Total)> ListForRecipientPagedAsync(
+    public async Task<(List<Notification> Items, int Total)> ListForRecipientPagedAsync(
         int recipientUserId,
         int page,
         int pageSize,
@@ -27,11 +27,11 @@ public class UserNotificationRepository : IUserNotificationRepository
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var q = _db.UserNotifications.AsNoTracking()
+        var q = _db.Notifications.AsNoTracking()
             .Where(n => n.RecipientUserId == recipientUserId)
             .Include(n => n.ActorUser)
             .ThenInclude(u => u!.Subscription)
-            .OrderByDescending(n => n.CreatedAtUtc);
+            .OrderByDescending(n => n.CreatedAt);
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
@@ -42,20 +42,20 @@ public class UserNotificationRepository : IUserNotificationRepository
     }
 
     public Task<int> CountUnreadForRecipientAsync(int recipientUserId, CancellationToken cancellationToken = default) =>
-        _db.UserNotifications.CountAsync(
-            n => n.RecipientUserId == recipientUserId && n.ReadAtUtc == null,
+        _db.Notifications.CountAsync(
+            n => n.RecipientUserId == recipientUserId && n.ReadAt == null,
             cancellationToken);
 
-    public Task<UserNotification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default) =>
-        _db.UserNotifications.FirstOrDefaultAsync(
+    public Task<Notification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default) =>
+        _db.Notifications.FirstOrDefaultAsync(
             n => n.Id == id && n.RecipientUserId == recipientUserId,
             cancellationToken);
 
     public async Task MarkAllReadForRecipientAsync(int recipientUserId, DateTime readAtUtc, CancellationToken cancellationToken = default)
     {
-        await _db.UserNotifications
-            .Where(n => n.RecipientUserId == recipientUserId && n.ReadAtUtc == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAtUtc, readAtUtc), cancellationToken);
+        await _db.Notifications
+            .Where(n => n.RecipientUserId == recipientUserId && n.ReadAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, readAtUtc), cancellationToken);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

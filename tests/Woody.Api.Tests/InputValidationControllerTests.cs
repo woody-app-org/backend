@@ -99,7 +99,7 @@ public class InputValidationControllerTests
             new Mock<IPostEnrichmentService>().Object,
             new Mock<IContentPinningService>().Object,
             new Mock<IResourceAuthorizationService>().Object,
-            new Mock<IUserNotificationService>().Object);
+            new Mock<INotificationService>().Object);
         SetUser(controller);
         return controller;
     }
@@ -123,7 +123,7 @@ public class InputValidationControllerTests
             new Mock<IFollowRepository>().Object,
             new Mock<IPostRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
-            new Mock<IUserNotificationService>().Object);
+            new Mock<INotificationService>().Object);
         SetUser(controller);
         return controller;
     }
