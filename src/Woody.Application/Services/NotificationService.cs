@@ -69,6 +69,7 @@ public sealed class NotificationService : INotificationService
         {
             row.ReadAt = DateTime.UtcNow;
             await _notifications.SaveChangesAsync(cancellationToken);
+            await _realtime.PublishInboxChangedAsync(recipientUserId, cancellationToken);
         }
 
         return true;
@@ -78,6 +79,7 @@ public sealed class NotificationService : INotificationService
     {
         var now = DateTime.UtcNow;
         await _notifications.MarkAllReadForRecipientAsync(recipientUserId, now, cancellationToken);
+        await _realtime.PublishInboxChangedAsync(recipientUserId, cancellationToken);
     }
 
     public async Task NotifyPostLikedAsync(int actorUserId, int postOwnerUserId, int postId, CancellationToken cancellationToken = default)

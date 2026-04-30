@@ -33,6 +33,9 @@ public class NotificationsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
         var result = await _notifications.ListMineAsync(me.Value, page, pageSize, cancellationToken);
         return Ok(result);
     }

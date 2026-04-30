@@ -2,6 +2,12 @@ using Woody.Application.DTOs.Api;
 
 namespace Woody.Application.Interfaces;
 
+/// <summary>
+/// Notificações in-app da utilizadora (lista, leitura, criação a partir de domínio).
+/// Extensões previstas sem quebrar o contrato: preferências por tipo/canal, digest por e-mail,
+/// push (FCM/APNs), agrupamento de eventos similares e arquivo/histórico — exigirão novos campos
+/// ou tabelas e filtros na listagem, mantendo <see cref="ListMineAsync"/> como fonte de verdade.
+/// </summary>
 public interface INotificationService
 {
     Task<NotificationListResponseDto> ListMineAsync(
