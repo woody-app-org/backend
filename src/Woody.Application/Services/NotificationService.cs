@@ -39,9 +39,10 @@ public sealed class NotificationService : INotificationService
                 Message = n.Message,
                 Metadata = metaEl,
                 Payload = metaEl,
-                CreatedAtUtc = n.CreatedAt,
-                ReadAtUtc = n.ReadAt,
-                Actor = n.ActorUser != null ? EntityMappers.ToUserPublicDto(n.ActorUser) : null
+                CreatedAt = n.CreatedAt,
+                ReadAt = n.ReadAt,
+                Actor = NotificationActorDto.FromUserPublic(
+                    n.ActorUser != null ? EntityMappers.ToUserPublicDto(n.ActorUser) : null)
             };
         }).ToList();
 

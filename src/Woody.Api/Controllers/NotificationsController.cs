@@ -21,6 +21,7 @@ public class NotificationsController : ControllerBase
         _notifications = notifications;
     }
 
+    /// <summary>Lista notificações da utilizadora autenticada (mais recentes primeiro).</summary>
     [HttpGet]
     [ProducesResponseType(typeof(NotificationListResponseDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<NotificationListResponseDto>> List(
@@ -48,24 +49,9 @@ public class NotificationsController : ControllerBase
         return Ok(new NotificationUnreadCountDto { Count = count });
     }
 
-    [HttpPost("{notificationId}/read")]
-    public async Task<IActionResult> MarkRead(string notificationId, CancellationToken cancellationToken = default)
-    {
-        var me = User.GetUserId();
-        if (me == null)
-            return Unauthorized();
-
-        if (!int.TryParse(notificationId, out var nid))
-            return BadRequest();
-
-        var ok = await _notifications.TryMarkReadAsync(me.Value, nid, cancellationToken);
-        if (!ok)
-            return NotFound();
-
-        return NoContent();
-    }
-
-    [HttpPost("read-all")]
+    /// <summary>Marca todas as notificações como lidas.</summary>
+    [HttpPatch("read-all")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken = default)
     {
         var me = User.GetUserId();
@@ -73,6 +59,23 @@ public class NotificationsController : ControllerBase
             return Unauthorized();
 
         await _notifications.MarkAllReadAsync(me.Value, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Marca uma notificação como lida (apenas se pertencer à utilizadora).</summary>
+    [HttpPatch("{notificationId:int}/read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkRead(int notificationId, CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var ok = await _notifications.TryMarkReadAsync(me.Value, notificationId, cancellationToken);
+        if (!ok)
+            return NotFound(new { error = "Notificação não encontrada." });
+
         return NoContent();
     }
 }

@@ -3,6 +3,35 @@ using System.Text.Json.Serialization;
 
 namespace Woody.Application.DTOs.Api;
 
+/// <summary>Ator da notificação (subconjunto público, nomes estáveis para o cliente).</summary>
+public sealed class NotificationActorDto
+{
+    public string Id { get; set; } = null!;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = null!;
+
+    public string Username { get; set; } = null!;
+
+    /// <summary>URL do avatar (equivalente a <see cref="UserPublicDto.AvatarUrl"/>).</summary>
+    [JsonPropertyName("avatar")]
+    public string? Avatar { get; set; }
+
+    public static NotificationActorDto? FromUserPublic(UserPublicDto? u)
+    {
+        if (u == null)
+            return null;
+
+        return new NotificationActorDto
+        {
+            Id = u.Id,
+            DisplayName = u.Name,
+            Username = u.Username,
+            Avatar = u.AvatarUrl
+        };
+    }
+}
+
 public class NotificationItemDto
 {
     public string Id { get; set; } = null!;
@@ -20,15 +49,15 @@ public class NotificationItemDto
 
     public JsonElement Metadata { get; set; }
 
-    /// <summary>Alias de <see cref="Metadata"/> para compatibilidade com clientes que ainda leem <c>payload</c>.</summary>
+    /// <summary>Alias de <see cref="Metadata"/> para clientes legados que ainda leem <c>payload</c>.</summary>
     [JsonPropertyName("payload")]
     public JsonElement Payload { get; set; }
 
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime CreatedAt { get; set; }
 
-    public DateTime? ReadAtUtc { get; set; }
+    public DateTime? ReadAt { get; set; }
 
-    public UserPublicDto? Actor { get; set; }
+    public NotificationActorDto? Actor { get; set; }
 }
 
 public class NotificationListResponseDto
