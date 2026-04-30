@@ -1,6 +1,7 @@
 using Woody.Application.DTOs.Api;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Media;
 using Woody.Domain.Subscription;
 
 namespace Woody.Application.Mapping;
@@ -115,12 +116,36 @@ public static class EntityMappers
         bool communityBoostActive = false,
         string? communityBoostEndsAt = null)
     {
-        var imageUrls = p.Images
-            .OrderBy(i => i.DisplayOrder)
+        var ordered = p.Images.OrderBy(i => i.DisplayOrder).ToList();
+
+        var imageUrls = ordered
+            .Where(i => i.MediaKind != MediaKind.Video)
             .Select(i => i.Url)
             .ToList();
         if (imageUrls.Count == 0 && !string.IsNullOrWhiteSpace(p.ImageUrl))
             imageUrls = new List<string> { p.ImageUrl };
+
+        var mediaAttachments = ordered
+            .Select(i => new PostMediaAttachmentResponseDto
+            {
+                Url = i.Url,
+                MediaType = MediaKindApi.ToApiString(i.MediaKind),
+                MimeType = i.MimeType,
+                DurationSeconds = i.DurationSeconds
+            })
+            .ToList();
+        if (mediaAttachments.Count == 0 && imageUrls.Count > 0)
+        {
+            mediaAttachments = imageUrls
+                .Select(u => new PostMediaAttachmentResponseDto
+                {
+                    Url = u,
+                    MediaType = MediaKindApi.Image,
+                    MimeType = null,
+                    DurationSeconds = null
+                })
+                .ToList();
+        }
 
         return new PostResponseDto
         {
@@ -133,6 +158,7 @@ public static class EntityMappers
             Content = p.Content,
             ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
             ImageUrls = imageUrls.Count > 0 ? imageUrls : null,
+            MediaAttachments = mediaAttachments.Count > 0 ? mediaAttachments : null,
             Tags = p.Tags.Select(t => t.Tag).ToList(),
             CreatedAt = Iso(p.CreatedAt),
             UpdatedAt = p.UpdatedAt.HasValue ? Iso(p.UpdatedAt.Value) : null,

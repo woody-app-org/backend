@@ -20,10 +20,38 @@ public class LocalMediaStorage : IMediaStorage
         string contentType,
         CancellationToken cancellationToken = default)
     {
-        var normalizedExtension = extension.StartsWith('.') ? extension.ToLowerInvariant() : $".{extension.ToLowerInvariant()}";
+        var normalizedExtension = NormalizeExtension(extension);
         if (UploadedImagePolicy.GetContentTypeForStorageKey($"file{normalizedExtension}") != contentType)
             throw new ArgumentException("Tipo de arquivo inválido.");
 
+        return await SaveBlobAsync(content, normalizedExtension, contentType, cancellationToken);
+    }
+
+    public async Task<StoredMediaFile> SaveVideoAsync(
+        Stream content,
+        string extension,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedExtension = NormalizeExtension(extension);
+        if (UploadedVideoPolicy.GetContentTypeForStorageKey($"file{normalizedExtension}") != contentType)
+            throw new ArgumentException("Tipo de arquivo inválido.");
+
+        return await SaveBlobAsync(content, normalizedExtension, contentType, cancellationToken);
+    }
+
+    private static string NormalizeExtension(string extension)
+    {
+        var e = extension.StartsWith('.') ? extension.ToLowerInvariant() : $".{extension.ToLowerInvariant()}";
+        return e;
+    }
+
+    private async Task<StoredMediaFile> SaveBlobAsync(
+        Stream content,
+        string normalizedExtension,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
         var storageKey = $"{Guid.NewGuid():N}{normalizedExtension}";
         var fullPath = ResolvePath(storageKey);
 
@@ -46,7 +74,7 @@ public class LocalMediaStorage : IMediaStorage
         if (!IsServerGeneratedStorageKey(storageKey))
             return Task.FromResult<MediaReadResult?>(null);
 
-        var contentType = UploadedImagePolicy.GetContentTypeForStorageKey(storageKey);
+        var contentType = AttachmentStorageCatalog.GetContentTypeForStorageKey(storageKey);
         if (contentType == null)
             return Task.FromResult<MediaReadResult?>(null);
 

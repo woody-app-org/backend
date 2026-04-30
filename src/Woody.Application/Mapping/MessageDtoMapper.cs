@@ -1,5 +1,6 @@
 using Woody.Application.DTOs.Api;
 using Woody.Domain.Entities;
+using Woody.Domain.Media;
 
 namespace Woody.Application.Mapping;
 
@@ -34,7 +35,9 @@ public static class MessageDtoMapper
                     {
                         Id = a.Id,
                         Url = a.Url,
+                        MediaType = MediaKindApi.ToApiString(a.MediaKind),
                         ContentType = a.ContentType,
+                        DurationSeconds = a.DurationSeconds,
                         DisplayOrder = a.DisplayOrder,
                         CreatedAt = a.CreatedAt
                     })

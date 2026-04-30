@@ -16,7 +16,8 @@ public static class UploadedImagePolicy
             [".jpg"] = "image/jpeg",
             [".jpeg"] = "image/jpeg",
             [".png"] = "image/png",
-            [".webp"] = "image/webp"
+            [".webp"] = "image/webp",
+            [".gif"] = "image/gif"
         };
 
     private static readonly HashSet<string> DangerousExtensions =
@@ -84,6 +85,11 @@ public static class UploadedImagePolicy
                        && bytes[9] == 0x45
                        && bytes[10] == 0x42
                        && bytes[11] == 0x50,
+            ".gif" => bytes.Length >= 6
+                      && bytes[0] == 0x47
+                      && bytes[1] == 0x49
+                      && bytes[2] == 0x46
+                      && (bytes[3] == 0x38 && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61),
             _ => false
         };
     }
@@ -94,7 +100,7 @@ public static class UploadedImagePolicy
         return ContentTypesByExtension.TryGetValue(extension, out var contentType) ? contentType : null;
     }
 
-    private static bool HasSuspiciousDoubleExtension(string fileName)
+    public static bool HasSuspiciousDoubleExtension(string fileName)
     {
         var nameWithoutFinalExtension = Path.GetFileNameWithoutExtension(fileName);
         var previousExtension = Path.GetExtension(nameWithoutFinalExtension);

@@ -1,3 +1,5 @@
+using Woody.Domain.Media;
+
 namespace Woody.Application.DTOs;
 
 public class MediaUploadResponseDto
@@ -6,4 +8,7 @@ public class MediaUploadResponseDto
     public string StorageKey { get; set; } = null!;
     public string ContentType { get; set; } = null!;
     public long SizeBytes { get; set; }
+
+    /// <summary>Tipo semântico inferido no servidor (<c>image</c>, <c>video</c>, <c>gif</c>).</summary>
+    public string MediaKind { get; set; } = MediaKindApi.Image;
 }

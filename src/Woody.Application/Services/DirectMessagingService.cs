@@ -273,15 +273,15 @@ public sealed class DirectMessagingService : IDirectMessagingService
             throw new ForbiddenException("Não podes enviar mensagens nesta conversa.");
 
         var text = string.IsNullOrWhiteSpace(body.Body) ? null : body.Body.Trim();
-        var urls = NormalizeAttachmentUrls(body.AttachmentUrls);
-        if (text == null && urls.Count == 0)
+        var attachmentPlans = NormalizeIncomingAttachments(body);
+        if (text == null && attachmentPlans.Count == 0)
             throw new ArgumentException("A mensagem precisa de texto ou de pelo menos um anexo.");
 
         if (text != null && text.Length > MaxMessageBodyLength)
             throw new ArgumentException($"O texto não pode exceder {MaxMessageBodyLength} caracteres.");
 
-        if (urls.Count > MaxMessageAttachments)
-            throw new ArgumentException($"Máximo de {MaxMessageAttachments} imagens por mensagem.");
+        if (attachmentPlans.Count > MaxMessageAttachments)
+            throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
 
         var utcNow = DateTime.UtcNow;
         var message = new Message
@@ -293,13 +293,15 @@ public sealed class DirectMessagingService : IDirectMessagingService
         };
 
         var order = 0;
-        foreach (var url in urls)
+        foreach (var plan in attachmentPlans)
         {
             message.Attachments.Add(new MessageAttachment
             {
-                Url = url,
+                Url = plan.Url,
                 DisplayOrder = order++,
-                CreatedAt = utcNow
+                CreatedAt = utcNow,
+                MediaKind = plan.Kind,
+                DurationSeconds = plan.Kind == MediaKind.Video ? plan.DurationSeconds : null
             });
         }
 
@@ -471,13 +473,52 @@ public sealed class DirectMessagingService : IDirectMessagingService
         }
     }
 
-    private static List<string> NormalizeAttachmentUrls(IReadOnlyList<string>? raw)
-    {
-        if (raw == null || raw.Count == 0)
-            return new List<string>();
+    private sealed record AttachmentPlan(string Url, MediaKind Kind, int? DurationSeconds);
 
-        var list = new List<string>();
-        foreach (var u in raw)
+    private static List<AttachmentPlan> NormalizeIncomingAttachments(SendConversationMessageRequestDto body)
+    {
+        var list = new List<AttachmentPlan>();
+        if (body.Attachments is { Count: > 0 })
+        {
+            foreach (var a in body.Attachments)
+            {
+                if (a == null || string.IsNullOrWhiteSpace(a.Url))
+                    throw new ArgumentException("Cada anexo precisa de URL.");
+
+                if (!MediaKindApi.TryParse(a.MediaType, out var kind))
+                    throw new ArgumentException("mediaType inválido. Use image, video, gif ou sticker.");
+
+                if (a.DurationSeconds is int d &&
+                    (d < 0 || d > UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds))
+                {
+                    throw new ArgumentException(
+                        $"durationSeconds inválido (0–{UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds}).");
+                }
+
+                var t = a.Url.Trim();
+                var isDataImage = t.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+                var maxLength = isDataImage ? MaxDataImageAttachmentUrlLength : MaxExternalAttachmentUrlLength;
+                if (t.Length > maxLength)
+                    throw new ArgumentException($"Cada URL de anexo não pode exceder {maxLength} caracteres.");
+
+                if (!DirectMessageAttachmentPolicy.IsPermittedTypedAttachmentUrl(kind, t))
+                    throw new ArgumentException("Anexo inválido para o tipo indicado.");
+
+                if (list.Any(x => x.Url == t))
+                    continue;
+
+                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds));
+                if (list.Count > MaxMessageAttachments)
+                    throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
+            }
+
+            return list;
+        }
+
+        if (body.AttachmentUrls == null || body.AttachmentUrls.Count == 0)
+            return list;
+
+        foreach (var u in body.AttachmentUrls)
         {
             if (string.IsNullOrWhiteSpace(u))
                 continue;
@@ -489,11 +530,11 @@ public sealed class DirectMessagingService : IDirectMessagingService
             if (!DirectMessageAttachmentPolicy.IsPermittedAttachmentUrl(t))
                 throw new ArgumentException(
                     "Cada anexo tem de ser uma imagem: URL https válida ou data:image (png, jpeg, gif ou webp) em base64.");
-            if (list.Contains(t))
+            if (list.Any(x => x.Url == t))
                 continue;
-            list.Add(t);
+            list.Add(new AttachmentPlan(t, MediaKind.Image, null));
             if (list.Count > MaxMessageAttachments)
-                throw new ArgumentException($"Máximo de {MaxMessageAttachments} imagens por mensagem.");
+                throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
         }
 
         return list;

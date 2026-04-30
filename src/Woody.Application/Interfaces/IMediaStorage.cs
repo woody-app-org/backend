@@ -12,5 +12,11 @@ public interface IMediaStorage
         string contentType,
         CancellationToken cancellationToken = default);
 
+    Task<StoredMediaFile> SaveVideoAsync(
+        Stream content,
+        string extension,
+        string contentType,
+        CancellationToken cancellationToken = default);
+
     Task<MediaReadResult?> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default);
 }

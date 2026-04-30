@@ -9,6 +9,7 @@ using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Posts;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Media;
 using Woody.Application.Mapping;
 using Woody.Application.Validation;
 
@@ -114,7 +115,7 @@ public class PostsController : ControllerBase
                 out error))
             return BadRequest(new { error });
 
-        if (!TryNormalizePostImageUrls(body, out var imageUrls, out error))
+        if (!TryNormalizePostMedia(body, out var mediaRows, out error))
             return BadRequest(new { error });
 
         if (!InputValidator.TryNormalizeTags(
@@ -148,6 +149,9 @@ public class PostsController : ControllerBase
         else
             return BadRequest(new { error = "Contexto de publicação inválido. Use \"profile\" ou \"community\"." });
 
+        var cover = mediaRows.FirstOrDefault(r => r.Kind is MediaKind.Image or MediaKind.Gif or MediaKind.Sticker);
+        var coverUrl = cover?.Url;
+
         Post post;
         if (useProfile)
         {
@@ -158,7 +162,7 @@ public class PostsController : ControllerBase
                 PublicationContext = PostPublicationContext.Profile,
                 Title = title,
                 Content = content,
-                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                ImageUrl = coverUrl,
                 CreatedAt = DateTime.UtcNow
             };
         }
@@ -180,21 +184,25 @@ public class PostsController : ControllerBase
                 PublicationContext = PostPublicationContext.Community,
                 Title = title,
                 Content = content,
-                ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
+                ImageUrl = coverUrl,
                 CreatedAt = DateTime.UtcNow
             };
         }
         _posts.Add(post);
         await _posts.SaveChangesAsync(cancellationToken);
 
-        if (imageUrls.Count > 0)
+        if (mediaRows.Count > 0)
         {
-            var rows = imageUrls.Select((url, i) => new PostImage
-            {
-                PostId = post.Id,
-                Url = url,
-                DisplayOrder = i
-            });
+            var rows = mediaRows.Select(
+                (r, i) => new PostImage
+                {
+                    PostId = post.Id,
+                    Url = r.Url,
+                    MediaKind = r.Kind,
+                    MimeType = r.MimeType,
+                    DurationSeconds = r.Kind == MediaKind.Video ? r.DurationSeconds : null,
+                    DisplayOrder = i
+                });
             await _posts.AddPostImagesAsync(rows, cancellationToken);
             await _posts.SaveChangesAsync(cancellationToken);
         }
@@ -213,6 +221,83 @@ public class PostsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
     }
 
+    private sealed record NormalizedPostMediaRow(string Url, MediaKind Kind, int? DurationSeconds, string? MimeType);
+
+    private static bool TryNormalizePostMedia(
+        CreatePostRequestDTO body,
+        out List<NormalizedPostMediaRow> rows,
+        out string? error)
+    {
+        rows = new List<NormalizedPostMediaRow>();
+        error = null;
+
+        if (body.MediaAttachments is { Count: > 0 })
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in body.MediaAttachments)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.Url))
+                {
+                    error = "Cada anexo precisa de URL.";
+                    return false;
+                }
+
+                if (!MediaKindApi.TryParse(item.MediaType, out var kind))
+                {
+                    error = "mediaType inválido. Use image, video, gif ou sticker.";
+                    return false;
+                }
+
+                if (item.DurationSeconds is int d &&
+                    (d < 0 || d > UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds))
+                {
+                    error = $"durationSeconds inválido (0–{UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds}).";
+                    return false;
+                }
+
+                string? urlNorm;
+                switch (kind)
+                {
+                    case MediaKind.Video:
+                        if (!InputValidator.TryNormalizeHttpsVideoUrl(item.Url, out urlNorm, out error))
+                            return false;
+                        break;
+                    case MediaKind.Gif:
+                        if (!InputValidator.TryNormalizeHttpsGifUrl(item.Url, out urlNorm, out error))
+                            return false;
+                        break;
+                    default:
+                        if (!InputValidator.TryNormalizePostImageOrDataUrl(item.Url, out urlNorm, out error))
+                            return false;
+                        break;
+                }
+
+                if (urlNorm == null)
+                    continue;
+
+                if (!seen.Add(urlNorm))
+                    continue;
+
+                rows.Add(new NormalizedPostMediaRow(urlNorm, kind, item.DurationSeconds, null));
+                if (rows.Count > MaxPostImages)
+                {
+                    error = $"Máximo de {MaxPostImages} anexos por publicação.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (!TryNormalizePostImageUrls(body, out var legacyUrls, out error))
+            return false;
+
+        foreach (var u in legacyUrls)
+            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null));
+
+        return true;
+    }
+
     private static bool TryNormalizePostImageUrls(
         CreatePostRequestDTO body,
         out List<string> normalized,
@@ -225,7 +310,7 @@ public class PostsController : ControllerBase
         {
             foreach (var u in body.ImageUrls)
             {
-                if (!InputValidator.TryNormalizeHttpsImageUrl(u, out var imageUrl, out error))
+                if (!InputValidator.TryNormalizePostImageOrDataUrl(u, out var imageUrl, out error))
                     return false;
                 if (imageUrl == null || normalized.Contains(imageUrl))
                     continue;
@@ -240,7 +325,7 @@ public class PostsController : ControllerBase
             return true;
         }
 
-        if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var singleImageUrl, out error))
+        if (!InputValidator.TryNormalizePostImageOrDataUrl(body.ImageUrl, out var singleImageUrl, out error))
             return false;
         if (singleImageUrl != null)
             normalized.Add(singleImageUrl);

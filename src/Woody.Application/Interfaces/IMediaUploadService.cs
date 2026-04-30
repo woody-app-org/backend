@@ -10,4 +10,11 @@ public interface IMediaUploadService
         string contentType,
         long sizeBytes,
         CancellationToken cancellationToken = default);
+
+    Task<MediaUploadResponseDto> UploadVideoAsync(
+        Stream content,
+        string originalFileName,
+        string contentType,
+        long sizeBytes,
+        CancellationToken cancellationToken = default);
 }

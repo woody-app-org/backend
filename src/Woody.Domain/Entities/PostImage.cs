@@ -1,3 +1,5 @@
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Domain.Entities;
 
 /// <summary>
@@ -10,6 +12,15 @@ public class PostImage
     public Post Post { get; set; } = null!;
 
     public string Url { get; set; } = null!;
+
+    /// <summary>Discriminador semântico (imagem, vídeo curto, GIF animado, sticker).</summary>
+    public MediaKind MediaKind { get; set; } = MediaKind.Image;
+
+    /// <summary>MIME declarado ou inferido (opcional).</summary>
+    public string? MimeType { get; set; }
+
+    /// <summary>Duração em segundos para vídeo (opcional; validação exacta futura).</summary>
+    public int? DurationSeconds { get; set; }
 
     /// <summary>Ordem de exibição (0 = primeira).</summary>
     public int DisplayOrder { get; set; }

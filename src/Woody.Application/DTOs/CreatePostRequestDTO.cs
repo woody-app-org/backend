@@ -1,3 +1,5 @@
+using Woody.Application.DTOs.Api;
+
 namespace Woody.Application.DTOs;
 
 public class CreatePostRequestDTO
@@ -15,5 +17,11 @@ public class CreatePostRequestDTO
     public string? ImageUrl { get; set; }
     /// <summary>Várias URLs públicas (ex.: após upload para CDN/storage). Ordem preservada.</summary>
     public List<string>? ImageUrls { get; set; }
+
+    /// <summary>
+    /// Anexos tipados (imagem, vídeo, gif, sticker). Quando preenchido, tem prioridade sobre <see cref="ImageUrls"/> / <see cref="ImageUrl"/>.
+    /// </summary>
+    public List<PostMediaAttachmentRequestDto>? MediaAttachments { get; set; }
+
     public List<string>? Tags { get; set; }
 }

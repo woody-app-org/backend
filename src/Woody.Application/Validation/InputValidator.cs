@@ -86,6 +86,137 @@ public static class InputValidator
         return true;
     }
 
+    public const string InvalidVideoUrlMessage = "URL de vídeo inválida. Use mp4/webm via https ou um vídeo enviado à plataforma.";
+    public const string InvalidGifUrlMessage = "URL de GIF inválida.";
+
+    public static bool TryNormalizeHttpsVideoUrl(string? raw, out string? normalized, out string? error)
+    {
+        normalized = null;
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var value = raw.Trim();
+        if (value.Length == 0)
+            return true;
+
+        if (!PublicVideoUrlPolicy.IsPermittedVideoUrl(value))
+        {
+            error = InvalidVideoUrlMessage;
+            return false;
+        }
+
+        normalized = value;
+        return true;
+    }
+
+    /// <summary>GIF em posts: data <c>image/gif</c>, URL https .gif ou ficheiro local .gif.</summary>
+    public static bool TryNormalizeHttpsGifUrl(string? raw, out string? normalized, out string? error)
+    {
+        normalized = null;
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var value = raw.Trim();
+        if (value.Length == 0)
+            return true;
+
+        var lower = value.ToLowerInvariant();
+        if (lower.StartsWith("data:image/gif", StringComparison.Ordinal))
+        {
+            if (lower.StartsWith("data:image/svg", StringComparison.Ordinal))
+            {
+                error = InvalidGifUrlMessage;
+                return false;
+            }
+
+            if (!lower.Contains(";base64,", StringComparison.Ordinal))
+            {
+                error = InvalidGifUrlMessage;
+                return false;
+            }
+
+            normalized = value;
+            return true;
+        }
+
+        if (!PublicImageUrlPolicy.IsPermittedImageUrl(value))
+        {
+            error = InvalidGifUrlMessage;
+            return false;
+        }
+
+        if (value.StartsWith(PublicImageUrlPolicy.LocalMediaPathPrefix, StringComparison.Ordinal))
+        {
+            if (!value.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                error = InvalidGifUrlMessage;
+                return false;
+            }
+
+            normalized = value;
+            return true;
+        }
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && uri.AbsolutePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = value;
+            return true;
+        }
+
+        error = InvalidGifUrlMessage;
+        return false;
+    }
+
+    /// <summary>Imagem ou sticker em posts: URL pública ou data URL raster (composer).</summary>
+    public static bool TryNormalizePostImageOrDataUrl(string? raw, out string? normalized, out string? error)
+    {
+        normalized = null;
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var value = raw.Trim();
+        if (value.Length == 0)
+            return true;
+
+        if (value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+        {
+            var lower = value.ToLowerInvariant();
+            if (lower.StartsWith("data:image/svg", StringComparison.Ordinal))
+            {
+                error = InvalidImageUrlMessage;
+                return false;
+            }
+
+            if (!lower.Contains(";base64,", StringComparison.Ordinal))
+            {
+                error = InvalidImageUrlMessage;
+                return false;
+            }
+
+            if (!lower.StartsWith("data:image/png", StringComparison.Ordinal)
+                && !lower.StartsWith("data:image/jpeg", StringComparison.Ordinal)
+                && !lower.StartsWith("data:image/jpg", StringComparison.Ordinal)
+                && !lower.StartsWith("data:image/webp", StringComparison.Ordinal)
+                && !lower.StartsWith("data:image/gif", StringComparison.Ordinal))
+            {
+                error = InvalidImageUrlMessage;
+                return false;
+            }
+
+            normalized = value;
+            return true;
+        }
+
+        return TryNormalizeHttpsImageUrl(raw, out normalized, out error);
+    }
+
     public static bool TryNormalizeTags(
         IEnumerable<string>? raw,
         int maxCount,

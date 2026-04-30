@@ -12,6 +12,8 @@ public class PostResponseDto
     public string Content { get; set; } = null!;
     public string? ImageUrl { get; set; }
     public List<string>? ImageUrls { get; set; }
+    /// <summary>Galeria tipada (inclui vídeo). <see cref="ImageUrls"/> mantém só entradas adequadas a <c>&lt;img&gt;</c> para clientes legados.</summary>
+    public List<PostMediaAttachmentResponseDto>? MediaAttachments { get; set; }
     public List<string>? Tags { get; set; }
     public string CreatedAt { get; set; } = null!;
     public string? UpdatedAt { get; set; }
