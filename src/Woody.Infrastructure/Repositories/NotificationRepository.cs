@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Repositories;
@@ -13,6 +14,21 @@ public class NotificationRepository : INotificationRepository
     {
         _db = db;
     }
+
+    public Task<bool> HasRecentPostLikeToRecipientAsync(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default) =>
+        _db.Notifications.AsNoTracking().AnyAsync(
+            n => n.RecipientUserId == recipientUserId
+                 && n.ActorUserId == actorUserId
+                 && n.Type == NotificationType.PostLike
+                 && n.TargetKind == NotificationTargetKind.Post
+                 && n.TargetId == postId
+                 && n.CreatedAt >= sinceUtc,
+            cancellationToken);
 
     public void Add(Notification row) => _db.Notifications.Add(row);
 

@@ -9,6 +9,9 @@ namespace Woody.Application.Services;
 
 public sealed class NotificationService : INotificationService
 {
+    /// <summary>Janela em que um segundo like no mesmo post pelo mesmo utilizador não gera nova notificação.</summary>
+    private static readonly TimeSpan PostLikeDedupeWindow = TimeSpan.FromMinutes(15);
+
     private readonly INotificationRepository _notifications;
 
     public NotificationService(INotificationRepository notifications)
@@ -79,7 +82,16 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == postOwnerUserId)
             return;
 
-        _notifications.Add(NotificationComposer.PostLiked(postOwnerUserId, actorUserId, postId, DateTime.UtcNow));
+        var now = DateTime.UtcNow;
+        if (await _notifications.HasRecentPostLikeToRecipientAsync(
+                postOwnerUserId,
+                actorUserId,
+                postId,
+                now - PostLikeDedupeWindow,
+                cancellationToken))
+            return;
+
+        _notifications.Add(NotificationComposer.PostLiked(postOwnerUserId, actorUserId, postId, now));
         await _notifications.SaveChangesAsync(cancellationToken);
     }
 

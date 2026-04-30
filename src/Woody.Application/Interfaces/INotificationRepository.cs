@@ -1,9 +1,20 @@
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.Interfaces;
 
 public interface INotificationRepository
 {
+    /// <summary>
+    /// Evita spam de <see cref="NotificationType.PostLike"/> (ex.: like → unlike → like no mesmo post).
+    /// </summary>
+    Task<bool> HasRecentPostLikeToRecipientAsync(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        DateTime sinceUtc,
+        CancellationToken cancellationToken = default);
+
     void Add(Notification row);
 
     void AddRange(IEnumerable<Notification> rows);
