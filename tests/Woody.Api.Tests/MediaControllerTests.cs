@@ -27,9 +27,11 @@ public class MediaControllerTests
         var created = Assert.IsType<CreatedResult>(actionResult);
         var dto = Assert.IsType<MediaUploadResponseDto>(created.Value);
         Assert.EndsWith(".png", dto.StorageKey);
+        Assert.StartsWith("posts/1/", dto.StorageKey, StringComparison.Ordinal);
         Assert.DoesNotContain("original", dto.StorageKey, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith("/api/media/images/", dto.Url, StringComparison.Ordinal);
-        Assert.True(File.Exists(Path.Combine(fixture.RootPath, dto.StorageKey)));
+        var physicalKey = dto.StorageKey.Replace('/', Path.DirectorySeparatorChar);
+        Assert.True(File.Exists(Path.Combine(fixture.RootPath, physicalKey)));
     }
 
     [Fact]
@@ -214,8 +216,8 @@ public class MediaControllerTests
         public MediaController CreateController()
         {
             var options = Options.Create(_options);
-            var storage = new LocalMediaStorage(options);
-            var core = new MediaUploadService(storage, options);
+            var storage = new LocalMediaStorageProvider(options);
+            var core = new MediaUploadService(storage);
             var app = new MediaUploadApplicationService(core, _communityPermissions.Object, _conversations.Object, options);
             var httpContext = new DefaultHttpContext();
             httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(

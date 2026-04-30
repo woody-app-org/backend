@@ -37,8 +37,16 @@ public sealed class MediaUploadApplicationService : IMediaUploadApplicationServi
     {
         await EnsureAuthorizedAsync(authorization, isVideo: false, cancellationToken).ConfigureAwait(false);
         var maxBytes = _options.MaxImageSizeBytes;
+        var storage = MediaStoragePathBuilder.FromAuthorization(authorization);
         return await _uploads
-            .UploadImageAsync(content, originalFileName, contentType, sizeBytes, maxBytes, cancellationToken)
+            .UploadImageAsync(
+                storage,
+                content,
+                originalFileName,
+                contentType,
+                sizeBytes,
+                maxBytes,
+                cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -59,7 +67,9 @@ public sealed class MediaUploadApplicationService : IMediaUploadApplicationServi
             _ => throw new ArgumentException("Escopo de upload inválido.")
         };
 
+        var storage = MediaStoragePathBuilder.FromAuthorization(authorization);
         return await _uploads.UploadVideoAsync(
+                storage,
                 content,
                 originalFileName,
                 contentType,

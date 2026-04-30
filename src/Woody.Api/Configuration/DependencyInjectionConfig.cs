@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using Woody.Application.Configuration;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
 using Woody.Application.Interfaces.Messaging;
@@ -67,7 +69,15 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ICommunityPostBoostRepository, CommunityPostBoostRepository>();
         builder.Services.AddScoped<ICommunityPostBoostService, CommunityPostBoostService>();
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
-        builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
+        builder.Services.AddSingleton<IPostConfigureOptions<R2MediaStorageOptions>, R2MediaStorageEnvironmentConfigure>();
+        builder.Services.Configure<R2MediaStorageOptions>(builder.Configuration.GetSection("R2"));
+
+        var mediaDriver = (builder.Configuration["MediaStorage:Driver"] ?? "Local").Trim();
+        if (string.Equals(mediaDriver, "S3", StringComparison.OrdinalIgnoreCase))
+            builder.Services.AddScoped<IMediaStorageProvider, S3CompatibleMediaStorageProvider>();
+        else
+            builder.Services.AddScoped<IMediaStorageProvider, LocalMediaStorageProvider>();
+
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
         builder.Services.AddSingleton<IGifStickerSearchProvider, LocalCatalogGifStickerSearchProvider>();

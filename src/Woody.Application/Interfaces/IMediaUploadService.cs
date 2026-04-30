@@ -1,5 +1,7 @@
 using Woody.Application.DTOs;
 
+using Woody.Application.Media;
+
 namespace Woody.Application.Interfaces;
 
 /// <summary>
@@ -9,6 +11,7 @@ namespace Woody.Application.Interfaces;
 public interface IMediaUploadService
 {
     Task<MediaUploadResponseDto> UploadImageAsync(
+        MediaStorageWriteContext storageContext,
         Stream content,
         string originalFileName,
         string contentType,
@@ -17,6 +20,7 @@ public interface IMediaUploadService
         CancellationToken cancellationToken = default);
 
     Task<MediaUploadResponseDto> UploadVideoAsync(
+        MediaStorageWriteContext storageContext,
         Stream content,
         string originalFileName,
         string contentType,

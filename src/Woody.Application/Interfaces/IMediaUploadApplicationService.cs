@@ -5,7 +5,7 @@ namespace Woody.Application.Interfaces;
 
 /// <summary>
 /// Orquestra upload multimédia com permissões por contexto (post vs mensagem).
-/// O armazenamento concreto continua em <see cref="IMediaStorage"/> (local hoje, bucket depois).
+/// O armazenamento concreto continua em <see cref="IMediaStorageProvider"/> (local hoje, bucket depois).
 /// </summary>
 public interface IMediaUploadApplicationService
 {

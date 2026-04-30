@@ -18,9 +18,9 @@ public class MediaController : ControllerBase
     private const long MultipartSlackBytes = 1024 * 1024;
 
     private readonly IMediaUploadApplicationService _uploads;
-    private readonly IMediaStorage _storage;
+    private readonly IMediaStorageProvider _storage;
 
-    public MediaController(IMediaUploadApplicationService uploads, IMediaStorage storage)
+    public MediaController(IMediaUploadApplicationService uploads, IMediaStorageProvider storage)
     {
         _uploads = uploads;
         _storage = storage;
@@ -166,13 +166,13 @@ public class MediaController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpGet("images/{storageKey}")]
+    [HttpGet("images/{*storageKey}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicRead)]
     public async Task<IActionResult> GetImage(string storageKey, CancellationToken cancellationToken) =>
         await ServeMediaAsync(storageKey, "image", enableRangeProcessing: false, cancellationToken);
 
     [AllowAnonymous]
-    [HttpGet("videos/{storageKey}")]
+    [HttpGet("videos/{*storageKey}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicRead)]
     public async Task<IActionResult> GetVideo(string storageKey, CancellationToken cancellationToken) =>
         await ServeMediaAsync(storageKey, "video", enableRangeProcessing: true, cancellationToken);

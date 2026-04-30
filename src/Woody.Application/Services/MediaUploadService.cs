@@ -1,7 +1,6 @@
-using Microsoft.Extensions.Options;
-using Woody.Application.Configuration;
 using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
+using Woody.Application.Media;
 using Woody.Domain.Media;
 
 namespace Woody.Application.Services;
@@ -10,16 +9,15 @@ public class MediaUploadService : IMediaUploadService
 {
     private const int MagicBytesToRead = 24;
 
-    private readonly IMediaStorage _storage;
-    private readonly MediaStorageOptions _options;
+    private readonly IMediaStorageProvider _storage;
 
-    public MediaUploadService(IMediaStorage storage, IOptions<MediaStorageOptions> options)
+    public MediaUploadService(IMediaStorageProvider storage)
     {
         _storage = storage;
-        _options = options.Value;
     }
 
     public async Task<MediaUploadResponseDto> UploadImageAsync(
+        MediaStorageWriteContext storageContext,
         Stream content,
         string originalFileName,
         string contentType,
@@ -46,16 +44,14 @@ public class MediaUploadService : IMediaUploadService
             throw new ArgumentException("Assinatura do arquivo inválida.");
 
         buffered.Position = 0;
-        var stored = await _storage.SaveImageAsync(
-            buffered,
-            metadata.Extension!,
-            metadata.ContentType!,
-            cancellationToken);
+        var stored = await _storage
+            .PutImageAsync(storageContext, buffered, metadata.Extension!, metadata.ContentType!, cancellationToken)
+            .ConfigureAwait(false);
 
         var kind = MediaKindApi.FromMimeForUploadedFile(metadata.ContentType!, metadata.Extension!);
         return new MediaUploadResponseDto
         {
-            Url = BuildImagePublicUrl(stored.StorageKey),
+            Url = _storage.BuildPublicImageUrl(stored.StorageKey),
             StorageKey = stored.StorageKey,
             ContentType = stored.ContentType,
             SizeBytes = stored.SizeBytes,
@@ -64,6 +60,7 @@ public class MediaUploadService : IMediaUploadService
     }
 
     public async Task<MediaUploadResponseDto> UploadVideoAsync(
+        MediaStorageWriteContext storageContext,
         Stream content,
         string originalFileName,
         string contentType,
@@ -94,17 +91,15 @@ public class MediaUploadService : IMediaUploadService
             throw new ArgumentException("Assinatura de vídeo inválida.");
 
         buffered.Position = 0;
-        var stored = await _storage.SaveVideoAsync(
-            buffered,
-            metadata.Extension!,
-            metadata.ContentType!,
-            cancellationToken);
+        var stored = await _storage
+            .PutVideoAsync(storageContext, buffered, metadata.Extension!, metadata.ContentType!, cancellationToken)
+            .ConfigureAwait(false);
 
         int? durationMs = clientDeclaredDurationSeconds is int s ? s * 1000 : null;
 
         return new MediaUploadResponseDto
         {
-            Url = BuildVideoPublicUrl(stored.StorageKey),
+            Url = _storage.BuildPublicVideoUrl(stored.StorageKey),
             StorageKey = stored.StorageKey,
             ContentType = stored.ContentType,
             SizeBytes = stored.SizeBytes,
@@ -143,21 +138,5 @@ public class MediaUploadService : IMediaUploadService
             throw new ArgumentException("Arquivo inválido.");
 
         return buffered;
-    }
-
-    private string BuildImagePublicUrl(string storageKey)
-    {
-        var basePath = string.IsNullOrWhiteSpace(_options.PublicUrlPath)
-            ? "/api/media/images"
-            : _options.PublicUrlPath.TrimEnd('/');
-        return $"{basePath}/{Uri.EscapeDataString(storageKey)}";
-    }
-
-    private string BuildVideoPublicUrl(string storageKey)
-    {
-        var basePath = string.IsNullOrWhiteSpace(_options.PublicVideoUrlPath)
-            ? "/api/media/videos"
-            : _options.PublicVideoUrlPath.TrimEnd('/');
-        return $"{basePath}/{Uri.EscapeDataString(storageKey)}";
     }
 }

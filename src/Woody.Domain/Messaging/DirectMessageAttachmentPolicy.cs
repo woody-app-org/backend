@@ -71,7 +71,7 @@ public static class DirectMessageAttachmentPolicy
         {
             var key = t[PublicImageUrlPolicy.LocalMediaPathPrefix.Length..];
             return key.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)
-                   && UploadedImagePolicy.GetContentTypeForStorageKey(key) != null;
+                   && MediaStorageKeySyntax.IsPermittedImageStorageKeyForLocalApi(key);
         }
 
         if (Uri.TryCreate(t, UriKind.Absolute, out var uri)

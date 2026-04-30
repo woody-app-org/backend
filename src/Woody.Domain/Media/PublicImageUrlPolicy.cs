@@ -56,8 +56,7 @@ public static class PublicImageUrlPolicy
             return false;
 
         var storageKey = url[LocalMediaPathPrefix.Length..];
-        return UploadedImagePolicy.GetContentTypeForStorageKey(storageKey) != null
-               && Path.GetFileName(storageKey) == storageKey;
+        return MediaStorageKeySyntax.IsPermittedImageStorageKeyForLocalApi(storageKey);
     }
 
     private static bool IsPrivateOrLocalAddress(string host)

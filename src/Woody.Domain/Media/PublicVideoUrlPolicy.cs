@@ -29,8 +29,7 @@ public static class PublicVideoUrlPolicy
             return false;
 
         var storageKey = url[LocalVideoMediaPathPrefix.Length..];
-        return UploadedVideoPolicy.GetContentTypeForStorageKey(storageKey) != null
-               && Path.GetFileName(storageKey) == storageKey;
+        return MediaStorageKeySyntax.IsPermittedVideoStorageKeyForLocalApi(storageKey);
     }
 
     private static bool IsPermittedExternalVideoUrl(string url)
