@@ -26,6 +26,10 @@ public sealed class MediaAttachmentResponseDto
 
     public string? Provider { get; set; }
     public string? ExternalId { get; set; }
+
+    /// <summary>Chave no armazenamento (local ou bucket) quando aplicável.</summary>
+    public string? StorageKey { get; set; }
+
     public int DisplayOrder { get; set; }
     public DateTime CreatedAt { get; set; }
 }

@@ -10,4 +10,11 @@ public sealed class MessageAttachmentItemRequestDto
     public int? DurationSeconds { get; set; }
     public string? Provider { get; set; }
     public string? ExternalId { get; set; }
+
+    /// <summary>Chave interna quando a URL é media Woody; deve coincidir com a URL.</summary>
+    public string? StorageKey { get; set; }
+
+    public string? MimeType { get; set; }
+
+    public long? FileSize { get; set; }
 }

@@ -26,6 +26,7 @@ public static class MediaAttachmentDtoMapper
             DurationSeconds = a.DurationMs.HasValue ? (a.DurationMs.Value + 999) / 1000 : null,
             Provider = a.Provider,
             ExternalId = a.ExternalId,
+            StorageKey = a.StorageKey,
             DisplayOrder = a.DisplayOrder,
             CreatedAt = a.CreatedAt
         };
@@ -56,6 +57,7 @@ public static class MediaAttachmentDtoMapper
             DurationSeconds = null,
             Provider = null,
             ExternalId = null,
+            StorageKey = null,
             DisplayOrder = displayOrder,
             CreatedAt = createdAt
         };

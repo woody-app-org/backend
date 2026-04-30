@@ -11,6 +11,7 @@ using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
 using Woody.Domain.Posts;
 using Woody.Application.Mapping;
+using Woody.Application.Media;
 using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
@@ -207,6 +208,8 @@ public class PostsController : ControllerBase
                     Provider = r.Provider,
                     ExternalId = r.ExternalId,
                     DisplayOrder = i,
+                    StorageKey = r.StorageKey,
+                    FileSize = r.FileSize,
                     CreatedAt = DateTime.UtcNow
                 });
             await _posts.AddPostMediaAttachmentsAsync(rows, cancellationToken);
@@ -233,7 +236,9 @@ public class PostsController : ControllerBase
         int? DurationSeconds,
         string? MimeType,
         string? Provider,
-        string? ExternalId);
+        string? ExternalId,
+        string? StorageKey,
+        long? FileSize);
 
     private static bool TryNormalizePostMedia(
         CreatePostRequestDTO body,
@@ -290,7 +295,29 @@ public class PostsController : ControllerBase
                 if (!seen.Add(urlNorm))
                     continue;
 
-                rows.Add(new NormalizedPostMediaRow(urlNorm, kind, item.DurationSeconds, null, TrimOrNull(item.Provider), TrimOrNull(item.ExternalId)));
+                if (!LocalAttachmentRequestMetadata.TryResolve(
+                        kind,
+                        urlNorm,
+                        item.StorageKey,
+                        item.MimeType,
+                        item.FileSize,
+                        MediaReferenceConstraints.PostVideoMaxUploadBytes,
+                        MediaReferenceConstraints.ImageMaxUploadBytes,
+                        out var storageKey,
+                        out var resolvedMime,
+                        out var fileSize,
+                        out error))
+                    return false;
+
+                rows.Add(new NormalizedPostMediaRow(
+                    urlNorm,
+                    kind,
+                    item.DurationSeconds,
+                    resolvedMime,
+                    TrimOrNull(item.Provider),
+                    TrimOrNull(item.ExternalId),
+                    storageKey,
+                    fileSize));
                 if (rows.Count > MaxPostImages)
                 {
                     error = $"Máximo de {MaxPostImages} anexos por publicação.";
@@ -305,7 +332,7 @@ public class PostsController : ControllerBase
             return false;
 
         foreach (var u in legacyUrls)
-            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null, null, null));
+            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null, null, null, null, null));
 
         return true;
     }

@@ -2,6 +2,7 @@ using Woody.Application.DTOs.Api;
 using Woody.Application.Exceptions;
 using Woody.Application.Interfaces;
 using Woody.Application.Mapping;
+using Woody.Application.Media;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
@@ -312,7 +313,10 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     DurationMs = plan.Kind == MediaKind.Video && plan.DurationSeconds is int s ? s * 1000 : null,
                     Provider = plan.Provider,
                     ExternalId = plan.ExternalId,
-                    ThumbnailUrl = plan.ThumbnailUrl
+                    ThumbnailUrl = plan.ThumbnailUrl,
+                    StorageKey = plan.StorageKey,
+                    MimeType = plan.MimeType,
+                    FileSize = plan.FileSize
                 });
         }
 
@@ -489,7 +493,10 @@ public sealed class DirectMessagingService : IDirectMessagingService
         int? DurationSeconds,
         string? Provider,
         string? ExternalId,
-        string? ThumbnailUrl);
+        string? ThumbnailUrl,
+        string? StorageKey,
+        string? MimeType,
+        long? FileSize);
 
     private static List<AttachmentPlan> NormalizeIncomingAttachments(SendConversationMessageRequestDto body)
     {
@@ -520,6 +527,20 @@ public sealed class DirectMessagingService : IDirectMessagingService
                 if (!DirectMessageAttachmentPolicy.IsPermittedTypedAttachmentUrl(kind, t))
                     throw new ArgumentException("Anexo inválido para o tipo indicado.");
 
+                if (!LocalAttachmentRequestMetadata.TryResolve(
+                        kind,
+                        t,
+                        a.StorageKey,
+                        a.MimeType,
+                        a.FileSize,
+                        MediaReferenceConstraints.MessageVideoMaxUploadBytes,
+                        MediaReferenceConstraints.ImageMaxUploadBytes,
+                        out var storageKey,
+                        out var resolvedMime,
+                        out var fileSize,
+                        out var metaError))
+                    throw new ArgumentException(metaError ?? "Metadados do anexo inválidos.");
+
                 var thumb = TrimOrNull(a.ThumbnailUrl);
                 if (thumb != null)
                 {
@@ -532,7 +553,16 @@ public sealed class DirectMessagingService : IDirectMessagingService
                 if (list.Any(x => x.Url == t))
                     continue;
 
-                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds, TrimOrNull(a.Provider), TrimOrNull(a.ExternalId), thumb));
+                list.Add(new AttachmentPlan(
+                    t,
+                    kind,
+                    a.DurationSeconds,
+                    TrimOrNull(a.Provider),
+                    TrimOrNull(a.ExternalId),
+                    thumb,
+                    storageKey,
+                    resolvedMime,
+                    fileSize));
                 if (list.Count > MaxMessageAttachments)
                     throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
             }
@@ -557,7 +587,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     "Cada anexo tem de ser uma imagem: URL https válida ou data:image (png, jpeg, gif ou webp) em base64.");
             if (list.Any(x => x.Url == t))
                 continue;
-            list.Add(new AttachmentPlan(t, MediaKind.Image, null, null, null, null));
+            list.Add(new AttachmentPlan(t, MediaKind.Image, null, null, null, null, null, null, null));
             if (list.Count > MaxMessageAttachments)
                 throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
         }
