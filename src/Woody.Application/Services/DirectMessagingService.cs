@@ -311,7 +311,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     MediaKind = plan.Kind,
                     DurationMs = plan.Kind == MediaKind.Video && plan.DurationSeconds is int s ? s * 1000 : null,
                     Provider = plan.Provider,
-                    ExternalId = plan.ExternalId
+                    ExternalId = plan.ExternalId,
+                    ThumbnailUrl = plan.ThumbnailUrl
                 });
         }
 
@@ -482,7 +483,13 @@ public sealed class DirectMessagingService : IDirectMessagingService
         }
     }
 
-    private sealed record AttachmentPlan(string Url, MediaKind Kind, int? DurationSeconds, string? Provider, string? ExternalId);
+    private sealed record AttachmentPlan(
+        string Url,
+        MediaKind Kind,
+        int? DurationSeconds,
+        string? Provider,
+        string? ExternalId,
+        string? ThumbnailUrl);
 
     private static List<AttachmentPlan> NormalizeIncomingAttachments(SendConversationMessageRequestDto body)
     {
@@ -513,10 +520,19 @@ public sealed class DirectMessagingService : IDirectMessagingService
                 if (!DirectMessageAttachmentPolicy.IsPermittedTypedAttachmentUrl(kind, t))
                     throw new ArgumentException("Anexo inválido para o tipo indicado.");
 
+                var thumb = TrimOrNull(a.ThumbnailUrl);
+                if (thumb != null)
+                {
+                    if (thumb.Length > MaxExternalAttachmentUrlLength)
+                        throw new ArgumentException($"thumbnailUrl não pode exceder {MaxExternalAttachmentUrlLength} caracteres.");
+                    if (!PublicImageUrlPolicy.IsPermittedImageUrl(thumb))
+                        throw new ArgumentException("thumbnailUrl inválida (HTTPS ou media local permitida).");
+                }
+
                 if (list.Any(x => x.Url == t))
                     continue;
 
-                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds, TrimOrNull(a.Provider), TrimOrNull(a.ExternalId)));
+                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds, TrimOrNull(a.Provider), TrimOrNull(a.ExternalId), thumb));
                 if (list.Count > MaxMessageAttachments)
                     throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
             }
@@ -541,7 +557,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     "Cada anexo tem de ser uma imagem: URL https válida ou data:image (png, jpeg, gif ou webp) em base64.");
             if (list.Any(x => x.Url == t))
                 continue;
-            list.Add(new AttachmentPlan(t, MediaKind.Image, null, null, null));
+            list.Add(new AttachmentPlan(t, MediaKind.Image, null, null, null, null));
             if (list.Count > MaxMessageAttachments)
                 throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
         }

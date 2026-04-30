@@ -1,9 +1,11 @@
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Billing;
+using Woody.Application.Interfaces.Messaging;
 using Woody.Api.Realtime;
 using Woody.Application.Interfaces.Email;
 using Woody.Application.Interfaces.Security;
 using Woody.Application.Services;
+using Woody.Application.Services.Messaging;
 using Woody.Application.UseCases.Auth.Login;
 using Woody.Application.UseCases.Auth.Register;
 using Woody.Application.UseCases.Billing;
@@ -68,6 +70,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
+        builder.Services.AddSingleton<IGifStickerSearchProvider, LocalCatalogGifStickerSearchProvider>();
         builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
