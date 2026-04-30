@@ -24,18 +24,19 @@ public class MediaUploadService : IMediaUploadService
         string originalFileName,
         string contentType,
         long sizeBytes,
+        long maxSizeBytes,
         CancellationToken cancellationToken = default)
     {
         var metadata = UploadedImagePolicy.ValidateMetadata(
             originalFileName,
             contentType,
             sizeBytes,
-            _options.MaxImageSizeBytes);
+            maxSizeBytes);
 
         if (!metadata.IsValid)
             throw new ArgumentException(metadata.Error);
 
-        await using var buffered = await BufferStreamAsync(content, sizeBytes, _options.MaxImageSizeBytes, cancellationToken);
+        await using var buffered = await BufferStreamAsync(content, sizeBytes, maxSizeBytes, cancellationToken);
 
         var headerLength = (int)Math.Min(MagicBytesToRead, buffered.Length);
         var header = new byte[headerLength];
@@ -67,18 +68,23 @@ public class MediaUploadService : IMediaUploadService
         string originalFileName,
         string contentType,
         long sizeBytes,
+        long maxSizeBytes,
+        int? maxDeclaredDurationSeconds,
+        int? clientDeclaredDurationSeconds,
         CancellationToken cancellationToken = default)
     {
         var metadata = UploadedVideoPolicy.ValidateMetadata(
             originalFileName,
             contentType,
             sizeBytes,
-            _options.MaxVideoSizeBytes);
+            maxSizeBytes,
+            maxDeclaredDurationSeconds,
+            clientDeclaredDurationSeconds);
 
         if (!metadata.IsValid)
             throw new ArgumentException(metadata.Error);
 
-        await using var buffered = await BufferStreamAsync(content, sizeBytes, _options.MaxVideoSizeBytes, cancellationToken);
+        await using var buffered = await BufferStreamAsync(content, sizeBytes, maxSizeBytes, cancellationToken);
 
         var headerLength = (int)Math.Min(MagicBytesToRead, buffered.Length);
         var header = new byte[headerLength];
@@ -94,26 +100,46 @@ public class MediaUploadService : IMediaUploadService
             metadata.ContentType!,
             cancellationToken);
 
+        int? durationMs = clientDeclaredDurationSeconds is int s ? s * 1000 : null;
+
         return new MediaUploadResponseDto
         {
             Url = BuildVideoPublicUrl(stored.StorageKey),
             StorageKey = stored.StorageKey,
             ContentType = stored.ContentType,
             SizeBytes = stored.SizeBytes,
-            MediaKind = MediaKindApi.Video
+            MediaKind = MediaKindApi.Video,
+            DurationMs = durationMs,
+            DurationSeconds = clientDeclaredDurationSeconds
         };
     }
 
     private static async Task<MemoryStream> BufferStreamAsync(
         Stream content,
-        long sizeBytes,
+        long declaredSizeBytes,
         long maxBytes,
         CancellationToken cancellationToken)
     {
-        var buffered = new MemoryStream(capacity: (int)Math.Min(sizeBytes, maxBytes));
-        await content.CopyToAsync(buffered, cancellationToken);
+        if (declaredSizeBytes > maxBytes)
+            throw new ArgumentException("Arquivo inválido.");
 
-        if (buffered.Length != sizeBytes)
+        var capacity = (int)Math.Min(declaredSizeBytes, int.MaxValue);
+        var buffered = new MemoryStream(capacity: Math.Max(capacity, 256));
+        var buffer = new byte[64 * 1024];
+        long totalRead = 0;
+        while (totalRead < declaredSizeBytes)
+        {
+            var toRead = (int)Math.Min(buffer.Length, declaredSizeBytes - totalRead);
+            var read = await content.ReadAsync(buffer.AsMemory(0, toRead), cancellationToken);
+            if (read == 0)
+                break;
+            totalRead += read;
+            if (totalRead > maxBytes)
+                throw new ArgumentException("Arquivo inválido.");
+            await buffered.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        if (buffered.Length != declaredSizeBytes)
             throw new ArgumentException("Arquivo inválido.");
 
         return buffered;

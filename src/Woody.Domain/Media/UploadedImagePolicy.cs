@@ -8,7 +8,7 @@ public sealed record UploadedImageValidationResult(
 
 public static class UploadedImagePolicy
 {
-    public const long DefaultMaxSizeBytes = 5 * 1024 * 1024;
+    public const long DefaultMaxSizeBytes = MediaReferenceConstraints.ImageMaxUploadBytes;
 
     private static readonly Dictionary<string, string> ContentTypesByExtension =
         new(StringComparer.OrdinalIgnoreCase)

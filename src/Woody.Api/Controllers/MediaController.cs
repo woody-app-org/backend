@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Woody.Api.Configuration;
+using Woody.Api.Extensions;
+using Woody.Application.Exceptions;
 using Woody.Application.Interfaces;
+using Woody.Application.Media;
 using Woody.Domain.Media;
 
 namespace Woody.Api.Controllers;
@@ -12,10 +15,12 @@ namespace Woody.Api.Controllers;
 [Route("api/media")]
 public class MediaController : ControllerBase
 {
-    private readonly IMediaUploadService _uploads;
+    private const long MultipartSlackBytes = 1024 * 1024;
+
+    private readonly IMediaUploadApplicationService _uploads;
     private readonly IMediaStorage _storage;
 
-    public MediaController(IMediaUploadService uploads, IMediaStorage storage)
+    public MediaController(IMediaUploadApplicationService uploads, IMediaStorage storage)
     {
         _uploads = uploads;
         _storage = storage;
@@ -25,17 +30,25 @@ public class MediaController : ControllerBase
     [HttpPost("images")]
     [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = UploadedImagePolicy.DefaultMaxSizeBytes + 1024 * 1024)]
-    public async Task<IActionResult> UploadImage([FromForm] ImageUploadRequest? request, CancellationToken cancellationToken)
+    [RequestSizeLimit(MediaReferenceConstraints.ImageMaxUploadBytes + MultipartSlackBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MediaReferenceConstraints.ImageMaxUploadBytes + MultipartSlackBytes)]
+    public async Task<IActionResult> UploadImage([FromForm] ScopedMediaUploadForm? request, CancellationToken cancellationToken)
     {
         if (request?.File == null)
             return BadRequest(new { error = "Arquivo obrigatório." });
+
+        var userId = User.GetUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        if (!TryBuildAuthorizationContext(request, userId.Value, out var auth, out var parseError))
+            return BadRequest(new { error = parseError });
 
         try
         {
             await using var stream = request.File.OpenReadStream();
             var result = await _uploads.UploadImageAsync(
+                auth,
                 stream,
                 request.File.FileName,
                 request.File.ContentType,
@@ -46,6 +59,10 @@ public class MediaController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+        catch (MediaUploadForbiddenException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
         }
     }
 
@@ -53,17 +70,27 @@ public class MediaController : ControllerBase
     [HttpPost("videos")]
     [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(UploadedVideoPolicy.DefaultMaxSizeBytes + 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = UploadedVideoPolicy.DefaultMaxSizeBytes + 1024 * 1024)]
-    public async Task<IActionResult> UploadVideo([FromForm] VideoUploadRequest? request, CancellationToken cancellationToken)
+    [RequestSizeLimit(MediaReferenceConstraints.PostVideoMaxUploadBytes + MultipartSlackBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MediaReferenceConstraints.PostVideoMaxUploadBytes + MultipartSlackBytes)]
+    public async Task<IActionResult> UploadVideo([FromForm] ScopedMediaUploadForm? request, CancellationToken cancellationToken)
     {
         if (request?.File == null)
             return BadRequest(new { error = "Arquivo obrigatório." });
+
+        var userId = User.GetUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        if (!TryBuildAuthorizationContext(request, userId.Value, out var auth, out var parseError))
+            return BadRequest(new { error = parseError });
+
+        var authWithDuration = auth with { DeclaredDurationSeconds = request.DurationSeconds };
 
         try
         {
             await using var stream = request.File.OpenReadStream();
             var result = await _uploads.UploadVideoAsync(
+                authWithDuration,
                 stream,
                 request.File.FileName,
                 request.File.ContentType,
@@ -75,6 +102,67 @@ public class MediaController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
+        catch (MediaUploadForbiddenException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
+        }
+    }
+
+    private static bool TryBuildAuthorizationContext(
+        ScopedMediaUploadForm request,
+        int userId,
+        out MediaUploadAuthorizationContext auth,
+        out string? error)
+    {
+        auth = new MediaUploadAuthorizationContext(userId, MediaUploadScope.Post, null, null, null, null);
+        error = null;
+
+        var scopeRaw = (request.Scope ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(scopeRaw))
+        {
+            error = "Indique scope: \"post\" ou \"message\".";
+            return false;
+        }
+
+        if (scopeRaw == "post")
+        {
+            auth = new MediaUploadAuthorizationContext(
+                userId,
+                MediaUploadScope.Post,
+                request.PublicationContext,
+                TryParsePositiveInt(request.CommunityId),
+                null,
+                null);
+            return true;
+        }
+
+        if (scopeRaw == "message")
+        {
+            if (!int.TryParse((request.ConversationId ?? string.Empty).Trim(), out var cid) || cid <= 0)
+            {
+                error = "conversationId inválido para scope \"message\".";
+                return false;
+            }
+
+            auth = new MediaUploadAuthorizationContext(
+                userId,
+                MediaUploadScope.Message,
+                null,
+                null,
+                cid,
+                null);
+            return true;
+        }
+
+        error = "scope inválido. Use \"post\" ou \"message\".";
+        return false;
+    }
+
+    private static int? TryParsePositiveInt(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+        return int.TryParse(raw.Trim(), out var v) && v > 0 ? v : null;
     }
 
     [AllowAnonymous]
@@ -106,12 +194,21 @@ public class MediaController : ControllerBase
     }
 }
 
-public sealed class ImageUploadRequest
+/// <summary>Multipart comum a imagem e vídeo (campos de contexto obrigatórios no upload).</summary>
+public sealed class ScopedMediaUploadForm
 {
     public IFormFile? File { get; set; }
-}
 
-public sealed class VideoUploadRequest
-{
-    public IFormFile? File { get; set; }
+    /// <summary><c>post</c> ou <c>message</c>.</summary>
+    public string? Scope { get; set; }
+
+    /// <summary><c>profile</c> ou <c>community</c> quando <see cref="Scope"/> é <c>post</c>.</summary>
+    public string? PublicationContext { get; set; }
+
+    public string? CommunityId { get; set; }
+
+    public string? ConversationId { get; set; }
+
+    /// <summary>Duração declarada (s) para vídeo; validada contra o limite do contexto.</summary>
+    public int? DurationSeconds { get; set; }
 }

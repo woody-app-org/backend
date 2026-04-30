@@ -156,9 +156,11 @@ builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Bil
 builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
 builder.Services.Configure<FormOptions>(options =>
 {
-    var maxImageSize = builder.Configuration.GetValue<long?>("MediaStorage:MaxImageSizeBytes")
-                       ?? UploadedImagePolicy.DefaultMaxSizeBytes;
-    options.MultipartBodyLengthLimit = maxImageSize + 1024 * 1024;
+    var cfg = builder.Configuration;
+    var maxImage = cfg.GetValue<long?>("MediaStorage:MaxImageSizeBytes") ?? MediaReferenceConstraints.ImageMaxUploadBytes;
+    var maxPostVideo = cfg.GetValue<long?>("MediaStorage:MaxPostVideoUploadBytes")
+                       ?? MediaReferenceConstraints.PostVideoMaxUploadBytes;
+    options.MultipartBodyLengthLimit = Math.Max(maxImage, maxPostVideo) + 1024 * 1024;
 });
 
 var corsEnabled = ConfigureCors(builder);

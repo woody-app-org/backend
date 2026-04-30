@@ -7,9 +7,9 @@ using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
-using Woody.Domain.Posts;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
+using Woody.Domain.Posts;
 using Woody.Application.Mapping;
 using Woody.Application.Validation;
 
@@ -261,9 +261,9 @@ public class PostsController : ControllerBase
                 }
 
                 if (item.DurationSeconds is int d &&
-                    (d < 0 || d > UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds))
+                    (d < 0 || d > MediaReferenceConstraints.PostVideoMaxDeclaredSeconds))
                 {
-                    error = $"durationSeconds inválido (0–{UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds}).";
+                    error = $"durationSeconds inválido (0–{MediaReferenceConstraints.PostVideoMaxDeclaredSeconds}).";
                     return false;
                 }
 

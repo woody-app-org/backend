@@ -498,10 +498,10 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     throw new ArgumentException("mediaType inválido. Use image, video, gif ou sticker.");
 
                 if (a.DurationSeconds is int d &&
-                    (d < 0 || d > UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds))
+                    (d < 0 || d > MediaReferenceConstraints.MessageVideoMaxDeclaredSeconds))
                 {
                     throw new ArgumentException(
-                        $"durationSeconds inválido (0–{UploadedVideoPolicy.DefaultMaxDeclaredDurationSeconds}).");
+                        $"durationSeconds inválido (0–{MediaReferenceConstraints.MessageVideoMaxDeclaredSeconds}).");
                 }
 
                 var t = a.Url.Trim();

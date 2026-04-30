@@ -62,7 +62,8 @@ public static class PublicVideoUrlPolicy
 
         var path = uri.AbsolutePath;
         return path.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)
-               || path.EndsWith(".webm", StringComparison.OrdinalIgnoreCase);
+               || path.EndsWith(".webm", StringComparison.OrdinalIgnoreCase)
+               || path.EndsWith(".mov", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPrivateOrLocalAddress(string host)

@@ -67,6 +67,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IContentPinningService, ContentPinningService>();
         builder.Services.AddScoped<IMediaStorage, LocalMediaStorage>();
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
+        builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
         builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

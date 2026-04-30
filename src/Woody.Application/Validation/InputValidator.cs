@@ -86,7 +86,7 @@ public static class InputValidator
         return true;
     }
 
-    public const string InvalidVideoUrlMessage = "URL de vídeo inválida. Use mp4/webm via https ou um vídeo enviado à plataforma.";
+    public const string InvalidVideoUrlMessage = "URL de vídeo inválida. Use mp4/webm/mov via https ou um vídeo enviado à plataforma.";
     public const string InvalidGifUrlMessage = "URL de GIF inválida.";
 
     public static bool TryNormalizeHttpsVideoUrl(string? raw, out string? normalized, out string? error)

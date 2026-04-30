@@ -1,28 +1,27 @@
 using Woody.Application.DTOs;
+using Woody.Application.Media;
 
 namespace Woody.Application.Interfaces;
 
 /// <summary>
-/// Persistência e validação técnica (MIME, extensão, assinatura, tamanho) do ficheiro.
-/// Permissões de negócio ficam em <see cref="IMediaUploadApplicationService"/>.
+/// Orquestra upload multimédia com permissões por contexto (post vs mensagem).
+/// O armazenamento concreto continua em <see cref="IMediaStorage"/> (local hoje, bucket depois).
 /// </summary>
-public interface IMediaUploadService
+public interface IMediaUploadApplicationService
 {
     Task<MediaUploadResponseDto> UploadImageAsync(
+        MediaUploadAuthorizationContext authorization,
         Stream content,
         string originalFileName,
         string contentType,
         long sizeBytes,
-        long maxSizeBytes,
         CancellationToken cancellationToken = default);
 
     Task<MediaUploadResponseDto> UploadVideoAsync(
+        MediaUploadAuthorizationContext authorization,
         Stream content,
         string originalFileName,
         string contentType,
         long sizeBytes,
-        long maxSizeBytes,
-        int? maxDeclaredDurationSeconds,
-        int? clientDeclaredDurationSeconds,
         CancellationToken cancellationToken = default);
 }

@@ -11,4 +11,9 @@ public class MediaUploadResponseDto
 
     /// <summary>Tipo semântico inferido no servidor (<c>image</c>, <c>video</c>, <c>gif</c>).</summary>
     public string MediaKind { get; set; } = MediaKindApi.Image;
+
+    /// <summary>Preenchido no upload de vídeo quando o cliente envia <c>durationSeconds</c> (ms derivado).</summary>
+    public int? DurationMs { get; set; }
+
+    public int? DurationSeconds { get; set; }
 }

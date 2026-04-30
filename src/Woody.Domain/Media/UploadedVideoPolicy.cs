@@ -6,10 +6,12 @@ public sealed record UploadedVideoValidationResult(
     string? Extension = null,
     string? ContentType = null);
 
-/// <summary>Validação de vídeo curto (upload directo). Duração exacta exige pipeline futuro (ex.: ffprobe).</summary>
+/// <summary>Validação de vídeo (upload directo). Duração exacta exige pipeline futuro (ex.: ffprobe).</summary>
 public static class UploadedVideoPolicy
 {
+    /// <summary>Limite genérico legado quando não há contexto (evitar uso em novos fluxos).</summary>
     public const long DefaultMaxSizeBytes = 50 * 1024 * 1024;
+
     public const int DefaultMaxDeclaredDurationSeconds = 300;
 
     private static readonly Dictionary<string, string> ContentTypesByExtension =
@@ -17,6 +19,7 @@ public static class UploadedVideoPolicy
         {
             [".mp4"] = "video/mp4",
             [".m4v"] = "video/mp4",
+            [".mov"] = "video/quicktime",
             [".webm"] = "video/webm"
         };
 
@@ -31,7 +34,9 @@ public static class UploadedVideoPolicy
         string? originalFileName,
         string? contentType,
         long sizeBytes,
-        long maxSizeBytes = DefaultMaxSizeBytes)
+        long maxSizeBytes = DefaultMaxSizeBytes,
+        int? maxDeclaredDurationSeconds = null,
+        int? clientDeclaredDurationSeconds = null)
     {
         if (sizeBytes <= 0)
             return Invalid("Arquivo vazio.");
@@ -48,13 +53,19 @@ public static class UploadedVideoPolicy
 
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (!ContentTypesByExtension.TryGetValue(extension, out var expectedContentType))
-            return Invalid("Extensão de vídeo inválida (permitido: mp4, webm).");
+            return Invalid("Extensão de vídeo inválida (permitido: mp4, mov, webm).");
 
         if (DangerousExtensions.Contains(extension))
             return Invalid("Extensão de arquivo inválida.");
 
         if (!string.Equals(contentType?.Trim(), expectedContentType, StringComparison.OrdinalIgnoreCase))
             return Invalid("Tipo de arquivo inválido.");
+
+        if (maxDeclaredDurationSeconds is int cap && clientDeclaredDurationSeconds is int d)
+        {
+            if (d < 0 || d > cap)
+                return Invalid($"Duração declarada inválida (máximo {cap} s).");
+        }
 
         return new UploadedVideoValidationResult(true, null, extension, expectedContentType);
     }
@@ -63,11 +74,11 @@ public static class UploadedVideoPolicy
     {
         return extension.ToLowerInvariant() switch
         {
-            ".mp4" or ".m4v" => bytes.Length >= 12
-                                && bytes[4] == (byte)'f'
-                                && bytes[5] == (byte)'t'
-                                && bytes[6] == (byte)'y'
-                                && bytes[7] == (byte)'p',
+            ".mp4" or ".m4v" or ".mov" => bytes.Length >= 12
+                                         && bytes[4] == (byte)'f'
+                                         && bytes[5] == (byte)'t'
+                                         && bytes[6] == (byte)'y'
+                                         && bytes[7] == (byte)'p',
             ".webm" => bytes.Length >= 4
                        && bytes[0] == 0x1A
                        && bytes[1] == 0x45
