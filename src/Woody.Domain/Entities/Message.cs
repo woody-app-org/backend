@@ -20,5 +20,5 @@ public class Message
     public DateTime? EditedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
-    public ICollection<MessageAttachment> Attachments { get; set; } = new List<MessageAttachment>();
+    public ICollection<MediaAttachment> MediaAttachments { get; set; } = new List<MediaAttachment>();
 }

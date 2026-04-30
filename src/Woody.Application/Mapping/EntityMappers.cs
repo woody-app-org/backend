@@ -116,7 +116,7 @@ public static class EntityMappers
         bool communityBoostActive = false,
         string? communityBoostEndsAt = null)
     {
-        var ordered = p.Images.OrderBy(i => i.DisplayOrder).ToList();
+        var ordered = p.MediaAttachments.OrderBy(i => i.DisplayOrder).ToList();
 
         var imageUrls = ordered
             .Where(i => i.MediaKind != MediaKind.Video)
@@ -126,24 +126,18 @@ public static class EntityMappers
             imageUrls = new List<string> { p.ImageUrl };
 
         var mediaAttachments = ordered
-            .Select(i => new PostMediaAttachmentResponseDto
-            {
-                Url = i.Url,
-                MediaType = MediaKindApi.ToApiString(i.MediaKind),
-                MimeType = i.MimeType,
-                DurationSeconds = i.DurationSeconds
-            })
+            .Select(MediaAttachmentDtoMapper.ToResponseDto)
             .ToList();
         if (mediaAttachments.Count == 0 && imageUrls.Count > 0)
         {
             mediaAttachments = imageUrls
-                .Select(u => new PostMediaAttachmentResponseDto
-                {
-                    Url = u,
-                    MediaType = MediaKindApi.Image,
-                    MimeType = null,
-                    DurationSeconds = null
-                })
+                .Select((u, idx) => MediaAttachmentDtoMapper.FromLegacyUrl(
+                    MediaOwnerType.Post,
+                    p.Id,
+                    u,
+                    MediaKind.Image,
+                    idx,
+                    p.CreatedAt))
                 .ToList();
         }
 

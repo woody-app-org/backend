@@ -194,16 +194,22 @@ public class PostsController : ControllerBase
         if (mediaRows.Count > 0)
         {
             var rows = mediaRows.Select(
-                (r, i) => new PostImage
+                (r, i) => new MediaAttachment
                 {
+                    OwnerType = MediaOwnerType.Post,
+                    OwnerId = post.Id,
                     PostId = post.Id,
+                    MessageId = null,
                     Url = r.Url,
                     MediaKind = r.Kind,
                     MimeType = r.MimeType,
-                    DurationSeconds = r.Kind == MediaKind.Video ? r.DurationSeconds : null,
-                    DisplayOrder = i
+                    DurationMs = r.Kind == MediaKind.Video && r.DurationSeconds is int ds ? ds * 1000 : null,
+                    Provider = r.Provider,
+                    ExternalId = r.ExternalId,
+                    DisplayOrder = i,
+                    CreatedAt = DateTime.UtcNow
                 });
-            await _posts.AddPostImagesAsync(rows, cancellationToken);
+            await _posts.AddPostMediaAttachmentsAsync(rows, cancellationToken);
             await _posts.SaveChangesAsync(cancellationToken);
         }
 
@@ -221,7 +227,13 @@ public class PostsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
     }
 
-    private sealed record NormalizedPostMediaRow(string Url, MediaKind Kind, int? DurationSeconds, string? MimeType);
+    private sealed record NormalizedPostMediaRow(
+        string Url,
+        MediaKind Kind,
+        int? DurationSeconds,
+        string? MimeType,
+        string? Provider,
+        string? ExternalId);
 
     private static bool TryNormalizePostMedia(
         CreatePostRequestDTO body,
@@ -278,7 +290,7 @@ public class PostsController : ControllerBase
                 if (!seen.Add(urlNorm))
                     continue;
 
-                rows.Add(new NormalizedPostMediaRow(urlNorm, kind, item.DurationSeconds, null));
+                rows.Add(new NormalizedPostMediaRow(urlNorm, kind, item.DurationSeconds, null, TrimOrNull(item.Provider), TrimOrNull(item.ExternalId)));
                 if (rows.Count > MaxPostImages)
                 {
                     error = $"Máximo de {MaxPostImages} anexos por publicação.";
@@ -293,10 +305,13 @@ public class PostsController : ControllerBase
             return false;
 
         foreach (var u in legacyUrls)
-            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null));
+            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null, null, null));
 
         return true;
     }
+
+    private static string? TrimOrNull(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
 
     private static bool TryNormalizePostImageUrls(
         CreatePostRequestDTO body,

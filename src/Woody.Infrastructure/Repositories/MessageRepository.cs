@@ -22,7 +22,7 @@ public class MessageRepository : IMessageRepository
             return new Dictionary<int, (string? Preview, DateTime AtUtc)>();
 
         var rows = await _db.Messages.AsNoTracking()
-            .Include(m => m.Attachments)
+            .Include(m => m.MediaAttachments)
             .Where(m => conversationIds.Contains(m.ConversationId) && m.DeletedAt == null)
             .ToListAsync(cancellationToken);
 
@@ -44,7 +44,7 @@ public class MessageRepository : IMessageRepository
             return t.Length <= 120 ? t : t[..120] + "…";
         }
 
-        return m.Attachments.Count > 0 ? "Imagem" : null;
+        return m.MediaAttachments.Count > 0 ? "Mídia" : null;
     }
 
     public async Task<(List<Message> Items, int Total)> ListByConversationPagedAsync(
@@ -58,7 +58,7 @@ public class MessageRepository : IMessageRepository
         var total = await baseQuery.CountAsync(cancellationToken);
         var items = await baseQuery
             .Include(m => m.Sender)
-            .Include(m => m.Attachments)
+            .Include(m => m.MediaAttachments)
             .OrderBy(m => m.CreatedAt)
             .ThenBy(m => m.Id)
             .Skip((page - 1) * pageSize)
@@ -74,7 +74,7 @@ public class MessageRepository : IMessageRepository
         CancellationToken cancellationToken = default) =>
         _db.Messages
             .Include(m => m.Sender)
-            .Include(m => m.Attachments)
+            .Include(m => m.MediaAttachments)
             .FirstOrDefaultAsync(m => m.Id == messageId && m.ConversationId == conversationId, cancellationToken);
 
     public Task<Message?> GetNoTrackingByIdInConversationAsync(
@@ -83,13 +83,13 @@ public class MessageRepository : IMessageRepository
         CancellationToken cancellationToken = default) =>
         _db.Messages.AsNoTracking()
             .Include(m => m.Sender)
-            .Include(m => m.Attachments)
+            .Include(m => m.MediaAttachments)
             .FirstOrDefaultAsync(m => m.Id == messageId && m.ConversationId == conversationId, cancellationToken);
 
     public void Add(Message message) => _db.Messages.Add(message);
 
-    public void RemoveAttachments(IEnumerable<MessageAttachment> attachments) =>
-        _db.MessageAttachments.RemoveRange(attachments);
+    public void RemoveMediaAttachments(IEnumerable<MediaAttachment> attachments) =>
+        _db.MediaAttachments.RemoveRange(attachments);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

@@ -27,7 +27,7 @@ public interface IMessageRepository
 
     void Add(Message message);
 
-    void RemoveAttachments(IEnumerable<MessageAttachment> attachments);
+    void RemoveMediaAttachments(IEnumerable<MediaAttachment> attachments);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -27,20 +27,11 @@ public static class MessageDtoMapper
             IsEdited = !deleted && message.EditedAt != null,
             IsDeleted = deleted,
             Attachments = deleted
-                ? Array.Empty<MessageAttachmentResponseDto>()
-                : message.Attachments
+                ? Array.Empty<MediaAttachmentResponseDto>()
+                : message.MediaAttachments
                     .OrderBy(a => a.DisplayOrder)
                     .ThenBy(a => a.Id)
-                    .Select(a => new MessageAttachmentResponseDto
-                    {
-                        Id = a.Id,
-                        Url = a.Url,
-                        MediaType = MediaKindApi.ToApiString(a.MediaKind),
-                        ContentType = a.ContentType,
-                        DurationSeconds = a.DurationSeconds,
-                        DisplayOrder = a.DisplayOrder,
-                        CreatedAt = a.CreatedAt
-                    })
+                    .Select(MediaAttachmentDtoMapper.ToResponseDto)
                     .ToList()
         };
     }

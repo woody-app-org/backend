@@ -292,22 +292,31 @@ public sealed class DirectMessagingService : IDirectMessagingService
             CreatedAt = utcNow
         };
 
-        var order = 0;
-        foreach (var plan in attachmentPlans)
-        {
-            message.Attachments.Add(new MessageAttachment
-            {
-                Url = plan.Url,
-                DisplayOrder = order++,
-                CreatedAt = utcNow,
-                MediaKind = plan.Kind,
-                DurationSeconds = plan.Kind == MediaKind.Video ? plan.DurationSeconds : null
-            });
-        }
-
         conversation.UpdatedAt = utcNow;
         _messages.Add(message);
         await _messages.SaveChangesAsync(cancellationToken);
+
+        var order = 0;
+        foreach (var plan in attachmentPlans)
+        {
+            message.MediaAttachments.Add(
+                new MediaAttachment
+                {
+                    OwnerType = MediaOwnerType.Message,
+                    OwnerId = message.Id,
+                    MessageId = message.Id,
+                    Url = plan.Url,
+                    DisplayOrder = order++,
+                    CreatedAt = utcNow,
+                    MediaKind = plan.Kind,
+                    DurationMs = plan.Kind == MediaKind.Video && plan.DurationSeconds is int s ? s * 1000 : null,
+                    Provider = plan.Provider,
+                    ExternalId = plan.ExternalId
+                });
+        }
+
+        if (attachmentPlans.Count > 0)
+            await _messages.SaveChangesAsync(cancellationToken);
 
         var persisted = await _messages.GetNoTrackingByIdInConversationAsync(
             conversationId,
@@ -410,8 +419,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
         message.Body = null;
         message.EditedAt = null;
 
-        if (message.Attachments.Count > 0)
-            _messages.RemoveAttachments(message.Attachments.ToList());
+        if (message.MediaAttachments.Count > 0)
+            _messages.RemoveMediaAttachments(message.MediaAttachments.ToList());
 
         var conv = await _conversations.GetTrackedByIdForParticipantAsync(conversationId, actorUserId, cancellationToken);
         if (conv != null)
@@ -473,7 +482,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         }
     }
 
-    private sealed record AttachmentPlan(string Url, MediaKind Kind, int? DurationSeconds);
+    private sealed record AttachmentPlan(string Url, MediaKind Kind, int? DurationSeconds, string? Provider, string? ExternalId);
 
     private static List<AttachmentPlan> NormalizeIncomingAttachments(SendConversationMessageRequestDto body)
     {
@@ -507,7 +516,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
                 if (list.Any(x => x.Url == t))
                     continue;
 
-                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds));
+                list.Add(new AttachmentPlan(t, kind, a.DurationSeconds, TrimOrNull(a.Provider), TrimOrNull(a.ExternalId)));
                 if (list.Count > MaxMessageAttachments)
                     throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
             }
@@ -532,11 +541,14 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     "Cada anexo tem de ser uma imagem: URL https válida ou data:image (png, jpeg, gif ou webp) em base64.");
             if (list.Any(x => x.Url == t))
                 continue;
-            list.Add(new AttachmentPlan(t, MediaKind.Image, null));
+            list.Add(new AttachmentPlan(t, MediaKind.Image, null, null, null));
             if (list.Count > MaxMessageAttachments)
                 throw new ArgumentException($"Máximo de {MaxMessageAttachments} anexos por mensagem.");
         }
 
         return list;
     }
+
+    private static string? TrimOrNull(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
 }

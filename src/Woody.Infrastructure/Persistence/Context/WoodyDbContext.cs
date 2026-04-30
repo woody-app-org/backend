@@ -19,7 +19,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<UserSocialLink> UserSocialLinks { get; set; }
         public virtual DbSet<UserInterest> UserInterests { get; set; }
         public virtual DbSet<PostTag> PostTags { get; set; }
-        public virtual DbSet<PostImage> PostImages { get; set; }
+        public virtual DbSet<MediaAttachment> MediaAttachments { get; set; }
         public virtual DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
         public virtual DbSet<CommunitySubscription> CommunitySubscriptions { get; set; }
@@ -32,7 +32,6 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
-        public virtual DbSet<MessageAttachment> MessageAttachments { get; set; }
         public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
 
@@ -181,11 +180,26 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasIndex(p => new { p.UserId, p.PinnedOnProfileAt });
             });
 
-            modelBuilder.Entity<PostImage>(e =>
+            modelBuilder.Entity<MediaAttachment>(e =>
             {
-                e.HasOne(i => i.Post)
-                    .WithMany(p => p.Images)
-                    .HasForeignKey(i => i.PostId)
+                e.ToTable(
+                    "media_attachments",
+                    t => t.HasCheckConstraint(
+                        "ck_media_attachments_owner_xor",
+                        "(owner_type = 1 AND post_id IS NOT NULL AND post_id = owner_id AND message_id IS NULL) "
+                        + "OR (owner_type = 2 AND message_id IS NOT NULL AND message_id = owner_id AND post_id IS NULL)"));
+
+                e.HasIndex(x => new { x.OwnerType, x.OwnerId, x.DisplayOrder })
+                    .HasDatabaseName("ix_media_attachments_owner_type_owner_id_display_order");
+
+                e.HasOne(x => x.Post)
+                    .WithMany(p => p.MediaAttachments)
+                    .HasForeignKey(x => x.PostId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Message)
+                    .WithMany(m => m.MediaAttachments)
+                    .HasForeignKey(x => x.MessageId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -298,14 +312,6 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.SentMessages)
                     .HasForeignKey(m => m.SenderUserId)
                     .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            modelBuilder.Entity<MessageAttachment>(e =>
-            {
-                e.HasOne(a => a.Message)
-                    .WithMany(m => m.Attachments)
-                    .HasForeignKey(a => a.MessageId)
-                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Notification>(e =>

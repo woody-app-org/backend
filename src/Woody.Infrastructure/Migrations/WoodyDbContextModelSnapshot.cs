@@ -839,7 +839,7 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("messages", (string)null);
                 });
 
-            modelBuilder.Entity("Woody.Domain.Entities.MessageAttachment", b =>
+            modelBuilder.Entity("Woody.Domain.Entities.MediaAttachment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -848,46 +848,91 @@ namespace Woody.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ContentType")
-                        .HasColumnType("text")
-                        .HasColumnName("content_type");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int?>("DurationSeconds")
+                    b.Property<int?>("DurationMs")
                         .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
+                        .HasColumnName("duration_ms");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
 
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("text")
+                        .HasColumnName("external_id");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
                     b.Property<int>("MediaKind")
                         .HasColumnType("integer")
                         .HasColumnName("media_kind");
 
-                    b.Property<int>("MessageId")
+                    b.Property<int?>("MessageId")
                         .HasColumnType("integer")
                         .HasColumnName("message_id");
+
+                    b.Property<string>("MimeType")
+                        .HasColumnType("text")
+                        .HasColumnName("mime_type");
+
+                    b.Property<int>("OwnerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("OwnerType")
+                        .HasColumnType("integer")
+                        .HasColumnName("owner_type");
+
+                    b.Property<int?>("PostId")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_id");
+
+                    b.Property<string>("Provider")
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
 
                     b.Property<string>("StorageKey")
                         .HasColumnType("text")
                         .HasColumnName("storage_key");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_url");
 
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("url");
 
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
                     b.HasKey("Id")
-                        .HasName("pk_message_attachments");
+                        .HasName("pk_media_attachments");
 
                     b.HasIndex("MessageId")
-                        .HasDatabaseName("ix_message_attachments_message_id");
+                        .HasDatabaseName("ix_media_attachments_message_id");
 
-                    b.ToTable("message_attachments", (string)null);
+                    b.HasIndex("PostId")
+                        .HasDatabaseName("ix_media_attachments_post_id");
+
+                    b.HasIndex("OwnerType", "OwnerId", "DisplayOrder")
+                        .HasDatabaseName("ix_media_attachments_owner_type_owner_id_display_order");
+
+                    b.ToTable("media_attachments", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("ck_media_attachments_owner_xor", "(owner_type = 1 AND post_id IS NOT NULL AND post_id = owner_id AND message_id IS NULL) OR (owner_type = 2 AND message_id IS NOT NULL AND message_id = owner_id AND post_id IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
@@ -1031,53 +1076,6 @@ namespace Woody.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_posts_publication_context_community", "(publication_context = 2 AND community_id IS NOT NULL) OR (publication_context = 1 AND community_id IS NULL)");
                         });
-                });
-
-            modelBuilder.Entity("Woody.Domain.Entities.PostImage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<int?>("DurationSeconds")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<int>("MediaKind")
-                        .HasColumnType("integer")
-                        .HasColumnName("media_kind");
-
-                    b.Property<string>("MimeType")
-                        .HasColumnType("text")
-                        .HasColumnName("mime_type");
-
-                    b.Property<int>("PostId")
-                        .HasColumnType("integer")
-                        .HasColumnName("post_id");
-
-                    b.Property<string>("StorageKey")
-                        .HasColumnType("text")
-                        .HasColumnName("storage_key");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("url");
-
-                    b.HasKey("Id")
-                        .HasName("pk_post_images");
-
-                    b.HasIndex("PostId")
-                        .HasDatabaseName("ix_post_images_post_id");
-
-                    b.ToTable("post_images", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.PostTag", b =>
@@ -1737,16 +1735,23 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Sender");
                 });
 
-            modelBuilder.Entity("Woody.Domain.Entities.MessageAttachment", b =>
+            modelBuilder.Entity("Woody.Domain.Entities.MediaAttachment", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.Message", "Message")
-                        .WithMany("Attachments")
+                        .WithMany("MediaAttachments")
                         .HasForeignKey("MessageId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_message_attachments_messages_message_id");
+                        .HasConstraintName("fk_media_attachments_messages_message_id");
+
+                    b.HasOne("Woody.Domain.Entities.Post", "Post")
+                        .WithMany("MediaAttachments")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_media_attachments_posts_post_id");
 
                     b.Navigation("Message");
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
@@ -1787,18 +1792,6 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Community");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Woody.Domain.Entities.PostImage", b =>
-                {
-                    b.HasOne("Woody.Domain.Entities.Post", "Post")
-                        .WithMany("Images")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_post_images_posts_post_id");
-
-                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.PostTag", b =>
@@ -1913,7 +1906,7 @@ namespace Woody.Infrastructure.Migrations
 
             modelBuilder.Entity("Woody.Domain.Entities.Message", b =>
                 {
-                    b.Navigation("Attachments");
+                    b.Navigation("MediaAttachments");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Post", b =>
@@ -1922,7 +1915,7 @@ namespace Woody.Infrastructure.Migrations
 
                     b.Navigation("CommunityPostBoosts");
 
-                    b.Navigation("Images");
+                    b.Navigation("MediaAttachments");
 
                     b.Navigation("Tags");
                 });

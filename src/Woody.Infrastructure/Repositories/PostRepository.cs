@@ -23,7 +23,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images)
+            .Include(p => p.MediaAttachments)
             .ToListAsync(cancellationToken);
 
     public async Task<List<PostFeedCandidate>> ListNonDeletedVisibleFeedCandidatesAsync(
@@ -66,7 +66,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images)
+            .Include(p => p.MediaAttachments)
             .ToListAsync(cancellationToken);
 
         var index = new Dictionary<int, int>(ids.Count);
@@ -100,7 +100,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images);
+            .Include(p => p.MediaAttachments);
 
         var pinned = await withNav
             .Where(p => p.PinnedOnProfileAt != null)
@@ -132,7 +132,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images)
+            .Include(p => p.MediaAttachments)
             .OrderByDescending(p => _db.CommunityPostBoosts.Any(b =>
                 b.PostId == p.Id
                 && b.CommunityId == communityId
@@ -162,7 +162,7 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images)
+            .Include(p => p.MediaAttachments)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
     public async Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default) =>
@@ -191,13 +191,13 @@ public class PostRepository : IPostRepository
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)
-            .Include(p => p.Images)
+            .Include(p => p.MediaAttachments)
             .Take(take)
             .ToListAsync(cancellationToken);
 
-    public async Task AddPostImagesAsync(IEnumerable<PostImage> images, CancellationToken cancellationToken = default)
+    public async Task AddPostMediaAttachmentsAsync(IEnumerable<MediaAttachment> attachments, CancellationToken cancellationToken = default)
     {
-        await _db.PostImages.AddRangeAsync(images, cancellationToken);
+        await _db.MediaAttachments.AddRangeAsync(attachments, cancellationToken);
     }
 
     public Task<int> CountPinnedPostsForAuthorAsync(int authorUserId, CancellationToken cancellationToken = default) =>

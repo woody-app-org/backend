@@ -16,5 +16,5 @@ public sealed class MessageResponseDto
     public bool IsEdited { get; set; }
     public bool IsDeleted { get; set; }
 
-    public IReadOnlyList<MessageAttachmentResponseDto> Attachments { get; set; } = Array.Empty<MessageAttachmentResponseDto>();
+    public IReadOnlyList<MediaAttachmentResponseDto> Attachments { get; set; } = Array.Empty<MediaAttachmentResponseDto>();
 }
