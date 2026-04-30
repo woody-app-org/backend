@@ -6,8 +6,8 @@ using Woody.Application.Interfaces;
 namespace Woody.Api.Hubs;
 
 /// <summary>
-/// Tempo real para DMs. Grupos: <see cref="DirectMessageHubGroups.Conversation"/> (só após validação de participante)
-/// e <see cref="DirectMessageHubGroups.UserInbox"/> (inbox da utilizadora autenticada).
+/// Tempo real para DMs e avisos de inbox da utilizadora autenticada. Grupos: <see cref="DirectMessageHubGroups.Conversation"/> (só após validação de participante)
+/// e <see cref="DirectMessageHubGroups.UserInbox"/> (eventos como <c>inboxChanged</c> e <c>notificationsChanged</c>).
 /// </summary>
 [Authorize]
 public sealed class DirectMessagesHub : Hub
