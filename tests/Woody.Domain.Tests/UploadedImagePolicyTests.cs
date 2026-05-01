@@ -9,6 +9,8 @@ public class UploadedImagePolicyTests
     [InlineData("photo.jpeg", "image/jpeg", ".jpeg")]
     [InlineData("photo.png", "image/png", ".png")]
     [InlineData("photo.webp", "image/webp", ".webp")]
+    [InlineData("photo.png.jpg", "image/jpeg", ".jpg")]
+    [InlineData("Screen.Recording.2024-01-15.jpg", "image/jpeg", ".jpg")]
     public void ValidateMetadata_AllowsSupportedImages(string fileName, string contentType, string extension)
     {
         var result = UploadedImagePolicy.ValidateMetadata(fileName, contentType, sizeBytes: 100);
@@ -23,7 +25,7 @@ public class UploadedImagePolicyTests
     [InlineData("photo.html", "text/html")]
     [InlineData("photo.js", "application/javascript")]
     [InlineData("photo.exe", "application/octet-stream")]
-    [InlineData("photo.png.jpg", "image/jpeg")]
+    [InlineData("photo.exe.jpg", "image/jpeg")]
     [InlineData("../photo.png", "image/png")]
     public void ValidateMetadata_RejectsUnsafeNamesAndExtensions(string fileName, string contentType)
     {
