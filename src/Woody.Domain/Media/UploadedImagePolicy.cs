@@ -100,11 +100,17 @@ public static class UploadedImagePolicy
         return ContentTypesByExtension.TryGetValue(extension, out var contentType) ? contentType : null;
     }
 
+    /// <summary>
+    /// Detecta padrão do tipo <c>ficheiro.exe.jpg</c> (extensão perigosa antes da extensão final).
+    /// Nomes legítimos com vários pontos (ex.: <c>Gravação.2024.mp4</c>) não são marcados: a extensão
+    /// intermédia não está na lista de risco.
+    /// </summary>
     public static bool HasSuspiciousDoubleExtension(string fileName)
     {
         var nameWithoutFinalExtension = Path.GetFileNameWithoutExtension(fileName);
         var previousExtension = Path.GetExtension(nameWithoutFinalExtension);
-        return !string.IsNullOrEmpty(previousExtension);
+        return !string.IsNullOrEmpty(previousExtension)
+            && DangerousExtensions.Contains(previousExtension);
     }
 
     private static UploadedImageValidationResult Invalid(string error) =>
