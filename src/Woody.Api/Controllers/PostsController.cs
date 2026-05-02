@@ -20,7 +20,7 @@ namespace Woody.Api.Controllers;
 [Route("api/posts")]
 public class PostsController : ControllerBase
 {
-    private const int MaxPostImages = 20;
+    private const int MaxPostImages = 6;
 
     private readonly IPostRepository _posts;
     private readonly ICommunityRepository _communities;
