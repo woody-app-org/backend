@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Woody.Application.DTOs;
@@ -105,41 +104,14 @@ public class AuthEndpointTests
 
         private readonly string _databaseName = Guid.NewGuid().ToString();
 
-        public AuthApiFactory()
-        {
-            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", "Host=localhost;Database=woody_tests;Username=postgres;Password=postgres");
-            Environment.SetEnvironmentVariable("Jwt__Secret", "test-secret-that-is-at-least-32-chars");
-            Environment.SetEnvironmentVariable("Jwt__Issuer", "Woody.Api.Tests");
-            Environment.SetEnvironmentVariable("Jwt__Audience", "Woody.Api.Tests");
-            Environment.SetEnvironmentVariable("Jwt__ExpirationMinutes", "15");
-            Environment.SetEnvironmentVariable("Resend__ApiKey", "test-resend-key");
-            Environment.SetEnvironmentVariable("Resend__FromEmail", "no-reply@example.com");
-            Environment.SetEnvironmentVariable("EmailVerification__ExpirationMinutes", "10");
-            Environment.SetEnvironmentVariable("EmailVerification__MaxAttempts", "5");
-            Environment.SetEnvironmentVariable("AuthSecurity__MaxFailedLoginAttempts", "5");
-            Environment.SetEnvironmentVariable("AuthSecurity__LockoutMinutes", "15");
-        }
-
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
-            builder.ConfigureAppConfiguration((_, config) =>
+            foreach (var pair in BuildAuthHostSettings())
             {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=woody_tests;Username=postgres;Password=postgres",
-                    ["Jwt:Secret"] = "test-secret-that-is-at-least-32-chars",
-                    ["Jwt:Issuer"] = "Woody.Api.Tests",
-                    ["Jwt:Audience"] = "Woody.Api.Tests",
-                    ["Jwt:ExpirationMinutes"] = "15",
-                    ["Resend:ApiKey"] = "test-resend-key",
-                    ["Resend:FromEmail"] = "no-reply@example.com",
-                    ["EmailVerification:ExpirationMinutes"] = "10",
-                    ["EmailVerification:MaxAttempts"] = "5",
-                    ["AuthSecurity:MaxFailedLoginAttempts"] = "5",
-                    ["AuthSecurity:LockoutMinutes"] = "15"
-                });
-            });
+                if (pair.Value != null)
+                    builder.UseSetting(pair.Key, pair.Value);
+            }
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<DbContextOptions>();
@@ -179,5 +151,20 @@ public class AuthEndpointTests
             });
             await db.SaveChangesAsync();
         }
+
+        private static Dictionary<string, string?> BuildAuthHostSettings() => new()
+        {
+            ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=woody_tests;Username=postgres;Password=postgres",
+            ["Jwt:Secret"] = "test-secret-that-is-at-least-32-chars",
+            ["Jwt:Issuer"] = "Woody.Api.Tests",
+            ["Jwt:Audience"] = "Woody.Api.Tests",
+            ["Jwt:ExpirationMinutes"] = "15",
+            ["Resend:ApiKey"] = "test-resend-key",
+            ["Resend:FromEmail"] = "no-reply@example.com",
+            ["EmailVerification:ExpirationMinutes"] = "10",
+            ["EmailVerification:MaxAttempts"] = "5",
+            ["AuthSecurity:MaxFailedLoginAttempts"] = "5",
+            ["AuthSecurity:LockoutMinutes"] = "15"
+        };
     }
 }
