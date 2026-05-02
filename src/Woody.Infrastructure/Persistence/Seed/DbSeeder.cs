@@ -29,6 +29,7 @@ public static class DbSeeder
         SeedCommunityPremiumDemo(context);
         EnsureAdminStaffOnPremiumDemoCommunity(context);
         SeedPosts(context);
+        SeedAdminGalleryDemoPosts(context);
         SeedCommunityPostBoostDemo(context);
         SeedComments(context);
         SeedFollows(context);
@@ -625,6 +626,116 @@ public static class DbSeeder
                 context.PostTags.Add(new PostTag { PostId = p.Id, Tag = t });
             if (rnd.Next(0, 2) == 0)
                 context.PostTags.Add(new PostTag { PostId = p.Id, Tag = tagPool[p.Id % tagPool.Length] });
+        }
+
+        context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Posts com 2–3 fotos pela conta <c>admin</c> (login dev: <c>admin</c> / <c>admin123</c>):
+    /// dois na comunidade <c>geral</c> e um só de perfil. Idempotente (títulos com prefixo <c>[Demo Woody]</c>).
+    /// </summary>
+    private static void SeedAdminGalleryDemoPosts(WoodyDbContext context)
+    {
+        const string demoPrefix = "[Demo Woody]";
+        if (context.Posts.Any(p => p.Title.StartsWith(demoPrefix)))
+            return;
+
+        var admin = context.Users.FirstOrDefault(u => u.Username == "admin");
+        var geral = context.Communities.FirstOrDefault(c => c.Slug == "geral");
+        if (admin == null || geral == null)
+            return;
+
+        var createdAtBase = DateTime.UtcNow.AddMinutes(-45);
+
+        static string Shot(int seed) =>
+            $"https://picsum.photos/seed/woody-gallery-demo-{seed}/720/480";
+
+        void AddTags(int postId, params string[] tags)
+        {
+            foreach (var t in tags)
+            {
+                if (context.PostTags.Any(pt => pt.PostId == postId && pt.Tag == t))
+                    continue;
+                context.PostTags.Add(new PostTag { PostId = postId, Tag = t });
+            }
+        }
+
+        var p1 = new Post
+        {
+            UserId = admin.Id,
+            CommunityId = geral.Id,
+            PublicationContext = PostPublicationContext.Community,
+            Title = $"{demoPrefix} Galeria · 3 fotos",
+            Content =
+                "Seed da base de dados: três imagens no mesmo post (media_attachments). Testa o mosaico no feed, o perfil da admin e o bloco «Fotos & Vídeos».",
+            ImageUrl = null,
+            CreatedAt = createdAtBase,
+            UpdatedAt = null,
+            DeletedAt = null
+        };
+        context.Posts.Add(p1);
+        context.SaveChanges();
+        AddPostImageAttachments(context, p1.Id, createdAtBase, Shot(31), Shot(32), Shot(33));
+        AddTags(p1.Id, "demo", "galeria");
+
+        var p2 = new Post
+        {
+            UserId = admin.Id,
+            CommunityId = geral.Id,
+            PublicationContext = PostPublicationContext.Community,
+            Title = $"{demoPrefix} Duo · 2 fotos lado a lado",
+            Content =
+                "Segundo exemplo com duas imagens. Útil para validar layout em ecrãs estreitos e o lightbox.",
+            ImageUrl = null,
+            CreatedAt = createdAtBase.AddMinutes(12),
+            UpdatedAt = null,
+            DeletedAt = null
+        };
+        context.Posts.Add(p2);
+        context.SaveChanges();
+        AddPostImageAttachments(context, p2.Id, p2.CreatedAt, Shot(41), Shot(42));
+        AddTags(p2.Id, "demo", "galeria");
+
+        var p3 = new Post
+        {
+            UserId = admin.Id,
+            CommunityId = null,
+            PublicationContext = PostPublicationContext.Profile,
+            Title = $"{demoPrefix} Álbum apenas no perfil",
+            Content =
+                "Publicação com contexto de perfil (sem comunidade). Aparece no teu perfil e no grid de fotos.",
+            ImageUrl = null,
+            CreatedAt = createdAtBase.AddMinutes(24),
+            UpdatedAt = null,
+            DeletedAt = null
+        };
+        context.Posts.Add(p3);
+        context.SaveChanges();
+        AddPostImageAttachments(context, p3.Id, p3.CreatedAt, Shot(51), Shot(52), Shot(53));
+        AddTags(p3.Id, "demo", "perfil");
+
+        context.SaveChanges();
+    }
+
+    private static void AddPostImageAttachments(
+        WoodyDbContext context,
+        int postId,
+        DateTime createdAt,
+        params string[] urls)
+    {
+        for (var i = 0; i < urls.Length; i++)
+        {
+            context.MediaAttachments.Add(new MediaAttachment
+            {
+                OwnerType = MediaOwnerType.Post,
+                OwnerId = postId,
+                PostId = postId,
+                Url = urls[i],
+                MediaKind = MediaKind.Image,
+                DisplayOrder = i,
+                CreatedAt = createdAt
+            });
         }
 
         context.SaveChanges();
