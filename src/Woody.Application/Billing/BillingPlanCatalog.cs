@@ -24,6 +24,18 @@ public static class BillingPlanCatalog
             return !string.IsNullOrEmpty(priceId);
         }
 
+        if (string.Equals(t, BillingPlanCodes.MaxMonthly, StringComparison.Ordinal))
+        {
+            priceId = options.Stripe?.PriceIds?.MaxMonthly?.Trim() ?? string.Empty;
+            return !string.IsNullOrEmpty(priceId);
+        }
+
+        if (string.Equals(t, BillingPlanCodes.MaxAnnual, StringComparison.Ordinal))
+        {
+            priceId = options.Stripe?.PriceIds?.MaxAnnual?.Trim() ?? string.Empty;
+            return !string.IsNullOrEmpty(priceId);
+        }
+
         return false;
     }
 
@@ -54,6 +66,8 @@ public static class BillingPlanCatalog
         var t = planCode?.Trim();
         if (string.IsNullOrEmpty(t)) return false;
         return string.Equals(t, BillingPlanCodes.ProMonthly, StringComparison.Ordinal)
-               || string.Equals(t, BillingPlanCodes.ProAnnual, StringComparison.Ordinal);
+               || string.Equals(t, BillingPlanCodes.ProAnnual, StringComparison.Ordinal)
+               || string.Equals(t, BillingPlanCodes.MaxMonthly, StringComparison.Ordinal)
+               || string.Equals(t, BillingPlanCodes.MaxAnnual, StringComparison.Ordinal);
     }
 }

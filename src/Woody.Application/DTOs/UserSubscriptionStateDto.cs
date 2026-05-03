@@ -10,7 +10,7 @@ public class UserSubscriptionStateDto
     /// <summary>Plano com benefícios ativos neste momento (<c>free</c> ou <c>pro</c>).</summary>
     public string EffectivePlan { get; set; } = "free";
 
-    /// <summary>Plano persistido na base (pode ser <c>pro</c> sem benefícios se expirado/cancelado).</summary>
+    /// <summary>Plano de faturação persistido (<c>free</c>, <c>pro</c>, <c>max</c>); benefícios efetivos vê <see cref="EffectivePlan"/>.</summary>
     public string BillingPlan { get; set; } = "free";
 
     /// <summary>Código de catálogo (ex.: <c>free</c>, <c>pro_monthly</c>); alinhado com Stripe price ids na configuração.</summary>

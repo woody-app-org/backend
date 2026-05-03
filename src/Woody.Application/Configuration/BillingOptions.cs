@@ -37,6 +37,12 @@ public class StripePriceIdsOptions
     /// <summary>Price id do Stripe Billing para Pro anual (ex.: price_…).</summary>
     public string ProAnnual { get; set; } = string.Empty;
 
+    /// <summary>Price id do Stripe Billing para Criador Max mensal.</summary>
+    public string MaxMonthly { get; set; } = string.Empty;
+
+    /// <summary>Price id do Stripe Billing para Criador Max anual (ou pagamento único ancorado ao mesmo produto).</summary>
+    public string MaxAnnual { get; set; } = string.Empty;
+
     /// <summary>Price id Stripe para plano premium da comunidade (mensal).</summary>
     public string CommunityPremiumMonthly { get; set; } = string.Empty;
 

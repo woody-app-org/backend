@@ -18,7 +18,7 @@ public static class InputValidationLimits
 
     public const int PostTitleMaxLength = 160;
     public const int PostContentMaxLength = 20_000;
-    public const int PostTagsMaxCount = 12;
+    public const int PostTagsMaxCount = 5;
     public const int TagMaxLength = 40;
 
     public const int CommentContentMaxLength = 5_000;

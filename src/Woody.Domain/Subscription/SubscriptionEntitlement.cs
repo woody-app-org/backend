@@ -12,7 +12,7 @@ public static class SubscriptionEntitlement
     {
         if (subscription is null)
             return false;
-        if (subscription.Plan != SubscriptionPlan.Pro)
+        if (subscription.Plan != SubscriptionPlan.Pro && subscription.Plan != SubscriptionPlan.Max)
             return false;
 
         return subscription.Status switch

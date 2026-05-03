@@ -24,8 +24,12 @@ public static class SubscriptionDtoMapper
         };
     }
 
-    public static string ToApiPlan(SubscriptionPlan plan) =>
-        plan == SubscriptionPlan.Pro ? "pro" : "free";
+    public static string ToApiPlan(SubscriptionPlan plan) => plan switch
+    {
+        SubscriptionPlan.Pro => "pro",
+        SubscriptionPlan.Max => "max",
+        _ => "free"
+    };
 
     public static string ToApiStatus(SubscriptionStatus status) => status switch
     {

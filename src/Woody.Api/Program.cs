@@ -337,6 +337,8 @@ static void ValidateProductionStripeOptions(BillingOptions billingOptions)
         || !string.IsNullOrWhiteSpace(stripe.WebhookSecret)
         || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProMonthly)
         || !string.IsNullOrWhiteSpace(stripe.PriceIds.ProAnnual)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.MaxMonthly)
+        || !string.IsNullOrWhiteSpace(stripe.PriceIds.MaxAnnual)
         || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumMonthly)
         || !string.IsNullOrWhiteSpace(stripe.PriceIds.CommunityPremiumAnnual);
 
