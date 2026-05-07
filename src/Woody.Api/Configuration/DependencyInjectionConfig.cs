@@ -12,6 +12,7 @@ using Woody.Application.UseCases.Auth.Login;
 using Woody.Application.UseCases.Auth.Register;
 using Woody.Application.UseCases.Billing;
 using Woody.Infrastructure.Billing.StripePayments;
+using Woody.Infrastructure.Persistence;
 using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
@@ -24,6 +25,8 @@ public static class DependencyInjectionConfig
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IBetaInviteRepository, BetaInviteRepository>();
+        builder.Services.AddScoped<IWoodyUnitOfWork, WoodyUnitOfWork>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();
         builder.Services.AddScoped<IBillingCheckoutAttemptRepository, BillingCheckoutAttemptRepository>();
         builder.Services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();

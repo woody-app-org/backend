@@ -27,6 +27,9 @@ namespace Woody.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
+        public int? InviteId { get; set; }
+        public BetaInvite? Invite { get; set; }
+
         /// <summary>Quem pode enviar sinais de perfil para esta utilizadora.</summary>
         public ProfileSignalsIncomingPreference ProfileSignalsIncomingPreference { get; set; }
 

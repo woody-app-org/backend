@@ -138,6 +138,8 @@ builder.Services.AddRateLimiter(options =>
         FixedWindowByUser(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimitPolicyNames.StripeWebhook, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimitPolicyNames.BetaInviteValidate, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 30, window: TimeSpan.FromMinutes(10)));
 });
 
 if (builder.Environment.IsDevelopment())
@@ -153,6 +155,7 @@ builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Rese
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
 builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection("AuthSecurity"));
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
+builder.Services.Configure<BetaAccessOptions>(builder.Configuration.GetSection("BetaAccess"));
 builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
 builder.Services.Configure<FormOptions>(options =>
 {

@@ -34,6 +34,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
+        public virtual DbSet<BetaInvite> BetaInvites { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -48,6 +49,21 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.Property(u => u.ProfileSignalsIncomingPreference)
                     .HasConversion<int>()
                     .HasDefaultValue(ProfileSignalsIncomingPreference.All);
+
+                e.HasOne(u => u.Invite)
+                    .WithMany(i => i.Users)
+                    .HasForeignKey(u => u.InviteId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<BetaInvite>(e =>
+            {
+                e.ToTable("beta_invites");
+                e.HasIndex(i => i.Code).IsUnique();
+                e.Property(i => i.Code).HasMaxLength(128);
+                e.Property(i => i.Label).HasMaxLength(256);
+                e.Property(i => i.CreatedBy).HasMaxLength(256);
+                e.HasCheckConstraint("ck_beta_invites_max_uses_positive", "max_uses > 0");
             });
 
             modelBuilder.Entity<UserSubscription>(e =>

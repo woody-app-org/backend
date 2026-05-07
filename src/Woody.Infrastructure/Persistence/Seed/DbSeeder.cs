@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Woody.Application.Beta;
 using Woody.Application.Billing;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
@@ -22,6 +23,7 @@ public static class DbSeeder
     public static void Seed(WoodyDbContext context)
     {
         SeedUsers(context);
+        SeedBetaInvites(context);
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
         SeedCommunitiesAndMemberships(context);
@@ -114,6 +116,31 @@ public static class DbSeeder
                 UpdatedAt = now
             });
         }
+
+        context.SaveChanges();
+    }
+
+    private static void SeedBetaInvites(WoodyDbContext context)
+    {
+        var raw = Environment.GetEnvironmentVariable("WOODY_DEV_BETA_INVITE_CODE")?.Trim();
+        if (string.IsNullOrEmpty(raw))
+            raw = "WOODY-DEV-BETA-2026";
+
+        var code = BetaInviteNormalizer.Normalize(raw);
+        if (context.BetaInvites.Any(i => i.Code == code))
+            return;
+
+        context.BetaInvites.Add(new BetaInvite
+        {
+            Code = code,
+            Label = "Convite inicial beta",
+            MaxUses = 10_000,
+            UsesCount = 0,
+            ExpiresAt = null,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "seed"
+        });
 
         context.SaveChanges();
     }

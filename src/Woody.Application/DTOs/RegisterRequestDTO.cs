@@ -9,4 +9,7 @@ public class RegisterRequestDTO
     /// <summary>ISO YYYY-MM-DD</summary>
     public string BirthDate { get; set; } = null!;
     public string? AvatarUrl { get; set; }
+
+    /// <summary>Obrigatório quando o beta fechado está ativo no servidor.</summary>
+    public string? InviteCode { get; set; }
 }

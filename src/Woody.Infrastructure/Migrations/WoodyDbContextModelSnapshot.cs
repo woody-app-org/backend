@@ -22,6 +22,65 @@ namespace Woody.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Woody.Domain.Entities.BetaInvite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("label");
+
+                    b.Property<int>("MaxUses")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_uses");
+
+                    b.Property<int>("UsesCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("uses_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_beta_invites");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_beta_invites_code");
+
+                    b.ToTable("beta_invites", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_beta_invites_max_uses_positive", "max_uses > 0");
+                        });
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.BillingCheckoutAttempt", b =>
                 {
                     b.Property<int>("Id")
@@ -794,51 +853,6 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("login_lockouts", (string)null);
                 });
 
-            modelBuilder.Entity("Woody.Domain.Entities.Message", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Body")
-                        .HasColumnType("text")
-                        .HasColumnName("body");
-
-                    b.Property<int>("ConversationId")
-                        .HasColumnType("integer")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<DateTime?>("EditedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("edited_at");
-
-                    b.Property<int>("SenderUserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("sender_user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_messages");
-
-                    b.HasIndex("SenderUserId")
-                        .HasDatabaseName("ix_messages_sender_user_id");
-
-                    b.HasIndex("ConversationId", "CreatedAt")
-                        .HasDatabaseName("ix_messages_conversation_id_created_at");
-
-                    b.ToTable("messages", (string)null);
-                });
-
             modelBuilder.Entity("Woody.Domain.Entities.MediaAttachment", b =>
                 {
                     b.Property<int>("Id")
@@ -852,13 +866,13 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int?>("DurationMs")
-                        .HasColumnType("integer")
-                        .HasColumnName("duration_ms");
-
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
+
+                    b.Property<int?>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
 
                     b.Property<string>("ExternalId")
                         .HasColumnType("text")
@@ -929,10 +943,55 @@ namespace Woody.Infrastructure.Migrations
                     b.HasIndex("OwnerType", "OwnerId", "DisplayOrder")
                         .HasDatabaseName("ix_media_attachments_owner_type_owner_id_display_order");
 
-                    b.ToTable("media_attachments", (string)null, t =>
+                    b.ToTable("media_attachments", null, t =>
                         {
                             t.HasCheckConstraint("ck_media_attachments_owner_xor", "(owner_type = 1 AND post_id IS NOT NULL AND post_id = owner_id AND message_id IS NULL) OR (owner_type = 2 AND message_id IS NOT NULL AND message_id = owner_id AND post_id IS NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.Message", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<int>("ConversationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("edited_at");
+
+                    b.Property<int>("SenderUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("sender_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_messages");
+
+                    b.HasIndex("SenderUserId")
+                        .HasDatabaseName("ix_messages_sender_user_id");
+
+                    b.HasIndex("ConversationId", "CreatedAt")
+                        .HasDatabaseName("ix_messages_conversation_id_created_at");
+
+                    b.ToTable("messages", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
@@ -1268,6 +1327,10 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("email_verified_at");
 
+                    b.Property<int?>("InviteId")
+                        .HasColumnType("integer")
+                        .HasColumnName("invite_id");
+
                     b.Property<bool>("IsEmailVerified")
                         .HasColumnType("boolean")
                         .HasColumnName("is_email_verified");
@@ -1315,6 +1378,9 @@ namespace Woody.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("ix_users_email");
+
+                    b.HasIndex("InviteId")
+                        .HasDatabaseName("ix_users_invite_id");
 
                     b.HasIndex("Username")
                         .IsUnique()
@@ -1714,6 +1780,25 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.MediaAttachment", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Message", "Message")
+                        .WithMany("MediaAttachments")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_media_attachments_messages_message_id");
+
+                    b.HasOne("Woody.Domain.Entities.Post", "Post")
+                        .WithMany("MediaAttachments")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_media_attachments_posts_post_id");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.Message", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.Conversation", "Conversation")
@@ -1733,25 +1818,6 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Conversation");
 
                     b.Navigation("Sender");
-                });
-
-            modelBuilder.Entity("Woody.Domain.Entities.MediaAttachment", b =>
-                {
-                    b.HasOne("Woody.Domain.Entities.Message", "Message")
-                        .WithMany("MediaAttachments")
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("fk_media_attachments_messages_message_id");
-
-                    b.HasOne("Woody.Domain.Entities.Post", "Post")
-                        .WithMany("MediaAttachments")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("fk_media_attachments_posts_post_id");
-
-                    b.Navigation("Message");
-
-                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>
@@ -1839,6 +1905,17 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.User", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.BetaInvite", "Invite")
+                        .WithMany("Users")
+                        .HasForeignKey("InviteId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_users_beta_invites_invite_id");
+
+                    b.Navigation("Invite");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.UserInterest", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.User", "User")
@@ -1873,6 +1950,11 @@ namespace Woody.Infrastructure.Migrations
                         .HasConstraintName("fk_subscriptions_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.BetaInvite", b =>
+                {
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Comment", b =>
