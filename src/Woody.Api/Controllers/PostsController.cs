@@ -210,6 +210,7 @@ public class PostsController : ControllerBase
                     DisplayOrder = i,
                     StorageKey = r.StorageKey,
                     FileSize = r.FileSize,
+                    ThumbnailUrl = r.ThumbnailUrl,
                     CreatedAt = DateTime.UtcNow
                 });
             await _posts.AddPostMediaAttachmentsAsync(rows, cancellationToken);
@@ -238,7 +239,8 @@ public class PostsController : ControllerBase
         string? Provider,
         string? ExternalId,
         string? StorageKey,
-        long? FileSize);
+        long? FileSize,
+        string? ThumbnailUrl);
 
     private static bool TryNormalizePostMedia(
         CreatePostRequestDTO body,
@@ -309,6 +311,13 @@ public class PostsController : ControllerBase
                         out error))
                     return false;
 
+                string? thumbNorm = null;
+                if (!string.IsNullOrWhiteSpace(item.ThumbnailUrl))
+                {
+                    if (!InputValidator.TryNormalizePostImageOrDataUrl(item.ThumbnailUrl, out thumbNorm, out error))
+                        return false;
+                }
+
                 rows.Add(new NormalizedPostMediaRow(
                     urlNorm,
                     kind,
@@ -317,7 +326,8 @@ public class PostsController : ControllerBase
                     TrimOrNull(item.Provider),
                     TrimOrNull(item.ExternalId),
                     storageKey,
-                    fileSize));
+                    fileSize,
+                    thumbNorm));
                 if (rows.Count > MaxPostImages)
                 {
                     error = $"Máximo de {MaxPostImages} anexos por publicação.";
@@ -332,7 +342,7 @@ public class PostsController : ControllerBase
             return false;
 
         foreach (var u in legacyUrls)
-            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null, null, null, null, null));
+            rows.Add(new NormalizedPostMediaRow(u, MediaKind.Image, null, null, null, null, null, null, null));
 
         return true;
     }

@@ -17,4 +17,7 @@ public sealed class PostMediaAttachmentRequestDto
 
     /// <summary>Tamanho em bytes (opcional; só aceite com URL de media Woody).</summary>
     public long? FileSize { get; set; }
+
+    /// <summary>Miniatura/poster para vídeo (URL de imagem ou data URL, mesma política que imagens em posts).</summary>
+    public string? ThumbnailUrl { get; set; }
 }
