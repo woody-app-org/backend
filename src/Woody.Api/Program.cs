@@ -223,7 +223,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHub<DirectMessagesHub>(DirectMessagesHub.RoutePath).RequireAuthorization();
+// Mensagens em tempo real: exige conta aprovada (mesma policy que ConversationsController REST).
+app.MapHub<DirectMessagesHub>(DirectMessagesHub.RoutePath).RequireAuthorization("VerifiedAccount");
 
 app.MapHealthChecks(
     "/health",

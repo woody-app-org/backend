@@ -19,16 +19,16 @@ public class FeedController : ControllerBase
         _feed = feed;
     }
 
-    [AllowAnonymous]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet]
-    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> GetFeed(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string filter = "trending",
         CancellationToken cancellationToken = default)
     {
-        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var viewerId = User.GetUserId();
         var result = await _feed.GetFeedAsync(page, pageSize, filter, viewerId, cancellationToken);
         return Ok(result);
     }

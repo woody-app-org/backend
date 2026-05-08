@@ -43,12 +43,16 @@ public class VerificationController : ControllerBase
     [HttpPost("document")]
     [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(8 * 1024 * 1024 + 512 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 8 * 1024 * 1024 + 512 * 1024)]
+    [DisableRequestSizeLimit] // Limite aplicado dinamicamente via VerificationStorageOptions
     public async Task<IActionResult> SubmitDocument(
         [FromForm] VerificationDocumentUploadForm? form,
         CancellationToken cancellationToken)
     {
+        // Aplicar limite de tamanho da request alinhado à configuração do serviço
+        var effectiveLimit = _storageOptions.MaxUploadBytes + MultipartSlackBytes;
+        if (HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } sizeFeature)
+            sizeFeature.MaxRequestBodySize = effectiveLimit;
+
         if (form?.File == null)
             return BadRequest(new { error = "Arquivo obrigatório." });
 
