@@ -1,7 +1,7 @@
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Woody.Application.Configuration;
 using Woody.Application.DTOs;
+using Woody.Application.Helpers;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
@@ -125,7 +125,7 @@ public class VerificationService : IVerificationService
         verification.Status = VerificationStatus.PendingReview;
         verification.RejectionReason = null;
         verification.UpdatedAt = now;
-        verification.DecisionLog = AppendDecisionLogEvent(
+        verification.DecisionLog = VerificationDecisionLogHelper.Append(
             verification.DecisionLog,
             isResubmit ? "resubmitted" : "submitted",
             userId,
@@ -174,7 +174,7 @@ public class VerificationService : IVerificationService
         verification.DocumentSubmittedAt = null;
         verification.Status = VerificationStatus.PendingDocument;
         verification.UpdatedAt = now;
-        verification.DecisionLog = AppendDecisionLogEvent(
+        verification.DecisionLog = VerificationDecisionLogHelper.Append(
             verification.DecisionLog,
             "document_removed",
             userId,
@@ -202,38 +202,6 @@ public class VerificationService : IVerificationService
             : null,
         AttemptCount = v.AttemptCount
     };
-
-    private static string AppendDecisionLogEvent(
-        string? existingLog,
-        string action,
-        int actorUserId,
-        DateTime at)
-    {
-        var events = new List<object>();
-
-        if (!string.IsNullOrWhiteSpace(existingLog))
-        {
-            try
-            {
-                var parsed = JsonSerializer.Deserialize<List<JsonElement>>(existingLog);
-                if (parsed != null)
-                    events.AddRange(parsed.Cast<object>());
-            }
-            catch
-            {
-                // Log corrompido: inicia novo
-            }
-        }
-
-        events.Add(new
-        {
-            action,
-            by = actorUserId,
-            at = at.ToUniversalTime().ToString("o")
-        });
-
-        return JsonSerializer.Serialize(events);
-    }
 
     private static async Task<MemoryStream> BufferStreamAsync(
         Stream content,

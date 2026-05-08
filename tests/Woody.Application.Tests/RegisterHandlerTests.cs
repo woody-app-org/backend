@@ -170,6 +170,14 @@ public class RegisterHandlerTests
         uow.Setup(x => x.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
             .Returns<Func<Task>, CancellationToken>((fn, _) => fn());
 
+        var identityVerifications = new Mock<IIdentityVerificationRepository>();
+        identityVerifications
+            .Setup(x => x.AddAsync(It.IsAny<Woody.Domain.Entities.IdentityVerification>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        identityVerifications
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         return new RegisterHandler(
             users.Object,
             subscriptions.Object,
@@ -179,7 +187,8 @@ public class RegisterHandlerTests
             authSessions.Object,
             betaInvites.Object,
             uow.Object,
-            Options.Create(new BetaAccessOptions { Enabled = betaEnabled }));
+            Options.Create(new BetaAccessOptions { Enabled = betaEnabled }),
+            identityVerifications.Object);
     }
 
     private static Mock<IUserRepository> CreateDefaultUsersMock()

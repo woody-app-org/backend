@@ -17,6 +17,7 @@ using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
 using Woody.Infrastructure.Storage;
+using AdminVerificationService = Woody.Application.Services.AdminVerificationService;
 using VerificationService = Woody.Application.Services.VerificationService;
 
 namespace Woody.Api.Configuration;
@@ -100,6 +101,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IDefaultCommunityBootstrap, DefaultCommunityBootstrap>();
         builder.Services.AddScoped<IIdentityVerificationRepository, IdentityVerificationRepository>();
         builder.Services.AddScoped<IVerificationService, VerificationService>();
+        builder.Services.AddScoped<IAdminVerificationService, AdminVerificationService>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();
     }
