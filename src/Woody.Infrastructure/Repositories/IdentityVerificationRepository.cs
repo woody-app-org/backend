@@ -16,6 +16,11 @@ public class IdentityVerificationRepository : IIdentityVerificationRepository
 
     public Task<IdentityVerification?> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default)
         => _context.IdentityVerifications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.UserId == userId, cancellationToken);
+
+    public Task<IdentityVerification?> GetByUserIdTrackedAsync(int userId, CancellationToken cancellationToken = default)
+        => _context.IdentityVerifications
             .FirstOrDefaultAsync(v => v.UserId == userId, cancellationToken);
 
     public async Task AddAsync(IdentityVerification verification, CancellationToken cancellationToken = default)

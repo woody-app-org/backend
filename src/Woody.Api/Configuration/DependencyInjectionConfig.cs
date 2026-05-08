@@ -17,6 +17,7 @@ using Woody.Infrastructure.Repositories;
 using Woody.Infrastructure.Security;
 using Woody.Infrastructure.Services.Email;
 using Woody.Infrastructure.Storage;
+using VerificationService = Woody.Application.Services.VerificationService;
 
 namespace Woody.Api.Configuration;
 
@@ -81,6 +82,10 @@ public static class DependencyInjectionConfig
         else
             builder.Services.AddScoped<IMediaStorageProvider, LocalMediaStorageProvider>();
 
+        // Storage privado para documentos de verificação de identidade
+        // Driver "Local" usa disco privado (fora de wwwroot); trocar por S3Private quando disponível
+        builder.Services.AddScoped<IVerificationDocumentStorageProvider, LocalPrivateVerificationDocumentStorageProvider>();
+
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
         builder.Services.AddSingleton<IGifStickerSearchProvider, LocalCatalogGifStickerSearchProvider>();
@@ -94,6 +99,7 @@ public static class DependencyInjectionConfig
         });
         builder.Services.AddScoped<IDefaultCommunityBootstrap, DefaultCommunityBootstrap>();
         builder.Services.AddScoped<IIdentityVerificationRepository, IdentityVerificationRepository>();
+        builder.Services.AddScoped<IVerificationService, VerificationService>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();
     }

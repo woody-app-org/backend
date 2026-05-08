@@ -158,13 +158,15 @@ builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
 builder.Services.Configure<BetaAccessOptions>(builder.Configuration.GetSection("BetaAccess"));
 builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
+builder.Services.Configure<VerificationStorageOptions>(builder.Configuration.GetSection("VerificationStorage"));
 builder.Services.Configure<FormOptions>(options =>
 {
     var cfg = builder.Configuration;
     var maxImage = cfg.GetValue<long?>("MediaStorage:MaxImageSizeBytes") ?? MediaReferenceConstraints.ImageMaxUploadBytes;
     var maxPostVideo = cfg.GetValue<long?>("MediaStorage:MaxPostVideoUploadBytes")
                        ?? MediaReferenceConstraints.PostVideoMaxUploadBytes;
-    options.MultipartBodyLengthLimit = Math.Max(maxImage, maxPostVideo) + 1024 * 1024;
+    var maxVerifDoc = cfg.GetValue<long?>("VerificationStorage:MaxUploadBytes") ?? (8L * 1024 * 1024);
+    options.MultipartBodyLengthLimit = Math.Max(Math.Max(maxImage, maxPostVideo), maxVerifDoc) + 1024 * 1024;
 });
 
 var corsEnabled = ConfigureCors(builder);
