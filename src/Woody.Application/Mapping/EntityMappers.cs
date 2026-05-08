@@ -216,7 +216,8 @@ public static class EntityMappers
         List<SocialLinkDto>? links = null,
         List<InterestItemResponseDto>? interests = null,
         int followersCount = 0,
-        int followingCount = 0) => new()
+        int followingCount = 0,
+        bool includePrivateFields = false) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -227,6 +228,7 @@ public static class EntityMappers
         Bio = u.Bio ?? string.Empty,
         Location = u.Location,
         Role = u.Role,
+        VerificationStatus = includePrivateFields ? u.VerificationStatus.ToString() : null,
         SocialLinks = links ?? new List<SocialLinkDto>(),
         Interests = interests ?? new List<InterestItemResponseDto>(),
         Suggestions = new List<object>(),

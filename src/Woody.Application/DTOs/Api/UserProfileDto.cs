@@ -13,6 +13,10 @@ public class UserProfileDto
     public string Bio { get; set; } = string.Empty;
     public string? Location { get; set; }
     public string? Role { get; set; }
+
+    /// <summary>Presente apenas em <c>GET /users/me</c>. Não expor em perfis públicos.</summary>
+    public string? VerificationStatus { get; set; }
+
     public List<SocialLinkDto> SocialLinks { get; set; } = new();
     public List<InterestItemResponseDto> Interests { get; set; } = new();
     public List<object> Suggestions { get; set; } = new();

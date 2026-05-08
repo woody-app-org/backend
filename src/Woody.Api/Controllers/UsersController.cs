@@ -499,8 +499,10 @@ public class UsersController : ControllerBase
         var followersCount = await _follows.CountFollowersAsync(userId, cancellationToken);
         var followingCount = await _follows.CountFollowingAsync(userId, cancellationToken);
 
-        var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount);
-        if (viewerId.HasValue && viewerId.Value == userId)
+        var isOwnProfile = viewerId.HasValue && viewerId.Value == userId;
+        var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount,
+            includePrivateFields: isOwnProfile);
+        if (isOwnProfile)
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 
         return profile;

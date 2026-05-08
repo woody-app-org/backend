@@ -10,6 +10,12 @@ public class AuthUserDto
     public string? Name { get; set; }
     public string? AvatarUrl { get; set; }
 
+    /// <summary>Role global da utilizadora: User, Admin, SuperAdmin.</summary>
+    public string Role { get; set; } = null!;
+
+    /// <summary>Status de verificação de identidade. Usado pelo frontend para decidir redirecionamento pós-login.</summary>
+    public string VerificationStatus { get; set; } = null!;
+
     /// <summary>
     /// Plano e ciclo de vida da assinatura. Integração futura com gateway: atualizar linhas via webhooks e devolver aqui o estado recalculado.
     /// </summary>

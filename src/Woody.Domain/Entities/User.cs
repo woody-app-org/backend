@@ -22,6 +22,11 @@ namespace Woody.Domain.Entities
         public bool IsEmailVerified { get; set; }
         public DateTime? EmailVerifiedAt { get; set; }
 
+        /// <summary>Cache desnormalizado do status de verificação de identidade. Atualizado em sincronia com <see cref="IdentityVerification"/>.</summary>
+        public VerificationStatus VerificationStatus { get; set; } = VerificationStatus.PendingDocument;
+
+        public IdentityVerification? IdentityVerification { get; set; }
+
         public UserSubscription? Subscription { get; set; }
 
         public DateTime CreatedAt { get; set; }

@@ -34,6 +34,7 @@ public class JwtTokenService : IJwtTokenService
             new(ClaimTypes.Role, user.Role),
             new(WoodyClaims.Plan, effectivePlan),
             new(WoodyClaims.SubscriptionStatus, SubscriptionDtoMapper.ToApiStatus(subscription?.Status ?? SubscriptionStatus.Active)),
+            new(WoodyClaims.VerificationStatus, user.VerificationStatus.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

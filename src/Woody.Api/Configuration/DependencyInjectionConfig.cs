@@ -93,6 +93,7 @@ public static class DependencyInjectionConfig
             client.BaseAddress = new Uri("https://api.resend.com/");
         });
         builder.Services.AddScoped<IDefaultCommunityBootstrap, DefaultCommunityBootstrap>();
+        builder.Services.AddScoped<IIdentityVerificationRepository, IdentityVerificationRepository>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();
     }

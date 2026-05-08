@@ -22,6 +22,7 @@ public class RegisterHandler
     private readonly IBetaInviteRepository _betaInvites;
     private readonly IWoodyUnitOfWork _unitOfWork;
     private readonly IOptions<BetaAccessOptions> _betaAccess;
+    private readonly IIdentityVerificationRepository _identityVerifications;
 
     public RegisterHandler(
         IUserRepository users,
@@ -32,7 +33,8 @@ public class RegisterHandler
         IAuthSessionService authSessions,
         IBetaInviteRepository betaInvites,
         IWoodyUnitOfWork unitOfWork,
-        IOptions<BetaAccessOptions> betaAccess)
+        IOptions<BetaAccessOptions> betaAccess,
+        IIdentityVerificationRepository identityVerifications)
     {
         _users = users;
         _subscriptions = subscriptions;
@@ -43,6 +45,7 @@ public class RegisterHandler
         _betaInvites = betaInvites;
         _unitOfWork = unitOfWork;
         _betaAccess = betaAccess;
+        _identityVerifications = identityVerifications;
     }
 
     public async Task<LoginResultDTO> HandleAsync(RegisterRequestDTO request, CancellationToken cancellationToken = default)
@@ -128,6 +131,15 @@ public class RegisterHandler
                 await _users.AddAsync(user);
                 await _users.SaveChangesAsync();
 
+                await _identityVerifications.AddAsync(new IdentityVerification
+                {
+                    UserId = user.Id,
+                    Status = VerificationStatus.PendingDocument,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                }, cancellationToken);
+                await _identityVerifications.SaveChangesAsync(cancellationToken);
+
                 var subscription = new UserSubscription
                 {
                     UserId = user.Id,
@@ -163,6 +175,15 @@ public class RegisterHandler
 
         await _users.AddAsync(userNoBeta);
         await _users.SaveChangesAsync();
+
+        await _identityVerifications.AddAsync(new IdentityVerification
+        {
+            UserId = userNoBeta.Id,
+            Status = VerificationStatus.PendingDocument,
+            CreatedAt = now,
+            UpdatedAt = now
+        }, cancellationToken);
+        await _identityVerifications.SaveChangesAsync(cancellationToken);
 
         var subscriptionNoBeta = new UserSubscription
         {

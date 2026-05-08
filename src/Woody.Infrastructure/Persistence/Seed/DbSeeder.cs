@@ -5,6 +5,7 @@ using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Security;
+using VerificationStatus = Woody.Domain.Entities.Enum.VerificationStatus;
 
 namespace Woody.Infrastructure.Persistence.Seed;
 
@@ -23,9 +24,11 @@ public static class DbSeeder
     public static void Seed(WoodyDbContext context)
     {
         SeedUsers(context);
+        EnsureSuperAdmin(context);
         SeedBetaInvites(context);
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
+        EnsureIdentityVerifications(context);
         SeedCommunitiesAndMemberships(context);
         EnsureCommunitySubscriptions(context);
         SeedCommunityPremiumDemo(context);
@@ -118,6 +121,109 @@ public static class DbSeeder
         }
 
         context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Cria/atualiza a conta SuperAdmin a partir de variáveis de ambiente.
+    /// Variáveis: WOODY_SUPERADMIN_USERNAME, WOODY_SUPERADMIN_EMAIL, WOODY_SUPERADMIN_PASSWORD.
+    /// Se as variáveis não estiverem definidas, promove a conta "admin" seed para SuperAdmin (apenas em dev).
+    /// </summary>
+    private static void EnsureSuperAdmin(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+        var hasher = new PasswordHasher();
+
+        var username = Environment.GetEnvironmentVariable("WOODY_SUPERADMIN_USERNAME")?.Trim();
+        var email = Environment.GetEnvironmentVariable("WOODY_SUPERADMIN_EMAIL")?.Trim();
+        var password = Environment.GetEnvironmentVariable("WOODY_SUPERADMIN_PASSWORD")?.Trim();
+
+        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(password))
+        {
+            var existing = context.Users.FirstOrDefault(u => u.Email == email.ToLowerInvariant());
+            if (existing == null)
+            {
+                context.Users.Add(new User
+                {
+                    Username = username,
+                    Email = email.ToLowerInvariant(),
+                    Password = hasher.HashPassword(password),
+                    Role = "SuperAdmin",
+                    DisplayName = username,
+                    IsEmailVerified = true,
+                    EmailVerifiedAt = now,
+                    VerificationStatus = VerificationStatus.Approved,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                context.SaveChanges();
+            }
+            else if (existing.Role != "SuperAdmin")
+            {
+                existing.Role = "SuperAdmin";
+                existing.VerificationStatus = VerificationStatus.Approved;
+                existing.UpdatedAt = now;
+                context.SaveChanges();
+            }
+        }
+        else
+        {
+            // Fallback dev: promover conta "admin" seed para SuperAdmin
+            var adminUser = context.Users.FirstOrDefault(u => u.Username == "admin");
+            if (adminUser != null && adminUser.Role != "SuperAdmin")
+            {
+                adminUser.Role = "SuperAdmin";
+                adminUser.VerificationStatus = VerificationStatus.Approved;
+                adminUser.UpdatedAt = now;
+                context.SaveChanges();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Garante que todos os utilizadores seed tenham um registo em <c>identity_verifications</c> com status Approved.
+    /// Também garante que novos utilizadores seed (adicionados futuramente) sejam cobertos.
+    /// Utilizadores reais criados via registo nascem com PendingDocument — este método NÃO os altera.
+    /// </summary>
+    private static void EnsureIdentityVerifications(WoodyDbContext context)
+    {
+        var now = DateTime.UtcNow;
+
+        // Atualiza o campo desnormalizado de todos os users seed para Approved
+        var seedUsers = context.Users
+            .Where(u => u.VerificationStatus != VerificationStatus.Approved
+                        && u.VerificationStatus != VerificationStatus.Rejected)
+            .ToList();
+
+        foreach (var u in seedUsers)
+        {
+            u.VerificationStatus = VerificationStatus.Approved;
+            u.UpdatedAt = now;
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
+
+        // Cria registros de IdentityVerification ausentes para todos os users (idempotente)
+        var userIds = context.Users.Select(u => u.Id).ToList();
+        var existingVerifIds = context.IdentityVerifications.Select(v => v.UserId).ToHashSet();
+
+        foreach (var userId in userIds.Where(id => !existingVerifIds.Contains(id)))
+        {
+            var user = context.Users.Find(userId);
+            if (user == null) continue;
+
+            context.IdentityVerifications.Add(new IdentityVerification
+            {
+                UserId = userId,
+                Status = user.VerificationStatus,
+                ReviewedAt = now,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+            context.SaveChanges();
     }
 
     private static void SeedBetaInvites(WoodyDbContext context)

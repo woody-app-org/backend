@@ -13,6 +13,8 @@ public static class AuthUserMapper
         IsEmailVerified = user.IsEmailVerified,
         Name = user.DisplayName ?? user.Username,
         AvatarUrl = user.ProfilePic,
+        Role = user.Role,
+        VerificationStatus = user.VerificationStatus.ToString(),
         Subscription = SubscriptionDtoMapper.ToStateDto(subscription, utcNow)
     };
 }

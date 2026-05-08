@@ -35,6 +35,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<ProfileSignal> ProfileSignals { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<BetaInvite> BetaInvites { get; set; }
+        public virtual DbSet<IdentityVerification> IdentityVerifications { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -49,10 +50,35 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.Property(u => u.ProfileSignalsIncomingPreference)
                     .HasConversion<int>()
                     .HasDefaultValue(ProfileSignalsIncomingPreference.All);
+                e.Property(u => u.VerificationStatus)
+                    .HasConversion<string>()
+                    .HasDefaultValue(VerificationStatus.PendingDocument);
 
                 e.HasOne(u => u.Invite)
                     .WithMany(i => i.Users)
                     .HasForeignKey(u => u.InviteId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<IdentityVerification>(e =>
+            {
+                e.ToTable("identity_verifications");
+                e.HasIndex(v => v.UserId).IsUnique();
+                e.Property(v => v.Status)
+                    .HasConversion<string>()
+                    .HasDefaultValue(VerificationStatus.PendingDocument);
+                e.Property(v => v.DocumentStorageKey).HasMaxLength(500);
+                e.Property(v => v.RejectionReason).HasMaxLength(1000);
+                e.Property(v => v.DecisionLog).HasColumnType("text");
+
+                e.HasOne(v => v.User)
+                    .WithOne(u => u.IdentityVerification)
+                    .HasForeignKey<IdentityVerification>(v => v.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(v => v.ReviewedBy)
+                    .WithMany()
+                    .HasForeignKey(v => v.ReviewedByUserId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
