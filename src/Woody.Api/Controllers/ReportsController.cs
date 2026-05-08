@@ -11,6 +11,7 @@ using Woody.Domain.Entities;
 namespace Woody.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/reports")]
 public class ReportsController : ControllerBase
 {

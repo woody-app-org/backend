@@ -9,6 +9,7 @@ using Woody.Domain.Entities;
 namespace Woody.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/join-requests")]
 public class JoinRequestsController : ControllerBase
 {

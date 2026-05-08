@@ -91,7 +91,7 @@ public class PostsController : ControllerBase
         return Ok(list[0]);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost]
     [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
     public async Task<ActionResult<PostResponseDto>> Create([FromBody] CreatePostRequestDTO body, CancellationToken cancellationToken)
@@ -384,7 +384,7 @@ public class PostsController : ControllerBase
         return true;
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("{postId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PostResponseDto>> Update(
@@ -453,7 +453,7 @@ public class PostsController : ControllerBase
         return Ok(dto[0]);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{postId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Delete(string postId, CancellationToken cancellationToken)
@@ -476,7 +476,7 @@ public class PostsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{postId}/like")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Like(string postId, CancellationToken cancellationToken)
@@ -498,7 +498,7 @@ public class PostsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{postId}/like")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Unlike(string postId, CancellationToken cancellationToken)
@@ -543,7 +543,7 @@ public class PostsController : ControllerBase
         return Ok(comments.Select(c => EntityMappers.ToCommentDto(c, postAuthorId, viewerId)).ToList());
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{postId}/comments")]
     [EnableRateLimiting(RateLimitPolicyNames.ContentComment)]
     public async Task<ActionResult<CommentResponseDto>> CreateComment(
@@ -617,7 +617,7 @@ public class PostsController : ControllerBase
         return Ok(EntityMappers.ToCommentDto(comment, postAuthorId, me));
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{postId}/comments/{commentId}/hide")]
     public async Task<ActionResult<CommentResponseDto>> HideComment(
         string postId,
@@ -650,7 +650,7 @@ public class PostsController : ControllerBase
         return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{postId}/profile-pin")]
     public async Task<IActionResult> PinOnProfile(string postId, CancellationToken cancellationToken)
     {
@@ -665,7 +665,7 @@ public class PostsController : ControllerBase
         return FromPinningOutcome(outcome);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{postId}/profile-pin")]
     public async Task<IActionResult> UnpinFromProfile(string postId, CancellationToken cancellationToken)
     {
@@ -680,7 +680,7 @@ public class PostsController : ControllerBase
         return FromPinningOutcome(outcome);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{postId}/comments/{commentId}/pin")]
     public async Task<IActionResult> PinComment(string postId, string commentId, CancellationToken cancellationToken)
     {
@@ -695,7 +695,7 @@ public class PostsController : ControllerBase
         return FromPinningOutcome(outcome);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{postId}/comments/{commentId}/pin")]
     public async Task<IActionResult> UnpinComment(string postId, string commentId, CancellationToken cancellationToken)
     {

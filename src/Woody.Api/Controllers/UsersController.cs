@@ -39,7 +39,7 @@ public class UsersController : ControllerBase
         _notificationService = notificationService;
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("me/communities")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<string>>> GetMyCommunityIds(CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public class UsersController : ControllerBase
         return Ok(ids);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("me/following")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
@@ -80,7 +80,7 @@ public class UsersController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("me/suggestions")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<List<UserPublicDto>>> GetSuggestions(
@@ -139,7 +139,7 @@ public class UsersController : ControllerBase
         return profile == null ? NotFound() : Ok(profile);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("me")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchMe(
@@ -236,7 +236,7 @@ public class UsersController : ControllerBase
         return Ok(profile);
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("me/interests")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<UserProfileDto>> PatchInterests(
@@ -412,7 +412,7 @@ public class UsersController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{userId}/follow")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Follow(string userId, CancellationToken cancellationToken)
@@ -446,7 +446,7 @@ public class UsersController : ControllerBase
         return Ok(new FollowMutationResponseDto { IsFollowing = true, FollowersCount = followersCount });
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{userId}/follow")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<FollowMutationResponseDto>> Unfollow(string userId, CancellationToken cancellationToken)

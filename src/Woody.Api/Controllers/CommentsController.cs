@@ -8,6 +8,7 @@ using Woody.Application.Interfaces;
 namespace Woody.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/comments")]
 public class CommentsController : ControllerBase
 {

@@ -9,7 +9,7 @@ using Woody.Application.Interfaces;
 namespace Woody.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/notifications")]
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class NotificationsController : ControllerBase
@@ -82,3 +82,4 @@ public class NotificationsController : ControllerBase
         return NoContent();
     }
 }
+

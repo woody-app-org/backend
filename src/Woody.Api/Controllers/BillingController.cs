@@ -9,7 +9,7 @@ using Woody.Application.UseCases.Billing;
 namespace Woody.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/[controller]")]
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class BillingController : ControllerBase
@@ -118,3 +118,4 @@ public class BillingController : ControllerBase
         }
     }
 }
+

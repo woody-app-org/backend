@@ -10,7 +10,7 @@ namespace Woody.Api.Controllers;
 
 /// <summary>Pesquisa plugável de GIF/stickers para o chat (não acopla a GIPHY/Tenor na API pública).</summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/messaging")]
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public sealed class MessagingStickerGifSearchController : ControllerBase
@@ -38,3 +38,4 @@ public sealed class MessagingStickerGifSearchController : ControllerBase
         return Ok(result);
     }
 }
+

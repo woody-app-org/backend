@@ -10,7 +10,7 @@ using Woody.Application.Mapping;
 namespace Woody.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/profile-signals")]
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class ProfileSignalsController : ControllerBase
@@ -197,3 +197,4 @@ public class ProfileSignalsController : ControllerBase
     private static int ResolveReceiverUserId(SendProfileSignalRequestDto body) =>
         body.ReceiverUserId > 0 ? body.ReceiverUserId : body.RecipientUserId;
 }
+

@@ -26,7 +26,7 @@ public class MediaController : ControllerBase
         _storage = storage;
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("images")]
     [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]
@@ -66,7 +66,7 @@ public class MediaController : ControllerBase
         }
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("videos")]
     [EnableRateLimiting(RateLimitPolicyNames.Upload)]
     [Consumes("multipart/form-data")]

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -7,6 +9,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Woody.Api.Authorization;
 using Woody.Api.Configuration;
 using Woody.Api.Hubs;
 using Woody.Application.Configuration;
@@ -108,7 +111,20 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin", "SuperAdmin"));
     options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("SuperAdmin"));
+
+    // Exige conta aprovada; o handler consulta o banco — imune a token stale.
+    // SuperAdmin tem bypass automático.
+    options.AddPolicy("VerifiedAccount", policy =>
+        policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new VerifiedAccountRequirement()));
 });
+
+// Handler de autorização de conta verificada (Scoped para acesso ao IUserRepository por request)
+builder.Services.AddScoped<IAuthorizationHandler, VerifiedAccountAuthorizationHandler>();
+
+// Customiza a resposta 403 quando bloqueado por VerifiedAccount
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, VerifiedAccountResultHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();

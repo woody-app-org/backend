@@ -68,7 +68,7 @@ public class CommunitiesController : ControllerBase
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost]
     [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
     public async Task<ActionResult<CommunityResponseDto>> Create(
@@ -249,7 +249,7 @@ public class CommunitiesController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{id:int}/join-requests")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> PendingJoinRequests(int id, CancellationToken cancellationToken)
@@ -313,7 +313,7 @@ public class CommunitiesController : ControllerBase
         });
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/members/me")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> MyMembership(string communityId, CancellationToken cancellationToken)
@@ -335,7 +335,7 @@ public class CommunitiesController : ControllerBase
     }
 
     /// <summary>Dashboard analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/premium/analytics")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityPremiumDashboardAnalyticsDto>> CommunityPremiumAnalytics(
@@ -378,7 +378,7 @@ public class CommunitiesController : ControllerBase
     }
 
     /// <summary>Activa impulsionamento (owner/admin + premium da comunidade).</summary>
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{communityId}/posts/{postId}/boost")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityPostBoostResponseDto>> BoostCommunityPost(
@@ -416,7 +416,7 @@ public class CommunitiesController : ControllerBase
     }
 
     /// <summary>Cancela impulsionamento activo do post nesta comunidade.</summary>
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{communityId}/posts/{postId}/boost")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> UnboostCommunityPost(
@@ -456,7 +456,7 @@ public class CommunitiesController : ControllerBase
     }
 
     /// <summary>Lista impulsionamentos activos (staff + premium).</summary>
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/post-boosts")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<IReadOnlyList<CommunityPostBoostListItemDto>>> ListCommunityPostBoosts(
@@ -487,7 +487,7 @@ public class CommunitiesController : ControllerBase
         };
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("{communityId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<ActionResult<CommunityResponseDto>> Patch(
@@ -546,7 +546,7 @@ public class CommunitiesController : ControllerBase
         return Ok(EntityMappers.ToCommunityDto(c));
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{communityId}/members")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> JoinPublic(string communityId, CancellationToken cancellationToken)
@@ -569,7 +569,7 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{communityId}/join-requests")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> RequestJoin(string communityId, CancellationToken cancellationToken)
@@ -619,13 +619,13 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{communityId}/join")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public Task<IActionResult> JoinAlias(string communityId, CancellationToken cancellationToken) =>
         RequestJoin(communityId, cancellationToken);
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{communityId}/members/me")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> Leave(string communityId, CancellationToken cancellationToken)
@@ -658,7 +658,7 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpDelete("{communityId}/members/{userId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> RemoveMember(string communityId, string userId, CancellationToken cancellationToken)
@@ -695,7 +695,7 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
+    [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("{communityId}/members/{userId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
     public async Task<IActionResult> PatchMember(

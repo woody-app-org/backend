@@ -9,7 +9,7 @@ using Woody.Application.Interfaces;
 namespace Woody.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "VerifiedAccount")]
 [Route("api/conversations")]
 [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
 public class ConversationsController : ControllerBase
@@ -148,3 +148,4 @@ public class ConversationsController : ControllerBase
         return Ok(result);
     }
 }
+
