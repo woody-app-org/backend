@@ -1,5 +1,18 @@
 namespace Woody.Application.Configuration;
 
+/// <summary>Definições da integração HTTP Klipy (<c>GifStickerSearch:Klipy</c>).</summary>
+public sealed class GifStickerSearchKlipyOptions
+{
+    /// <summary>Base da API (ex.: <c>https://api.klipy.com/</c>).</summary>
+    public string BaseUrl { get; set; } = "https://api.klipy.com/";
+
+    /// <summary>Chave de aplicação Klipy (apenas servidor; nunca expor ao cliente web).</summary>
+    public string ApiKey { get; set; } = "";
+
+    /// <summary>Timeout do <see cref="System.Net.Http.HttpClient"/> para pedidos Klipy (segundos).</summary>
+    public int TimeoutSeconds { get; set; } = 5;
+}
+
 /// <summary>
 /// Configuração da pesquisa plugável de GIF/stickers (<c>GifStickerSearch</c> em appsettings).
 /// </summary>
@@ -13,6 +26,9 @@ public sealed class GifStickerSearchOptions
 
     /// <summary>Timeout por pesquisa (segundos), aplicado ao token de cancelamento.</summary>
     public int TimeoutSeconds { get; set; } = 5;
+
+    /// <summary>Opções específicas quando <see cref="Provider"/> é Klipy.</summary>
+    public GifStickerSearchKlipyOptions Klipy { get; set; } = new();
 
     /// <summary>
     /// Quando o provider remoto (ex.: Klipy) não está implementado ou falha,

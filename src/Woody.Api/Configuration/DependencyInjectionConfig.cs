@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Woody.Application.Configuration;
@@ -93,6 +94,15 @@ public static class DependencyInjectionConfig
 
         builder.Services.Configure<GifStickerSearchOptions>(
             builder.Configuration.GetSection("GifStickerSearch"));
+        builder.Services.AddHttpClient(KlipyGifStickerSearchProvider.HttpClientName)
+            .ConfigureHttpClient((sp, client) =>
+            {
+                var monitor = sp.GetRequiredService<IOptionsMonitor<GifStickerSearchOptions>>();
+                var ts = monitor.CurrentValue.Klipy.TimeoutSeconds > 0 ? monitor.CurrentValue.Klipy.TimeoutSeconds : 5;
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(ts, 1, 120));
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "Mozilla/5.0 (compatible; WoodyBackend/1.0; KlipyGifStickerSearch)");
+            });
         builder.Services.AddSingleton<LocalCatalogGifStickerSearchProvider>();
         builder.Services.AddSingleton<KlipyGifStickerSearchProvider>();
         builder.Services.AddSingleton<IGifStickerSearchProvider>(sp =>
