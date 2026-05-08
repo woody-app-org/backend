@@ -5,7 +5,7 @@ namespace Woody.Application.Services.Messaging;
 
 /// <summary>
 /// Catálogo estático de GIF/stickers com URLs HTTPS públicas (Wikimedia Commons) — sem API keys, sem upload.
-/// Serve como primeira implementação de <see cref="IGifStickerSearchProvider"/>; substituir por outro provider via DI.
+/// Catálogo estático usado quando a configuração <c>GifStickerSearch:Provider</c> é Local ou como fallback.
 /// </summary>
 public sealed class LocalCatalogGifStickerSearchProvider : IGifStickerSearchProvider
 {

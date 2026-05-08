@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Woody.Application.Configuration;
 using Woody.Application.Interfaces;
@@ -89,7 +90,44 @@ public static class DependencyInjectionConfig
 
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
-        builder.Services.AddSingleton<IGifStickerSearchProvider, LocalCatalogGifStickerSearchProvider>();
+
+        builder.Services.Configure<GifStickerSearchOptions>(
+            builder.Configuration.GetSection("GifStickerSearch"));
+        builder.Services.AddSingleton<LocalCatalogGifStickerSearchProvider>();
+        builder.Services.AddSingleton<KlipyGifStickerSearchProvider>();
+        builder.Services.AddSingleton<IGifStickerSearchProvider>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GifStickerSearchOptions>>().Value;
+            var local = sp.GetRequiredService<LocalCatalogGifStickerSearchProvider>();
+            var klipy = sp.GetRequiredService<KlipyGifStickerSearchProvider>();
+            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("GifStickerSearch");
+
+            var kind = opts.GetResolvedKind(out var invalidProviderName);
+            if (invalidProviderName)
+            {
+                logger.LogWarning(
+                    "GifStickerSearch:Provider '{Provider}' desconhecido; a usar Local.",
+                    opts.Provider);
+            }
+
+            IGifStickerSearchProvider inner = kind switch
+            {
+                GifStickerSearchProviderKind.Klipy => klipy,
+                GifStickerSearchProviderKind.Giphy => local,
+                _ => local,
+            };
+
+            if (kind == GifStickerSearchProviderKind.Giphy)
+            {
+                logger.LogInformation(
+                    "GifStickerSearch: provider Giphy ainda não implementado; a usar catálogo Local.");
+            }
+
+            return new GifStickerSearchConfigurableWrapper(
+                inner,
+                sp.GetRequiredService<IOptions<GifStickerSearchOptions>>(),
+                sp.GetRequiredService<ILogger<GifStickerSearchConfigurableWrapper>>());
+        });
         builder.Services.AddScoped<IAuthSessionService, AuthSessionService>();
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
