@@ -126,8 +126,13 @@ public sealed class KlipyGifStickerSearchProvider : IGifStickerSearchProvider
 
         var perPage = NormalizeTrendingPerPage(take);
         var path = $"gifs/trending?page=1&per_page={perPage}";
-        await using var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
-        return doc == null ? [] : MapGifItems(ExtractItems(doc), take);
+        var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
+        if (doc == null)
+            return [];
+        using (doc)
+        {
+            return MapGifItems(ExtractItems(doc), take);
+        }
     }
 
     private async Task<List<GifStickerSearchItemDto>> FetchStickerTrendingAsync(int take, CancellationToken ct)
@@ -137,8 +142,13 @@ public sealed class KlipyGifStickerSearchProvider : IGifStickerSearchProvider
 
         var perPage = NormalizeTrendingPerPage(take);
         var path = $"stickers/trending?page=1&per_page={perPage}";
-        await using var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
-        return doc == null ? [] : MapStickerItems(ExtractItems(doc), take);
+        var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
+        if (doc == null)
+            return [];
+        using (doc)
+        {
+            return MapStickerItems(ExtractItems(doc), take);
+        }
     }
 
     private async Task<List<GifStickerSearchItemDto>> FetchGifSearchAsync(string q, int take, CancellationToken ct)
@@ -148,8 +158,13 @@ public sealed class KlipyGifStickerSearchProvider : IGifStickerSearchProvider
 
         var perPage = NormalizeSearchPerPage(take);
         var path = $"gifs/search?page=1&per_page={perPage}&q={Uri.EscapeDataString(q)}";
-        await using var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
-        return doc == null ? [] : MapGifItems(ExtractItems(doc), take);
+        var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
+        if (doc == null)
+            return [];
+        using (doc)
+        {
+            return MapGifItems(ExtractItems(doc), take);
+        }
     }
 
     private async Task<List<GifStickerSearchItemDto>> FetchStickerSearchAsync(string q, int take, CancellationToken ct)
@@ -159,8 +174,13 @@ public sealed class KlipyGifStickerSearchProvider : IGifStickerSearchProvider
 
         var perPage = NormalizeSearchPerPage(take);
         var path = $"stickers/search?page=1&per_page={perPage}&q={Uri.EscapeDataString(q)}";
-        await using var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
-        return doc == null ? [] : MapStickerItems(ExtractItems(doc), take);
+        var doc = await GetKlipyJsonDocumentAsync(path, ct).ConfigureAwait(false);
+        if (doc == null)
+            return [];
+        using (doc)
+        {
+            return MapStickerItems(ExtractItems(doc), take);
+        }
     }
 
     private async Task<JsonDocument?> GetKlipyJsonDocumentAsync(string pathAndQuery, CancellationToken ct)
@@ -180,7 +200,7 @@ public sealed class KlipyGifStickerSearchProvider : IGifStickerSearchProvider
                 return null;
             }
 
-            await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             return await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
