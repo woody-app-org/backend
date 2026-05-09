@@ -19,7 +19,7 @@ public class RateLimitPolicyAttributeTests
     [InlineData(typeof(PostsController), nameof(PostsController.Create), RateLimitPolicyNames.ContentCreate)]
     [InlineData(typeof(PostsController), nameof(PostsController.CreateComment), RateLimitPolicyNames.ContentComment)]
     [InlineData(typeof(ReportsController), nameof(ReportsController.Create), RateLimitPolicyNames.ReportCreate)]
-    [InlineData(typeof(FeedController), nameof(FeedController.GetFeed), RateLimitPolicyNames.PublicApi)]
+    [InlineData(typeof(FeedController), nameof(FeedController.GetFeed), RateLimitPolicyNames.AuthenticatedApi)]
     [InlineData(typeof(SearchController), nameof(SearchController.Search), RateLimitPolicyNames.PublicApi)]
     [InlineData(typeof(StripeBillingWebhooksController), nameof(StripeBillingWebhooksController.Post), RateLimitPolicyNames.StripeWebhook)]
     [InlineData(typeof(BetaController), nameof(BetaController.ValidateInvite), RateLimitPolicyNames.BetaInviteValidate)]
