@@ -39,13 +39,30 @@ public static class LocalAttachmentRequestMetadata
         }
 
         var declKey = string.IsNullOrWhiteSpace(declaredStorageKey) ? null : declaredStorageKey.Trim();
+
         if (declKey != null && derived == null)
         {
-            error = "storageKey só é permitido para URLs de media da plataforma (upload Woody).";
-            return false;
-        }
+            // URL não é um caminho local (/api/media/...) — pode ser URL CDN/R2 absoluta.
+            // Aceitar storageKey se for uma chave Woody válida e a URL terminar com o path da chave,
+            // provando que a URL foi construída a partir dessa chave (e não de uma chave arbitrária).
+            if (!MediaStorageKeySyntax.IsSafeServerMediaStorageKey(declKey))
+            {
+                error = "storageKey inválida.";
+                return false;
+            }
 
-        if (declKey != null && derived != null && !string.Equals(declKey, derived, StringComparison.Ordinal))
+            var encodedSuffix = "/" + string.Join("/", declKey.Split('/').Select(Uri.EscapeDataString));
+            var plainSuffix = "/" + declKey;
+            if (!normalizedUrl.EndsWith(encodedSuffix, StringComparison.OrdinalIgnoreCase)
+                && !normalizedUrl.EndsWith(plainSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                error = "storageKey não coincide com a URL do anexo.";
+                return false;
+            }
+
+            derived = declKey;
+        }
+        else if (declKey != null && derived != null && !string.Equals(declKey, derived, StringComparison.Ordinal))
         {
             error = "storageKey não coincide com a URL do anexo.";
             return false;
