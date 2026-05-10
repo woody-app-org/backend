@@ -77,6 +77,7 @@ public sealed class S3CompatibleVerificationDocumentStorageProvider
 
         var storageKey = $"verif/{userId}/{Guid.NewGuid():N}{normalizedExtension}";
 
+        // R2: sem DisablePayloadSigning o SDK pode usar assinatura chunked não suportada pelo R2.
         await _client
             .PutObjectAsync(
                 new PutObjectRequest
@@ -86,7 +87,8 @@ public sealed class S3CompatibleVerificationDocumentStorageProvider
                     InputStream = content,
                     ContentType = contentType,
                     AutoCloseStream = false,
-                    AutoResetStreamPosition = false
+                    AutoResetStreamPosition = false,
+                    DisablePayloadSigning = true
                 },
                 cancellationToken)
             .ConfigureAwait(false);

@@ -182,6 +182,8 @@ public sealed class S3CompatibleMediaStorageProvider : IMediaStorageProvider, ID
 
         var storageKey = $"{prefix}{Guid.NewGuid():N}{normalizedExtension}";
 
+        // Cloudflare R2 não implementa STREAMING-AWS4-HMAC-SHA256-PAYLOAD (upload chunked do SDK).
+        // DisablePayloadSigning evita esse modo e mantém SigV4 compatível com R2.
         await _client
             .PutObjectAsync(
                 new PutObjectRequest
@@ -191,7 +193,8 @@ public sealed class S3CompatibleMediaStorageProvider : IMediaStorageProvider, ID
                     InputStream = content,
                     ContentType = contentType,
                     AutoCloseStream = false,
-                    AutoResetStreamPosition = false
+                    AutoResetStreamPosition = false,
+                    DisablePayloadSigning = true
                 },
                 cancellationToken)
             .ConfigureAwait(false);
