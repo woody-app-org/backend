@@ -85,9 +85,16 @@ public static class DependencyInjectionConfig
         else
             builder.Services.AddScoped<IMediaStorageProvider, LocalMediaStorageProvider>();
 
-        // Storage privado para documentos de verificação de identidade
-        // Driver "Local" usa disco privado (fora de wwwroot); trocar por S3Private quando disponível
-        builder.Services.AddScoped<IVerificationDocumentStorageProvider, LocalPrivateVerificationDocumentStorageProvider>();
+        // Storage privado para documentos de verificação de identidade.
+        // Variáveis de ambiente: VerificationR2__AccountId, VerificationR2__AccessKeyId,
+        // VerificationR2__SecretAccessKey, VerificationR2__Bucket (duplo underscore = hierárquico).
+        builder.Services.Configure<VerificationR2StorageOptions>(builder.Configuration.GetSection("VerificationR2"));
+
+        var verificationDriver = (builder.Configuration["VerificationStorage:Driver"] ?? "Local").Trim();
+        if (string.Equals(verificationDriver, "S3", StringComparison.OrdinalIgnoreCase))
+            builder.Services.AddScoped<IVerificationDocumentStorageProvider, S3CompatibleVerificationDocumentStorageProvider>();
+        else
+            builder.Services.AddScoped<IVerificationDocumentStorageProvider, LocalPrivateVerificationDocumentStorageProvider>();
 
         builder.Services.AddScoped<IMediaUploadService, MediaUploadService>();
         builder.Services.AddScoped<IMediaUploadApplicationService, MediaUploadApplicationService>();
