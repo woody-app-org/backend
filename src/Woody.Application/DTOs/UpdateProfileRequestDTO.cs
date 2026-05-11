@@ -13,6 +13,7 @@ public class UpdateProfileRequestDTO
     public string Bio { get; set; } = string.Empty;
     public string? Pronouns { get; set; }
     public string? Location { get; set; }
+    public string? Profession { get; set; }
     public string? AvatarUrl { get; set; }
     public string? BannerUrl { get; set; }
     public List<InterestItemDto>? Interests { get; set; }

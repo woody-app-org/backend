@@ -16,6 +16,8 @@ namespace Woody.Domain.Entities
         public string? Pronouns { get; set; }
         public string? ProfilePic { get; set; }
         public string? BannerPic { get; set; }
+        /// <summary>Título profissional / ocupação exibido no perfil (independente de <see cref="Role"/> na plataforma).</summary>
+        public string? Profession { get; set; }
         public string? Location { get; set; }
         public string? Cpf { get; set; }
         public DateOnly? BirthDate { get; set; }

@@ -227,7 +227,7 @@ public static class EntityMappers
         BannerUrl = u.BannerPic,
         Bio = u.Bio ?? string.Empty,
         Location = u.Location,
-        Role = u.Role,
+        Profession = u.Profession,
         VerificationStatus = includePrivateFields ? u.VerificationStatus.ToString() : null,
         SocialLinks = links ?? new List<SocialLinkDto>(),
         Interests = interests ?? new List<InterestItemResponseDto>(),

@@ -194,6 +194,14 @@ public class UsersController : ControllerBase
                 out error))
             return BadRequest(new { error });
 
+        if (!InputValidator.TryNormalizeOptionalText(
+                body.Profession,
+                "Título ou profissão",
+                InputValidationLimits.ProfileProfessionMaxLength,
+                out var profession,
+                out error))
+            return BadRequest(new { error });
+
         if (!InputValidator.TryNormalizeHttpsImageUrl(body.AvatarUrl, out var avatarUrl, out error)
             || !InputValidator.TryNormalizeHttpsImageUrl(body.BannerUrl, out var bannerUrl, out error))
             return BadRequest(new { error });
@@ -212,6 +220,7 @@ public class UsersController : ControllerBase
         user.Bio = bio ?? string.Empty;
         user.Pronouns = pronouns;
         user.Location = location;
+        user.Profession = profession;
         user.ProfilePic = avatarUrl;
         user.BannerPic = bannerUrl;
         user.UpdatedAt = DateTime.UtcNow;

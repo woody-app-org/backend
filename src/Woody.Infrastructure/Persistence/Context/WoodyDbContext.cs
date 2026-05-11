@@ -53,6 +53,7 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.Property(u => u.VerificationStatus)
                     .HasConversion<string>()
                     .HasDefaultValue(VerificationStatus.PendingDocument);
+                e.Property(u => u.Profession).HasMaxLength(60);
 
                 e.HasOne(u => u.Invite)
                     .WithMany(i => i.Users)

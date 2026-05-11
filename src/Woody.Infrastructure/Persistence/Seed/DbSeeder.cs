@@ -10,7 +10,7 @@ using VerificationStatus = Woody.Domain.Entities.Enum.VerificationStatus;
 namespace Woody.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Dados de desenvolvimento. Idempotente por utilizador (username), comunidade (slug) e contagens mínimas.
+/// Dados de desenvolvimento. Idempotente por utilizador (username e email), comunidade (slug) e contagens mínimas.
 /// Para repovoar do zero: apagar a base ou <c>dotnet ef database drop</c> antes de migrar.
 /// </summary>
 /// <remarks>
@@ -98,9 +98,16 @@ public static class DbSeeder
                 "Nova na Woody — a explorar grupos.", "ela/dela", null, null, "Loures")
         };
 
+        var existingUsernames = new HashSet<string>(
+            context.Users.Select(u => u.Username),
+            StringComparer.Ordinal);
+        var existingEmails = new HashSet<string>(
+            context.Users.Select(u => u.Email.ToLowerInvariant()));
+
         foreach (var d in defs)
         {
-            if (context.Users.Any(u => u.Username == d.Username))
+            var emailLower = d.Email.ToLowerInvariant();
+            if (existingUsernames.Contains(d.Username) || existingEmails.Contains(emailLower))
                 continue;
 
             context.Users.Add(new User
@@ -118,6 +125,8 @@ public static class DbSeeder
                 CreatedAt = now,
                 UpdatedAt = now
             });
+            existingUsernames.Add(d.Username);
+            existingEmails.Add(emailLower);
         }
 
         context.SaveChanges();

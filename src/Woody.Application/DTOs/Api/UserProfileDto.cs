@@ -12,7 +12,8 @@ public class UserProfileDto
     public string? BannerUrl { get; set; }
     public string Bio { get; set; } = string.Empty;
     public string? Location { get; set; }
-    public string? Role { get; set; }
+    /// <summary>Título ou profissão definidos pela utilizadora (não confundir com papel na plataforma).</summary>
+    public string? Profession { get; set; }
 
     /// <summary>Presente apenas em <c>GET /users/me</c>. Não expor em perfis públicos.</summary>
     public string? VerificationStatus { get; set; }

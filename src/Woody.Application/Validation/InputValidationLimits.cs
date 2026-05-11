@@ -13,6 +13,7 @@ public static class InputValidationLimits
     public const int ProfileBioMaxLength = 500;
     public const int ProfilePronounsMaxLength = 40;
     public const int ProfileLocationMaxLength = 80;
+    public const int ProfileProfessionMaxLength = 60;
     public const int ProfileInterestsMaxCount = 12;
     public const int ProfileInterestLabelMaxLength = 40;
 
