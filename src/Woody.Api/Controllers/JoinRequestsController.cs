@@ -86,9 +86,11 @@ public class JoinRequestsController : ControllerBase
             membership.JoinedAt ??= now;
         }
 
-        jr.Community.MemberCount = await _memberships.CountActiveInCommunityAsync(jr.CommunityId, cancellationToken);
         jr.Community.UpdatedAt = now;
 
+        // Persiste JR aprovado + membership antes de contar, para que CountAsync leia valor correcto.
+        await _joinRequests.SaveChangesAsync(cancellationToken);
+        jr.Community.MemberCount = await _memberships.CountActiveInCommunityAsync(jr.CommunityId, cancellationToken);
         await _joinRequests.SaveChangesAsync(cancellationToken);
         await _notificationService.NotifyCommunityRequestApprovedAsync(
             jr.UserId,

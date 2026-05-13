@@ -245,6 +245,119 @@ public class JoinRequestsFlowTests
         Assert.Equal("banned", m.Status);
     }
 
+    [Fact]
+    public async Task Approve_twice_returns_not_found_on_second_call()
+    {
+        await using var factory = new JoinRequestsApiFactory();
+        await factory.SeedAsync();
+        var bobClient = factory.CreateClient();
+        var bobToken = await factory.LoginAsync(bobClient, JoinRequestsApiFactory.BobUsername, Password);
+        bobClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bobToken);
+        await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+
+        var me1 = await bobClient.GetFromJsonAsync<JsonElement>($"/api/communities/{factory.PrivateCommunity1Id}/join-requests/me");
+        var jrId = int.Parse(me1.GetProperty("requestId").GetString()!);
+
+        var aliceClient = factory.CreateClient();
+        var aliceToken = await factory.LoginAsync(aliceClient, JoinRequestsApiFactory.AliceUsername, Password);
+        aliceClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", aliceToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await aliceClient.PostAsync($"/api/join-requests/{jrId}/approve", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await aliceClient.PostAsync($"/api/join-requests/{jrId}/approve", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Approve_increments_member_count_correctly()
+    {
+        await using var factory = new JoinRequestsApiFactory();
+        await factory.SeedAsync();
+        var bobClient = factory.CreateClient();
+        var bobToken = await factory.LoginAsync(bobClient, JoinRequestsApiFactory.BobUsername, Password);
+        bobClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bobToken);
+        await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+
+        var me1 = await bobClient.GetFromJsonAsync<JsonElement>($"/api/communities/{factory.PrivateCommunity1Id}/join-requests/me");
+        var jrId = int.Parse(me1.GetProperty("requestId").GetString()!);
+
+        using var scopeBefore = factory.Services.CreateScope();
+        var dbBefore = scopeBefore.ServiceProvider.GetRequiredService<WoodyDbContext>();
+        var countBefore = await dbBefore.Communities.Where(c => c.Id == factory.PrivateCommunity1Id).Select(c => c.MemberCount).FirstAsync();
+
+        var aliceClient = factory.CreateClient();
+        var aliceToken = await factory.LoginAsync(aliceClient, JoinRequestsApiFactory.AliceUsername, Password);
+        aliceClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", aliceToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await aliceClient.PostAsync($"/api/join-requests/{jrId}/approve", null)).StatusCode);
+
+        using var scopeAfter = factory.Services.CreateScope();
+        var dbAfter = scopeAfter.ServiceProvider.GetRequiredService<WoodyDbContext>();
+        var countAfter = await dbAfter.Communities.Where(c => c.Id == factory.PrivateCommunity1Id).Select(c => c.MemberCount).FirstAsync();
+
+        Assert.Equal(countBefore + 1, countAfter);
+    }
+
+    [Fact]
+    public async Task Rejected_user_can_request_again()
+    {
+        await using var factory = new JoinRequestsApiFactory();
+        await factory.SeedAsync();
+        var bobClient = factory.CreateClient();
+        var bobToken = await factory.LoginAsync(bobClient, JoinRequestsApiFactory.BobUsername, Password);
+        bobClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bobToken);
+        await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+
+        var me1 = await bobClient.GetFromJsonAsync<JsonElement>($"/api/communities/{factory.PrivateCommunity1Id}/join-requests/me");
+        var jrId = int.Parse(me1.GetProperty("requestId").GetString()!);
+
+        var aliceClient = factory.CreateClient();
+        var aliceToken = await factory.LoginAsync(aliceClient, JoinRequestsApiFactory.AliceUsername, Password);
+        aliceClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", aliceToken);
+        await aliceClient.PostAsJsonAsync($"/api/join-requests/{jrId}/reject", new { reason = "Teste" });
+
+        var me2 = await bobClient.GetFromJsonAsync<JsonElement>($"/api/communities/{factory.PrivateCommunity1Id}/join-requests/me");
+        Assert.Equal("rejected", me2.GetProperty("status").GetString());
+        Assert.True(me2.GetProperty("canRequest").GetBoolean());
+
+        var r = await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+        Assert.Equal(HttpStatusCode.NoContent, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task CommunityPosts_returns_403_for_pending_member()
+    {
+        await using var factory = new JoinRequestsApiFactory();
+        await factory.SeedAsync();
+        var bobClient = factory.CreateClient();
+        var bobToken = await factory.LoginAsync(bobClient, JoinRequestsApiFactory.BobUsername, Password);
+        bobClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bobToken);
+
+        await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+
+        var r = await bobClient.GetAsync($"/api/communities/{factory.PrivateCommunity1Id}/posts");
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task JoinRequestsMe_does_not_expose_other_users_requests()
+    {
+        await using var factory = new JoinRequestsApiFactory();
+        await factory.SeedAsync();
+
+        // Bob faz pedido
+        var bobClient = factory.CreateClient();
+        var bobToken = await factory.LoginAsync(bobClient, JoinRequestsApiFactory.BobUsername, Password);
+        bobClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bobToken);
+        await bobClient.PostAsync($"/api/communities/{factory.PrivateCommunity1Id}/join-requests", null);
+
+        // Carol (sem pedido nesta comunidade) consulta /me — deve ver "none", não o pedido de Bob
+        var carolClient = factory.CreateClient();
+        var carolToken = await factory.LoginAsync(carolClient, JoinRequestsApiFactory.CarolUsername, Password);
+        carolClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", carolToken);
+
+        var me = await carolClient.GetFromJsonAsync<JsonElement>($"/api/communities/{factory.PrivateCommunity1Id}/join-requests/me");
+        Assert.Equal("none", me.GetProperty("status").GetString());
+        Assert.True(me.GetProperty("canRequest").GetBoolean());
+    }
+
     private sealed class JoinRequestsApiFactory : WebApplicationFactory<Program>
     {
         public const string AliceUsername = "join-alice";
