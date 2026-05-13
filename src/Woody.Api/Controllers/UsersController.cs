@@ -113,13 +113,30 @@ public class UsersController : ControllerBase
             return BadRequest();
 
         var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(uid, cancellationToken);
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+
+        HashSet<int>? viewerMemberCommunityIds = null;
+        if (viewerId.HasValue && viewerId.Value != uid)
+        {
+            var viewerCommunities = await _memberships.GetActiveCommunityIdsForUserAsync(viewerId.Value, cancellationToken);
+            viewerMemberCommunityIds = viewerCommunities.ToHashSet();
+        }
 
         var list = rows
             .OrderBy(m => m.Community.Name)
-            .Select(m => new UserCommunityMembershipDto
+            .Select(m =>
             {
-                Community = EntityMappers.ToCommunityDto(m.Community),
-                Role = m.Role
+                var c = m.Community;
+                var viewerSeesInterior = ViewerSeesPrivateCommunityInteriorOnProfile(
+                    uid,
+                    c,
+                    viewerId,
+                    viewerMemberCommunityIds);
+                return new UserCommunityMembershipDto
+                {
+                    Community = EntityMappers.ToCommunityDto(c, viewerSeesInterior),
+                    Role = m.Role
+                };
             })
             .ToList();
 
@@ -553,5 +570,24 @@ public class UsersController : ControllerBase
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Perfil lista comunidades onde o dono do perfil é membro. Interior de comunidade privada só na API
+    /// se o visitante for o próprio dono do perfil ou também membro activo dessa comunidade.
+    /// </summary>
+    private static bool ViewerSeesPrivateCommunityInteriorOnProfile(
+        int profileUserId,
+        Community c,
+        int? viewerId,
+        HashSet<int>? viewerMemberCommunityIds)
+    {
+        if (!string.Equals(c.Visibility, "private", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (viewerId == profileUserId)
+            return true;
+
+        return viewerMemberCommunityIds?.Contains(c.Id) == true;
     }
 }

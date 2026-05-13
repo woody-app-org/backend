@@ -193,22 +193,49 @@ public static class EntityMappers
         };
     }
 
-    public static CommunityResponseDto ToCommunityDto(Community c) => new()
+    /// <summary>
+    /// Mapeia comunidade para API. Em comunidades <c>private</c>, só quem vê o interior (membro activo)
+    /// deve passar <paramref name="viewerSeesPrivateInterior"/> verdadeiro; caso contrário descrição é
+    /// truncada para descoberta e <c>Rules</c> fica vazio (evita vazamento até existir <c>PublicDescription</c>).
+    /// </summary>
+    public static CommunityResponseDto ToCommunityDto(Community c, bool viewerSeesPrivateInterior = true)
     {
-        Id = c.Id.ToString(),
-        Slug = c.Slug,
-        Name = c.Name,
-        Description = c.Description,
-        Category = c.Category,
-        Tags = c.Tags.Select(t => t.Tag).ToList(),
-        Rules = c.Rules,
-        AvatarUrl = c.AvatarUrl,
-        CoverUrl = c.CoverUrl,
-        OwnerUserId = c.OwnerUserId.ToString(),
-        Visibility = c.Visibility,
-        MemberCount = c.MemberCount,
-        Billing = CommunityBillingMapper.ToBillingStateDto(c.Subscription, DateTime.UtcNow)
-    };
+        var isPrivate = string.Equals(c.Visibility, "private", StringComparison.OrdinalIgnoreCase);
+        var redact = isPrivate && !viewerSeesPrivateInterior;
+
+        return new CommunityResponseDto
+        {
+            Id = c.Id.ToString(),
+            Slug = c.Slug,
+            Name = c.Name,
+            Description = redact ? FormatPrivateDiscoveryDescription(c.Description) : c.Description,
+            Category = c.Category,
+            Tags = c.Tags.Select(t => t.Tag).ToList(),
+            Rules = redact ? string.Empty : c.Rules,
+            AvatarUrl = c.AvatarUrl,
+            CoverUrl = c.CoverUrl,
+            OwnerUserId = c.OwnerUserId.ToString(),
+            Visibility = c.Visibility,
+            MemberCount = c.MemberCount,
+            Billing = CommunityBillingMapper.ToBillingStateDto(c.Subscription, DateTime.UtcNow)
+        };
+    }
+
+    private const int PrivateDiscoveryDescriptionMaxLength = 360;
+
+    private static string FormatPrivateDiscoveryDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return "Comunidade privada no Woody. Solicita entrada para ver o conteúdo e as regras completas.";
+        }
+
+        var trimmed = description.Trim();
+        if (trimmed.Length <= PrivateDiscoveryDescriptionMaxLength)
+            return trimmed;
+
+        return trimmed[..PrivateDiscoveryDescriptionMaxLength].TrimEnd() + "…";
+    }
 
     public static UserProfileDto ToUserProfile(
         User u,

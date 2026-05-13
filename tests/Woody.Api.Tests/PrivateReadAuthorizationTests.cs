@@ -138,6 +138,66 @@ public class PrivateReadAuthorizationTests
         Assert.Equal("21", payload.Items[0].User.Id);
     }
 
+    [Fact]
+    public async Task GetById_PrivateCommunity_RedactsInterior_ForAnonymous()
+    {
+        var longDesc = new string('x', 400) + new string('y', 80);
+        var c = CreateCommunity(11, "private", description: longDesc, rules: "INTERNAL_RULES");
+        var controller = CreateCommunitiesControllerForDetail(c, viewerUserId: null);
+
+        var result = await controller.GetById(11, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<CommunityResponseDto>(ok.Value);
+        Assert.Equal(string.Empty, dto.Rules);
+        Assert.Equal(361, dto.Description.Length);
+        Assert.EndsWith("…", dto.Description);
+        Assert.DoesNotContain("y", dto.Description);
+    }
+
+    [Fact]
+    public async Task GetById_PrivateCommunity_ReturnsFullInterior_ForActiveMember()
+    {
+        var c = CreateCommunity(12, "private", description: "FULL", rules: "INTERNAL");
+        var active = new CommunityMembership { UserId = 99, CommunityId = 12, Status = "active", Role = "member" };
+        var controller = CreateCommunitiesControllerForDetail(c, viewerUserId: 99, activeMembership: active);
+
+        var result = await controller.GetById(12, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<CommunityResponseDto>(ok.Value);
+        Assert.Equal("INTERNAL", dto.Rules);
+        Assert.Equal("FULL", dto.Description);
+    }
+
+    [Fact]
+    public async Task GetById_PrivateCommunity_RedactsForAuthenticatedNonMember()
+    {
+        var c = CreateCommunity(14, "private", description: "Secret", rules: "R");
+        var controller = CreateCommunitiesControllerForDetail(c, viewerUserId: 20, activeMembership: null);
+
+        var result = await controller.GetById(14, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<CommunityResponseDto>(ok.Value);
+        Assert.Equal(string.Empty, dto.Rules);
+        Assert.Equal("Secret", dto.Description);
+    }
+
+    [Fact]
+    public async Task GetById_PublicCommunity_ReturnsFull_ForAnonymous()
+    {
+        var c = CreateCommunity(13, "public", description: "PubDesc", rules: "PubRules");
+        var controller = CreateCommunitiesControllerForDetail(c, viewerUserId: null);
+
+        var result = await controller.GetById(13, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<CommunityResponseDto>(ok.Value);
+        Assert.Equal("PubRules", dto.Rules);
+        Assert.Equal("PubDesc", dto.Description);
+    }
+
     private static SearchController CreateSearchController(
         IReadOnlyList<Post> searchResults,
         IReadOnlyCollection<int> allowedPostIds,
@@ -171,6 +231,52 @@ public class PrivateReadAuthorizationTests
             .ReturnsAsync((Post post, int? _, CancellationToken _) => allowedPostIds.Contains(post.Id));
 
         var controller = new SearchController(users.Object, communities.Object, posts.Object, enrichment.Object, authorization.Object);
+        SetUser(controller, viewerUserId);
+        return controller;
+    }
+
+    private static CommunitiesController CreateCommunitiesControllerForDetail(
+        Community community,
+        int? viewerUserId,
+        CommunityMembership? activeMembership = null)
+    {
+        var communities = new Mock<ICommunityRepository>();
+        communities
+            .Setup(x => x.GetByIdWithTagsNoTrackingAsync(community.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(community);
+
+        var memberships = new Mock<ICommunityMembershipRepository>();
+        if (viewerUserId.HasValue)
+        {
+            memberships
+                .Setup(x => x.GetActiveForUserAndCommunityNoTrackingAsync(
+                    viewerUserId.Value,
+                    community.Id,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(activeMembership);
+        }
+
+        var daily = new Mock<ICommunityDailyRollupRepository>();
+        daily
+            .Setup(x => x.IncrementPageViewAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var controller = new CommunitiesController(
+            communities.Object,
+            memberships.Object,
+            Mock.Of<IJoinRequestRepository>(),
+            Mock.Of<IPostRepository>(),
+            Mock.Of<IPostEnrichmentService>(),
+            Mock.Of<ICommunityPermissionService>(),
+            Mock.Of<IUserEntitlementService>(),
+            Mock.Of<ICommunitySubscriptionRepository>(),
+            Mock.Of<ICommunityPremiumEntitlementService>(),
+            daily.Object,
+            Mock.Of<ICommunityDashboardAnalyticsService>(),
+            Mock.Of<ICommunityPostBoostService>(),
+            Mock.Of<IResourceAuthorizationService>(),
+            Mock.Of<INotificationService>());
+
         SetUser(controller, viewerUserId);
         return controller;
     }
@@ -242,15 +348,17 @@ public class PrivateReadAuthorizationTests
         };
     }
 
-    private static Community CreateCommunity(int id, string visibility) => new()
+    private static Community CreateCommunity(int id, string visibility, string? description = null, string? rules = null) => new()
     {
         Id = id,
         Slug = $"community-{id}",
         Name = $"Community {id}",
-        Description = "Description",
+        Description = description ?? "Description",
         Category = "general",
+        Rules = rules ?? string.Empty,
         Visibility = visibility,
-        OwnerUserId = 1
+        OwnerUserId = 1,
+        MemberCount = 1
     };
 
     private static User CreateUser(int id, string username) => new()

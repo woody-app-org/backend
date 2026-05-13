@@ -166,7 +166,8 @@ public class CommunitiesController : ControllerBase
     public async Task<ActionResult<List<CommunityResponseDto>>> List(CancellationToken cancellationToken)
     {
         var list = await _communities.ListWithTagsOrderedByNameAsync(cancellationToken);
-        return Ok(list.Select(EntityMappers.ToCommunityDto).ToList());
+        // Descoberta: privadas aparecem, mas sem interior (regras / descrição longa) na listagem global.
+        return Ok(list.Select(c => EntityMappers.ToCommunityDto(c, viewerSeesPrivateInterior: false)).ToList());
     }
 
     [AllowAnonymous]
@@ -186,7 +187,9 @@ public class CommunitiesController : ControllerBase
             // Métricas não devem impedir o carregamento público da comunidade.
         }
 
-        return Ok(EntityMappers.ToCommunityDto(c));
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var viewerSeesPrivateInterior = await ViewerSeesPrivateCommunityInteriorAsync(c, viewerId, cancellationToken);
+        return Ok(EntityMappers.ToCommunityDto(c, viewerSeesPrivateInterior));
     }
 
     [AllowAnonymous]
@@ -206,7 +209,9 @@ public class CommunitiesController : ControllerBase
             // Métricas não devem impedir o carregamento público da comunidade.
         }
 
-        return Ok(EntityMappers.ToCommunityDto(c));
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var viewerSeesPrivateInterior = await ViewerSeesPrivateCommunityInteriorAsync(c, viewerId, cancellationToken);
+        return Ok(EntityMappers.ToCommunityDto(c, viewerSeesPrivateInterior));
     }
 
     [AllowAnonymous]
@@ -921,6 +926,24 @@ public class CommunitiesController : ControllerBase
         comm.UpdatedAt = DateTime.UtcNow;
         await _communities.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<bool> ViewerSeesPrivateCommunityInteriorAsync(
+        Community c,
+        int? viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(c.Visibility, "private", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!viewerUserId.HasValue)
+            return false;
+
+        var member = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(
+            viewerUserId.Value,
+            c.Id,
+            cancellationToken);
+        return member != null;
     }
 
     private static bool MembershipIsBanned(CommunityMembership? m) =>

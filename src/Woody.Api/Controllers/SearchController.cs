@@ -65,7 +65,13 @@ public class SearchController : ControllerBase
         if (string.Equals(mode, "communities", StringComparison.OrdinalIgnoreCase))
         {
             var list = await _communities.SearchWithTagsAsync(n, 50, cancellationToken);
-            return Ok(new { communities = list.Select(EntityMappers.ToCommunityDto).ToList() });
+            // Descoberta: privadas na pesquisa, sem interior na resposta (alinhado com listagem global).
+            return Ok(new
+            {
+                communities = list
+                    .Select(c => EntityMappers.ToCommunityDto(c, viewerSeesPrivateInterior: false))
+                    .ToList()
+            });
         }
 
         var posts = await _posts.SearchNonDeletedWithNavAsync(n, 200, cancellationToken);
