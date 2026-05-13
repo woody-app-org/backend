@@ -111,7 +111,14 @@ public static class InputValidator
         return true;
     }
 
-    /// <summary>GIF em posts: data <c>image/gif</c>, URL https .gif ou ficheiro local .gif.</summary>
+    /// <summary>
+    /// GIF em posts: aceita <c>data:image/gif</c>, URL https <c>.gif</c> ou caminho local <c>.gif</c>.
+    /// <para>
+    /// <b>Não usar para comentários.</b> Comentários usam
+    /// <see cref="CommentGifAttachmentValidator.TryNormalizeStrictExternalHttpsGifUrl"/>
+    /// que rejeita <c>data:</c> e exige HTTPS externo público.
+    /// </para>
+    /// </summary>
     public static bool TryNormalizeHttpsGifUrl(string? raw, out string? normalized, out string? error)
     {
         normalized = null;

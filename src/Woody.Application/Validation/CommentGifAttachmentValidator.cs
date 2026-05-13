@@ -162,7 +162,10 @@ public static class CommentGifAttachmentValidator
             return false;
         }
 
-        if (!value.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+        // Verificar extensão .gif no caminho (AbsolutePath) para não rejeitar URLs com query string
+        // válidas como https://media.tenor.com/abc.gif?size=small
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || !uri.AbsolutePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
         {
             error = InputValidator.InvalidGifUrlMessage;
             return false;

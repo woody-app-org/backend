@@ -64,6 +64,27 @@ public sealed class CommentGifAttachmentValidatorTests
         Assert.Contains("Provedor", err, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("https://media.tenor.com/abc.gif?itemid=123")]
+    [InlineData("https://media.giphy.com/media/abc.gif?cid=xyz&rid=ok")]
+    public void TryNormalizeStrictExternalHttpsGifUrl_Accepts_gif_with_query_string(string raw)
+    {
+        var ok = CommentGifAttachmentValidator.TryNormalizeStrictExternalHttpsGifUrl(raw, out var normalized, out var err);
+        Assert.True(ok, err);
+        Assert.Equal(raw, normalized);
+    }
+
+    [Theory]
+    [InlineData("https://cdn.example.com/image.png")]
+    [InlineData("https://cdn.example.com/video.mp4?token=abc")]
+    [InlineData("https://cdn.example.com/file.webp")]
+    public void TryNormalizeStrictExternalHttpsGifUrl_Rejects_non_gif_paths(string raw)
+    {
+        var ok = CommentGifAttachmentValidator.TryNormalizeStrictExternalHttpsGifUrl(raw, out _, out var err);
+        Assert.False(ok);
+        Assert.NotNull(err);
+    }
+
     [Fact]
     public void TryNormalizeGifFields_Rejects_title_with_angle_brackets()
     {
