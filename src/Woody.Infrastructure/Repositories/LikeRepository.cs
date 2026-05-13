@@ -83,6 +83,73 @@ public class LikeRepository : ILikeRepository
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);
 
+    public async Task<Dictionary<int, int>> GetCommentLikeCountsAsync(
+        IReadOnlyList<int> commentIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (commentIds.Count == 0)
+            return new Dictionary<int, int>();
+
+        return await _db.Likes.AsNoTracking()
+            .Where(l => l.TargetType == LikeTargetType.Comment && commentIds.Contains(l.TargetId))
+            .GroupBy(l => l.TargetId)
+            .Select(g => new { Id = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Id, x => x.Count, cancellationToken);
+    }
+
+    public async Task<HashSet<int>> GetCommentIdsLikedByUserAsync(
+        int userId,
+        IReadOnlyList<int> commentIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (commentIds.Count == 0)
+            return new HashSet<int>();
+
+        var list = await _db.Likes.AsNoTracking()
+            .Where(l =>
+                l.UserId == userId
+                && l.TargetType == LikeTargetType.Comment
+                && commentIds.Contains(l.TargetId))
+            .Select(l => l.TargetId)
+            .ToListAsync(cancellationToken);
+        return list.ToHashSet();
+    }
+
+    public async Task<bool> TryAddCommentLikeAsync(int userId, int commentId, CancellationToken cancellationToken = default)
+    {
+        var like = new Like
+        {
+            UserId = userId,
+            TargetType = LikeTargetType.Comment,
+            TargetId = commentId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Likes.Add(like);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException ex) when (IsUniqueLikeViolation(ex))
+        {
+            Detach(like);
+            return false;
+        }
+    }
+
+    public async Task RemoveCommentLikeAsync(int userId, int commentId, CancellationToken cancellationToken = default)
+    {
+        var row = await _db.Likes.FirstOrDefaultAsync(
+            l => l.UserId == userId && l.TargetType == LikeTargetType.Comment && l.TargetId == commentId,
+            cancellationToken);
+        if (row == null)
+            return;
+
+        _db.Likes.Remove(row);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     private static bool IsUniqueLikeViolation(DbUpdateException ex) =>
         IsPostgresUniqueLikeViolation(ex) || IsSqliteUniqueViolation(ex);
 

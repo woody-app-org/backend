@@ -524,6 +524,75 @@ public class PostsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("{postId}/comments/{commentId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<ActionResult<CommentLikeMutationResponseDto>> LikeComment(
+        string postId,
+        string commentId,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid) || !int.TryParse(commentId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
+        if (post == null || !await _authorization.CanReadPostAsync(post, me, cancellationToken))
+            return NotFound();
+
+        var comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken);
+        if (comment == null || comment.PostId != pid)
+            return NotFound();
+
+        await _likes.TryAddCommentLikeAsync(me.Value, cid, cancellationToken);
+
+        var counts = await _likes.GetCommentLikeCountsAsync(new[] { cid }, cancellationToken);
+        var likedIds = await _likes.GetCommentIdsLikedByUserAsync(me.Value, new[] { cid }, cancellationToken);
+        var likesCount = counts.TryGetValue(cid, out var n) ? n : 0;
+        return Ok(new CommentLikeMutationResponseDto
+        {
+            LikesCount = likesCount,
+            LikedByCurrentUser = likedIds.Contains(cid)
+        });
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpDelete("{postId}/comments/{commentId}/like")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<ActionResult<CommentLikeMutationResponseDto>> UnlikeComment(
+        string postId,
+        string commentId,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid) || !int.TryParse(commentId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(pid, cancellationToken);
+        if (post == null || !await _authorization.CanReadPostAsync(post, me, cancellationToken))
+            return NotFound();
+
+        var comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken);
+        if (comment == null || comment.PostId != pid)
+            return NotFound();
+
+        await _likes.RemoveCommentLikeAsync(me.Value, cid, cancellationToken);
+
+        var counts = await _likes.GetCommentLikeCountsAsync(new[] { cid }, cancellationToken);
+        var likesCount = counts.TryGetValue(cid, out var n) ? n : 0;
+        return Ok(new CommentLikeMutationResponseDto
+        {
+            LikesCount = likesCount,
+            LikedByCurrentUser = false
+        });
+    }
+
     [AllowAnonymous]
     [HttpGet("{postId}/comments")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
@@ -539,8 +608,20 @@ public class PostsController : ControllerBase
 
         var postAuthorId = post!.UserId;
         var comments = await _comments.ListActiveForPostWithAuthorAsync(pid, cancellationToken);
+        var commentIds = comments.Select(c => c.Id).ToList();
+        var likeCounts = commentIds.Count > 0
+            ? await _likes.GetCommentLikeCountsAsync(commentIds, cancellationToken)
+            : new Dictionary<int, int>();
+        var likedByViewer = commentIds.Count > 0 && viewerId.HasValue
+            ? await _likes.GetCommentIdsLikedByUserAsync(viewerId.Value, commentIds, cancellationToken)
+            : new HashSet<int>();
 
-        return Ok(comments.Select(c => EntityMappers.ToCommentDto(c, postAuthorId, viewerId)).ToList());
+        return Ok(comments.Select(c =>
+        {
+            var likesCount = likeCounts.TryGetValue(c.Id, out var cnt) ? cnt : 0;
+            var liked = viewerId.HasValue && likedByViewer.Contains(c.Id);
+            return EntityMappers.ToCommentDto(c, postAuthorId, viewerId, likesCount, liked);
+        }).ToList());
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -614,7 +695,7 @@ public class PostsController : ControllerBase
         comment = await _comments.GetByIdNonDeletedWithAuthorAsync(comment.Id, cancellationToken)
                   ?? throw new InvalidOperationException("Comment not found after create.");
 
-        return Ok(EntityMappers.ToCommentDto(comment, postAuthorId, me));
+        return Ok(EntityMappers.ToCommentDto(comment, postAuthorId, me, 0, false));
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -647,7 +728,11 @@ public class PostsController : ControllerBase
         comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken)
                   ?? throw new InvalidOperationException("Comment not found after hide.");
 
-        return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me));
+        var likeCountsAfterHide = await _likes.GetCommentLikeCountsAsync(new[] { cid }, cancellationToken);
+        var likedAfterHide = await _likes.GetCommentIdsLikedByUserAsync(me.Value, new[] { cid }, cancellationToken);
+        var likesCountAfterHide = likeCountsAfterHide.TryGetValue(cid, out var lc) ? lc : 0;
+        var likedByMeAfterHide = likedAfterHide.Contains(cid);
+        return Ok(EntityMappers.ToCommentDto(comment, post.UserId, me, likesCountAfterHide, likedByMeAfterHide));
     }
 
     [Authorize(Policy = "VerifiedAccount")]

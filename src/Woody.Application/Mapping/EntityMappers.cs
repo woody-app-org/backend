@@ -167,7 +167,12 @@ public static class EntityMappers
         };
     }
 
-    public static CommentResponseDto ToCommentDto(Comment c, int postAuthorId, int? viewerUserId)
+    public static CommentResponseDto ToCommentDto(
+        Comment c,
+        int postAuthorId,
+        int? viewerUserId,
+        int likesCount = 0,
+        bool likedByCurrentUser = false)
     {
         var hidden = c.HiddenByPostAuthorAt.HasValue;
         var viewerIsPostAuthor = viewerUserId == postAuthorId;
@@ -176,6 +181,8 @@ public static class EntityMappers
         string? mask = null;
         if (hidden && viewerUserId.HasValue && !viewerIsPostAuthor && !viewerIsCommentAuthor)
             mask = "hidden_by_post_author";
+
+        var liked = viewerUserId.HasValue && likedByCurrentUser;
 
         return new CommentResponseDto
         {
@@ -189,7 +196,9 @@ public static class EntityMappers
             DeletedAt = c.DeletedAt.HasValue ? Iso(c.DeletedAt.Value) : null,
             HiddenByPostAuthorAt = c.HiddenByPostAuthorAt.HasValue ? Iso(c.HiddenByPostAuthorAt.Value) : null,
             ContentModerationMask = mask,
-            PinnedOnPostAt = c.PinnedOnPostAt.HasValue ? Iso(c.PinnedOnPostAt.Value) : null
+            PinnedOnPostAt = c.PinnedOnPostAt.HasValue ? Iso(c.PinnedOnPostAt.Value) : null,
+            LikesCount = likesCount,
+            LikedByCurrentUser = liked
         };
     }
 

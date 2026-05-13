@@ -15,4 +15,9 @@ public class CommentResponseDto
 
     /// <summary>Destaque escolhido pela autora do post; <c>null</c> se não fixo.</summary>
     public string? PinnedOnPostAt { get; set; }
+
+    public int LikesCount { get; set; }
+
+    /// <summary>Autenticado: se a utilizadora atual deu gosto neste comentário; anónimo: sempre falso.</summary>
+    public bool LikedByCurrentUser { get; set; }
 }
