@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
+using Woody.Domain.Media;
 
 namespace Woody.Infrastructure.Persistence.Context
 {
@@ -273,6 +274,12 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<Comment>(e =>
             {
+                e.Property(c => c.GifUrl).HasMaxLength(PublicImageUrlPolicy.MaxUrlLength);
+                e.Property(c => c.GifThumbnailUrl).HasMaxLength(PublicImageUrlPolicy.MaxUrlLength);
+                e.Property(c => c.GifProvider).HasMaxLength(InputValidationLimits.CommentGifProviderMaxLength);
+                e.Property(c => c.GifExternalId).HasMaxLength(InputValidationLimits.CommentGifExternalIdMaxLength);
+                e.Property(c => c.GifTitle).HasMaxLength(InputValidationLimits.CommentGifTitleMaxLength);
+
                 e.HasIndex(c => c.PostId)
                     .IsUnique()
                     .HasFilter("pinned_on_post_at IS NOT NULL");

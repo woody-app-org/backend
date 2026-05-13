@@ -645,13 +645,64 @@ public class PostsController : ControllerBase
 
         var postAuthorId = post!.UserId;
 
-        if (!InputValidator.TryNormalizeRequiredText(
-                body.Content,
-                "Comentário",
-                InputValidationLimits.CommentContentMaxLength,
-                out var commentContent,
-                out var error))
-            return BadRequest(new { error });
+        var wantsGif = CommentGifAttachmentValidator.HasAnyGifField(
+            body.GifUrl,
+            body.GifThumbnailUrl,
+            body.GifProvider,
+            body.GifExternalId,
+            body.GifTitle);
+
+        string commentContent;
+        string? gifUrl = null;
+        string? gifThumbnailUrl = null;
+        string? gifProvider = null;
+        string? gifExternalId = null;
+        string? gifTitle = null;
+
+        if (wantsGif)
+        {
+            if (!CommentGifAttachmentValidator.TryNormalizeGifFields(
+                    body.GifUrl,
+                    body.GifThumbnailUrl,
+                    body.GifProvider,
+                    body.GifExternalId,
+                    body.GifTitle,
+                    out var gUrl,
+                    out var gThumb,
+                    out var gProv,
+                    out var gExt,
+                    out var gTitle,
+                    out var gifError))
+                return BadRequest(new { error = gifError });
+
+            gifUrl = gUrl;
+            gifThumbnailUrl = gThumb;
+            gifProvider = gProv;
+            gifExternalId = gExt;
+            gifTitle = gTitle;
+
+            if (!InputValidator.TryNormalizeOptionalText(
+                    body.Content,
+                    "Comentário",
+                    InputValidationLimits.CommentContentMaxLength,
+                    out var optionalContent,
+                    out var optError))
+                return BadRequest(new { error = optError });
+
+            commentContent = optionalContent ?? string.Empty;
+        }
+        else
+        {
+            if (!InputValidator.TryNormalizeRequiredText(
+                    body.Content,
+                    "Comentário",
+                    InputValidationLimits.CommentContentMaxLength,
+                    out var requiredContent,
+                    out var error))
+                return BadRequest(new { error });
+
+            commentContent = requiredContent;
+        }
 
         int? parentId = null;
         Comment? parentComment = null;
@@ -672,7 +723,12 @@ public class PostsController : ControllerBase
             AuthorId = me.Value,
             ParentCommentId = parentId,
             Content = commentContent,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            GifUrl = gifUrl,
+            GifThumbnailUrl = gifThumbnailUrl,
+            GifProvider = gifProvider,
+            GifExternalId = gifExternalId,
+            GifTitle = gifTitle,
         };
         _comments.Add(comment);
         await _comments.SaveChangesAsync(cancellationToken);

@@ -21,5 +21,13 @@ namespace Woody.Domain.Entities
 
         /// <summary>Quando não nulo, o comentário está destacado neste post (no máximo um por post).</summary>
         public DateTime? PinnedOnPostAt { get; set; }
+
+        /// <summary>GIF externo opcional (no máximo um por comentário); URLs só https públicas validadas na API.</summary>
+        public string? GifUrl { get; set; }
+
+        public string? GifThumbnailUrl { get; set; }
+        public string? GifProvider { get; set; }
+        public string? GifExternalId { get; set; }
+        public string? GifTitle { get; set; }
     }
 }

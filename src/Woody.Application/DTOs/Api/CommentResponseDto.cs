@@ -20,4 +20,7 @@ public class CommentResponseDto
 
     /// <summary>Autenticado: se a utilizadora atual deu gosto neste comentário; anónimo: sempre falso.</summary>
     public bool LikedByCurrentUser { get; set; }
+
+    /// <summary>GIF anexado; omitido quando o comentário não tem GIF ou o conteúdo está oculto ao viewer.</summary>
+    public CommentGifResponseDto? Gif { get; set; }
 }

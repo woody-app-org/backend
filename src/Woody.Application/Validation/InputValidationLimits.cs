@@ -24,6 +24,10 @@ public static class InputValidationLimits
 
     public const int CommentContentMaxLength = 5_000;
 
+    public const int CommentGifTitleMaxLength = 200;
+    public const int CommentGifExternalIdMaxLength = 128;
+    public const int CommentGifProviderMaxLength = 40;
+
     public const int CommunityNameMinLength = 2;
     public const int CommunityNameMaxLength = 80;
     public const int CommunityDescriptionMinLength = 10;

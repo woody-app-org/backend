@@ -184,6 +184,22 @@ public static class EntityMappers
 
         var liked = viewerUserId.HasValue && likedByCurrentUser;
 
+        CommentGifResponseDto? gifDto = null;
+        if (showContent
+            && !string.IsNullOrEmpty(c.GifUrl)
+            && !string.IsNullOrEmpty(c.GifProvider)
+            && !string.IsNullOrEmpty(c.GifExternalId))
+        {
+            gifDto = new CommentGifResponseDto
+            {
+                Url = c.GifUrl,
+                ThumbnailUrl = c.GifThumbnailUrl,
+                Provider = c.GifProvider,
+                ExternalId = c.GifExternalId,
+                Title = c.GifTitle,
+            };
+        }
+
         return new CommentResponseDto
         {
             Id = c.Id.ToString(),
@@ -198,7 +214,8 @@ public static class EntityMappers
             ContentModerationMask = mask,
             PinnedOnPostAt = c.PinnedOnPostAt.HasValue ? Iso(c.PinnedOnPostAt.Value) : null,
             LikesCount = likesCount,
-            LikedByCurrentUser = liked
+            LikedByCurrentUser = liked,
+            Gif = gifDto,
         };
     }
 
