@@ -4,7 +4,11 @@ public static class RateLimitPolicyNames
 {
     public const string AuthLogin = "auth-login";
     public const string AuthRegister = "auth-register";
-    public const string AuthEmail = "auth-email";
+    /// <summary>Envio e reenvio de código por e-mail (chave principal: e-mail normalizado).</summary>
+    public const string AuthEmailSend = "auth-email-send";
+
+    /// <summary>Confirmação do código (tentativas por e-mail, separado do envio).</summary>
+    public const string AuthEmailVerify = "auth-email-verify";
     public const string AuthRefresh = "auth-refresh";
     public const string Upload = "upload";
     public const string ContentCreate = "content-create";

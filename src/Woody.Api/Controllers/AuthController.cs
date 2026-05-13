@@ -66,7 +66,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("send-verification")]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmailSend)]
     public async Task<IActionResult> SendVerificationCode(
         [FromBody] SendEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)
@@ -76,7 +76,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("resend-verification")]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmailSend)]
     public async Task<IActionResult> ResendVerificationCode(
         [FromBody] SendEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)
@@ -86,7 +86,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-email")]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthEmail)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthEmailVerify)]
     public async Task<IActionResult> VerifyEmailCode(
         [FromBody] ConfirmEmailVerificationCodeRequestDTO request,
         CancellationToken cancellationToken)

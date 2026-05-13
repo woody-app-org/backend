@@ -12,8 +12,9 @@ using System.Threading.RateLimiting;
 using Woody.Api.Authorization;
 using Woody.Api.Configuration;
 using Woody.Api.Hubs;
-using Woody.Application.Configuration;
 using Woody.Api.Middlewares;
+using Woody.Api.RateLimiting;
+using Woody.Application.Configuration;
 using Woody.Infrastructure.Persistence.Configuration;
 using Woody.Infrastructure.Persistence.Context;
 using Woody.Infrastructure.Persistence.Seed;
@@ -25,11 +26,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 ConfigureRailwayPort(builder);
 
+var trustPrivateNetworkProxies = builder.Configuration.GetValue("ForwardedHeaders:TrustPrivateNetworkProxies", false);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    options.ForwardLimit = 2;
+    // Não usar KnownIPNetworks.Clear() / KnownProxies.Clear(): isso remove proxies confiáveis e impede X-Forwarded-For.
+    if (!trustPrivateNetworkProxies)
+        return;
+
+    // Apenas quando o tráfego direto ao Kestrel vier de redes internas (ex.: Railway, Docker bridge).
+    // Ative com ForwardedHeaders__TrustPrivateNetworkProxies=true no ambiente de deploy.
+    options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+    options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+    options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
+    options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("100.64.0.0/10"));
 });
 
 builder.Services.AddHealthChecks()
@@ -131,12 +142,13 @@ builder.Services.AddSignalR();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = AuthEmailRateLimitOnRejected.OnRejectedAsync;
     options.AddPolicy(RateLimitPolicyNames.AuthLogin, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 5, window: TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimitPolicyNames.AuthRegister, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
-    options.AddPolicy(RateLimitPolicyNames.AuthEmail, httpContext =>
-        FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.AuthEmailSend, AuthEmailRateLimitPolicies.PartitionAuthEmailSend);
+    options.AddPolicy(RateLimitPolicyNames.AuthEmailVerify, AuthEmailRateLimitPolicies.PartitionAuthEmailVerify);
     options.AddPolicy(RateLimitPolicyNames.AuthRefresh, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimitPolicyNames.Upload, httpContext =>
@@ -218,6 +230,7 @@ if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<AuthEmailRateLimitPreparationMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
@@ -259,7 +272,7 @@ static void ConfigureRailwayPort(WebApplicationBuilder builder)
 
 static RateLimitPartition<string> FixedWindowByIp(HttpContext httpContext, int permitLimit, TimeSpan window) =>
     RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: $"ip:{GetClientIp(httpContext)}",
+        partitionKey: $"ip:{RateLimitClientIp.Get(httpContext)}",
         factory: _ => CreateFixedWindowOptions(permitLimit, window));
 
 static RateLimitPartition<string> FixedWindowByUser(HttpContext httpContext, int permitLimit, TimeSpan window)
@@ -267,7 +280,7 @@ static RateLimitPartition<string> FixedWindowByUser(HttpContext httpContext, int
     var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
     var key = !string.IsNullOrWhiteSpace(userId)
         ? $"user:{userId}"
-        : $"ip:{GetClientIp(httpContext)}";
+        : $"ip:{RateLimitClientIp.Get(httpContext)}";
 
     return RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: key,
@@ -281,9 +294,6 @@ static FixedWindowRateLimiterOptions CreateFixedWindowOptions(int permitLimit, T
     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
     QueueLimit = 0
 };
-
-static string GetClientIp(HttpContext httpContext) =>
-    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 static bool ConfigureCors(WebApplicationBuilder builder)
 {
