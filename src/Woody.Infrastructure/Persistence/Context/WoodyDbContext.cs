@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 
@@ -203,7 +204,15 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<JoinRequest>(e =>
             {
-                e.HasIndex(j => new { j.CommunityId, j.UserId, j.Status });
+                e.Property(j => j.RejectionReason).HasMaxLength(InputValidationLimits.JoinRequestRejectionReasonMaxLength);
+                e.HasOne(j => j.ReviewedBy)
+                    .WithMany()
+                    .HasForeignKey(j => j.ReviewedByUserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                e.HasIndex(j => new { j.CommunityId, j.UserId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_join_requests_community_user_pending")
+                    .HasFilter("status = 'pending'");
             });
 
             modelBuilder.Entity<Post>(e =>

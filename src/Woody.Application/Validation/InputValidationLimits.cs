@@ -38,4 +38,6 @@ public static class InputValidationLimits
     public const int PlanCodeMaxLength = 80;
     public const int MembershipRoleMaxLength = 20;
     public const int MembershipStatusMaxLength = 20;
+
+    public const int JoinRequestRejectionReasonMaxLength = 500;
 }

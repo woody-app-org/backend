@@ -32,6 +32,32 @@ public class JoinRequestRepository : IJoinRequestRepository
             j => j.CommunityId == communityId && j.UserId == userId && j.Status == "pending",
             cancellationToken);
 
+    public async Task<JoinRequest?> GetPendingTrackedForUserAndCommunityAsync(
+        int communityId,
+        int userId,
+        CancellationToken cancellationToken = default) =>
+        await _db.JoinRequests.FirstOrDefaultAsync(
+            j => j.CommunityId == communityId && j.UserId == userId && j.Status == "pending",
+            cancellationToken);
+
+    public async Task<JoinRequest?> GetPendingNoTrackingForUserAndCommunityAsync(
+        int communityId,
+        int userId,
+        CancellationToken cancellationToken = default) =>
+        await _db.JoinRequests.AsNoTracking()
+            .FirstOrDefaultAsync(
+                j => j.CommunityId == communityId && j.UserId == userId && j.Status == "pending",
+                cancellationToken);
+
+    public async Task<JoinRequest?> GetLatestNoTrackingForUserAndCommunityAsync(
+        int communityId,
+        int userId,
+        CancellationToken cancellationToken = default) =>
+        await _db.JoinRequests.AsNoTracking()
+            .Where(j => j.CommunityId == communityId && j.UserId == userId)
+            .OrderByDescending(j => j.RequestedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public void Add(JoinRequest request) => _db.JoinRequests.Add(request);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

@@ -1118,7 +1118,8 @@ public static class DbSeeder
                     CommunityId = c.Id,
                     UserId = u.Id,
                     Status = "pending",
-                    RequestedAt = DateTime.UtcNow.AddDays(-2)
+                    RequestedAt = DateTime.UtcNow.AddDays(-2),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-2)
                 });
             }
         }

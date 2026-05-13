@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
@@ -272,6 +273,133 @@ public class CommunitiesController : ControllerBase
             requestedAt = j.RequestedAt.ToUniversalTime().ToString("o"),
             user = EntityMappers.ToUserPublicDto(j.User)
         }));
+    }
+
+    /// <summary>Estado do pedido de entrada da própria utilizadora nesta comunidade (para reidratar UI após reload).</summary>
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("{communityId}/join-requests/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<IActionResult> MyJoinRequest(string communityId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var community = await _communities.GetByIdWithTagsNoTrackingAsync(cid, cancellationToken);
+        if (community == null)
+            return NotFound();
+
+        var active = await _memberships.GetActiveForUserAndCommunityNoTrackingAsync(me.Value, cid, cancellationToken);
+        if (active != null)
+        {
+            return Ok(new
+            {
+                status = "member",
+                requestId = (string?)null,
+                requestedAt = (string?)null,
+                reviewedAt = (string?)null,
+                rejectionReason = (string?)null,
+                canRequest = false
+            });
+        }
+
+        var pending = await _joinRequests.GetPendingNoTrackingForUserAndCommunityAsync(cid, me.Value, cancellationToken);
+        if (pending != null)
+        {
+            return Ok(new
+            {
+                status = "pending",
+                requestId = pending.Id.ToString(),
+                requestedAt = pending.RequestedAt.ToUniversalTime().ToString("o"),
+                reviewedAt = (string?)null,
+                rejectionReason = (string?)null,
+                canRequest = false
+            });
+        }
+
+        var latest = await _joinRequests.GetLatestNoTrackingForUserAndCommunityAsync(cid, me.Value, cancellationToken);
+        if (latest == null)
+        {
+            return Ok(new
+            {
+                status = "none",
+                requestId = (string?)null,
+                requestedAt = (string?)null,
+                reviewedAt = (string?)null,
+                rejectionReason = (string?)null,
+                canRequest = true
+            });
+        }
+
+        return latest.Status switch
+        {
+            "rejected" => Ok(new
+            {
+                status = "rejected",
+                requestId = latest.Id.ToString(),
+                requestedAt = latest.RequestedAt.ToUniversalTime().ToString("o"),
+                reviewedAt = latest.ReviewedAt?.ToUniversalTime().ToString("o"),
+                rejectionReason = latest.RejectionReason,
+                canRequest = true
+            }),
+            "cancelled" => Ok(new
+            {
+                status = "cancelled",
+                requestId = latest.Id.ToString(),
+                requestedAt = latest.RequestedAt.ToUniversalTime().ToString("o"),
+                reviewedAt = latest.ReviewedAt?.ToUniversalTime().ToString("o"),
+                rejectionReason = (string?)null,
+                canRequest = true
+            }),
+            "approved" => Ok(new
+            {
+                status = "approved",
+                requestId = latest.Id.ToString(),
+                requestedAt = latest.RequestedAt.ToUniversalTime().ToString("o"),
+                reviewedAt = latest.ReviewedAt?.ToUniversalTime().ToString("o"),
+                rejectionReason = (string?)null,
+                canRequest = false
+            }),
+            _ => Ok(new
+            {
+                status = "none",
+                requestId = (string?)null,
+                requestedAt = (string?)null,
+                reviewedAt = (string?)null,
+                rejectionReason = (string?)null,
+                canRequest = true
+            })
+        };
+    }
+
+    /// <summary>A própria utilizadora cancela o pedido de entrada pendente.</summary>
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("{communityId}/join-requests/me/cancel")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<IActionResult> CancelMyJoinRequest(string communityId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(communityId, out var cid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        if (!await _communities.ExistsNoTrackingAsync(cid, cancellationToken))
+            return NotFound();
+
+        var pending = await _joinRequests.GetPendingTrackedForUserAndCommunityAsync(cid, me.Value, cancellationToken);
+        if (pending == null)
+            return NoContent();
+
+        var now = DateTime.UtcNow;
+        pending.Status = "cancelled";
+        pending.UpdatedAt = now;
+        await _joinRequests.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [AllowAnonymous]
@@ -565,6 +693,16 @@ public class CommunitiesController : ControllerBase
         if (!string.Equals(c.Visibility, "public", StringComparison.OrdinalIgnoreCase))
             return BadRequest();
 
+        var existingMember = await _memberships.GetForUserAndCommunityAsync(me.Value, cid, cancellationToken);
+        if (MembershipIsBanned(existingMember))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "membership_banned",
+                error = "Estás restrita nesta comunidade e não podes voltar a entrar por este fluxo."
+            });
+        }
+
         await EnsureMembershipAsync(me.Value, c, active: true, role: "member", cancellationToken);
         return NoContent();
     }
@@ -585,28 +723,48 @@ public class CommunitiesController : ControllerBase
         if (c == null)
             return NotFound();
 
+        var existingMember = await _memberships.GetForUserAndCommunityAsync(me.Value, cid, cancellationToken);
+        if (MembershipIsBanned(existingMember))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                code = "membership_banned",
+                error = "Estás restrita nesta comunidade e não podes solicitar entrada."
+            });
+        }
+
         if (string.Equals(c.Visibility, "public", StringComparison.OrdinalIgnoreCase))
         {
             await EnsureMembershipAsync(me.Value, c, active: true, role: "member", cancellationToken);
             return NoContent();
         }
 
-        var existingMember = await _memberships.GetForUserAndCommunityAsync(me.Value, cid, cancellationToken);
         if (existingMember is { Status: "active" })
             return NoContent();
 
         if (await _joinRequests.ExistsPendingAsync(cid, me.Value, cancellationToken))
             return NoContent();
 
+        var now = DateTime.UtcNow;
         var jr = new JoinRequest
         {
             CommunityId = cid,
             UserId = me.Value,
             Status = "pending",
-            RequestedAt = DateTime.UtcNow
+            RequestedAt = now,
+            UpdatedAt = now
         };
         _joinRequests.Add(jr);
-        await _joinRequests.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _joinRequests.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            if (await _joinRequests.ExistsPendingAsync(cid, me.Value, cancellationToken))
+                return NoContent();
+            throw;
+        }
 
         var mods = await _memberships.ListActiveModeratorUserIdsForCommunityAsync(cid, cancellationToken);
         await _notificationService.NotifyCommunityJoinRequestAsync(
@@ -740,7 +898,7 @@ public class CommunitiesController : ControllerBase
         if (normalizedStatus != null)
         {
             var status = normalizedStatus.ToLowerInvariant();
-            if (status is not ("active" or "pending"))
+            if (status is not ("active" or "pending" or "banned"))
                 return BadRequest(new { error = "Status inválido." });
             m.Status = status;
         }
@@ -765,6 +923,9 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
+    private static bool MembershipIsBanned(CommunityMembership? m) =>
+        m != null && string.Equals(m.Status, "banned", StringComparison.OrdinalIgnoreCase);
+
     private async Task EnsureMembershipAsync(int userId, Community c, bool active, string role, CancellationToken cancellationToken)
     {
         var existing = await _memberships.GetForUserAndCommunityAsync(userId, c.Id, cancellationToken);
@@ -772,6 +933,12 @@ public class CommunitiesController : ControllerBase
         {
             if (active)
             {
+                if (MembershipIsBanned(existing))
+                {
+                    throw new InvalidOperationException(
+                        "Membership banned cannot be reactivated via EnsureMembershipAsync.");
+                }
+
                 existing.Status = "active";
                 existing.Role = existing.Role == "owner" ? "owner" : role;
                 existing.JoinedAt ??= DateTime.UtcNow;
