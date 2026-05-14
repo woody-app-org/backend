@@ -20,7 +20,6 @@ public class InputValidationControllerTests
 
         var result = await controller.Create(new CreatePostRequestDTO
         {
-            Title = "Título seguro",
             Content = "Conteúdo seguro",
             ImageUrl = "http://tracker.example/pixel.png"
         }, CancellationToken.None);
@@ -36,7 +35,6 @@ public class InputValidationControllerTests
 
         var result = await controller.Create(new CreatePostRequestDTO
         {
-            Title = "Título seguro",
             Content = new string('x', InputValidationLimits.PostContentMaxLength + 1)
         }, CancellationToken.None);
 

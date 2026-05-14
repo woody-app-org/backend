@@ -263,4 +263,60 @@ public static class InputValidator
 
         return true;
     }
+
+    /// <summary>
+    /// Normaliza hashtags de publicação: remove <c>#</c> à esquerda, trim, sem duplicados (ignorando maiúsculas),
+    /// máximo <see cref="InputValidationLimits.PostHashtagsMaxCount"/>, comprimento máximo
+    /// <see cref="InputValidationLimits.PostHashtagMaxLength"/> por hashtag.
+    /// </summary>
+    public static bool TryNormalizePostHashtags(
+        IEnumerable<string>? raw,
+        out List<string> normalized,
+        out string? error)
+    {
+        normalized = new List<string>();
+        error = null;
+
+        if (raw == null)
+            return true;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in raw)
+        {
+            if (string.IsNullOrWhiteSpace(item))
+                continue;
+
+            var value = item.Trim();
+            while (value.Length > 0 && value[0] == '#')
+                value = value[1..].TrimStart();
+
+            value = value.Trim();
+            if (value.Length == 0)
+                continue;
+
+            if (value.Contains('#', StringComparison.Ordinal))
+            {
+                error = "Cada hashtag não pode conter o símbolo # no meio do texto.";
+                return false;
+            }
+
+            if (value.Length > InputValidationLimits.PostHashtagMaxLength)
+            {
+                error = $"Cada hashtag pode ter no máximo {InputValidationLimits.PostHashtagMaxLength} caracteres.";
+                return false;
+            }
+
+            if (!seen.Add(value))
+                continue;
+
+            normalized.Add(value);
+            if (normalized.Count > InputValidationLimits.PostHashtagsMaxCount)
+            {
+                error = $"Máximo de {InputValidationLimits.PostHashtagsMaxCount} hashtags por publicação.";
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

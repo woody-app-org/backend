@@ -166,7 +166,10 @@ public class PostRepository : IPostRepository
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
     public async Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default) =>
-        await _db.Posts.Include(p => p.Tags).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        await _db.Posts
+            .Include(p => p.Tags)
+            .Include(p => p.MediaAttachments)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public async Task<Post?> GetByIdTrackedAsync(int id, CancellationToken cancellationToken = default) =>
         await _db.Posts.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
@@ -187,7 +190,11 @@ public class PostRepository : IPostRepository
 
     public async Task<List<Post>> SearchNonDeletedWithNavAsync(string loweredQuery, int take, CancellationToken cancellationToken = default) =>
         await _db.Posts.AsNoTracking()
-            .Where(p => p.DeletedAt == null && (p.Title.ToLower().Contains(loweredQuery) || p.Content.ToLower().Contains(loweredQuery)))
+            .Where(p => p.DeletedAt == null
+                        && (p.Content.ToLower().Contains(loweredQuery)
+                            || p.Tags.Any(t => t.Tag.ToLower().Contains(loweredQuery))
+                            || p.User.Username.ToLower().Contains(loweredQuery)
+                            || (p.Community != null && p.Community.Name.ToLower().Contains(loweredQuery))))
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)

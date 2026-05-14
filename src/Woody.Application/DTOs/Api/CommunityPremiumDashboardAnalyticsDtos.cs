@@ -45,7 +45,8 @@ public sealed class CommunityEngagementSummaryDto
 public sealed class CommunityTopPostAnalyticsDto
 {
     public string PostId { get; set; } = null!;
-    public string Title { get; set; } = string.Empty;
+    /// <summary>Pré-visualização do conteúdo (substitui título removido).</summary>
+    public string ContentPreview { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
     public int LikesCount { get; set; }
     public int CommentsCount { get; set; }
@@ -72,7 +73,7 @@ public sealed class CommunityDailyActivityPointDto
 public sealed class CommunityTopPostAnalyticsRow
 {
     public int PostId { get; set; }
-    public string Title { get; set; } = string.Empty;
+    public string ContentPreview { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
     public int LikesCount { get; set; }
     public int CommentsCount { get; set; }

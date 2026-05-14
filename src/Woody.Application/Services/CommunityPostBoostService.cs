@@ -103,7 +103,7 @@ public class CommunityPostBoostService : ICommunityPostBoostService
         {
             Id = b.Id.ToString(),
             PostId = b.PostId.ToString(),
-            PostTitle = b.Post?.Title,
+            PostContentPreview = EntityMappers.ToPostContentPreview(b.Post?.Content),
             StartedAtUtc = EntityMappers.Iso(b.StartedAtUtc),
             EndsAtUtc = EntityMappers.Iso(b.EndsAtUtc),
             Active = b.IsActiveAt(now)

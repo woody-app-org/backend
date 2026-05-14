@@ -20,7 +20,8 @@ public sealed class CommunityPostBoostListItemDto
 {
     public string Id { get; set; } = null!;
     public string PostId { get; set; } = null!;
-    public string? PostTitle { get; set; }
+    /// <summary>Pré-visualização do texto do post (sem título).</summary>
+    public string? PostContentPreview { get; set; }
     public string StartedAtUtc { get; set; } = null!;
     public string EndsAtUtc { get; set; } = null!;
     public bool Active { get; set; }

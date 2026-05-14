@@ -100,32 +100,23 @@ public class PostsController : ControllerBase
         if (me == null)
             return Unauthorized();
 
-        if (!InputValidator.TryNormalizeRequiredText(
-                body.Title,
-                "Título",
-                InputValidationLimits.PostTitleMaxLength,
-                out var title,
-                out var error))
-            return BadRequest(new { error });
-
-        if (!InputValidator.TryNormalizeRequiredText(
+        if (!InputValidator.TryNormalizeOptionalText(
                 body.Content,
                 "Conteúdo",
                 InputValidationLimits.PostContentMaxLength,
-                out var content,
-                out error))
+                out var contentNullable,
+                out var error))
             return BadRequest(new { error });
 
         if (!TryNormalizePostMedia(body, out var mediaRows, out error))
             return BadRequest(new { error });
 
-        if (!InputValidator.TryNormalizeTags(
-                body.Tags,
-                InputValidationLimits.PostTagsMaxCount,
-                InputValidationLimits.TagMaxLength,
-                out var tags,
-                out error))
+        if (!InputValidator.TryNormalizePostHashtags(body.Tags, out var tags, out error))
             return BadRequest(new { error });
+
+        var text = string.IsNullOrWhiteSpace(contentNullable) ? string.Empty : contentNullable;
+        if (mediaRows.Count == 0 && string.IsNullOrWhiteSpace(text))
+            return BadRequest(new { error = "A publicação precisa de texto ou de mídia (imagem, vídeo ou GIF)." });
 
         var ctxRaw = (body.PublicationContext ?? string.Empty).Trim().ToLowerInvariant();
         var hasCommunityId = !string.IsNullOrWhiteSpace(body.CommunityId);
@@ -161,8 +152,7 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = null,
                 PublicationContext = PostPublicationContext.Profile,
-                Title = title,
-                Content = content,
+                Content = text,
                 ImageUrl = coverUrl,
                 CreatedAt = DateTime.UtcNow
             };
@@ -183,8 +173,7 @@ public class PostsController : ControllerBase
                 UserId = me.Value,
                 CommunityId = communityId,
                 PublicationContext = PostPublicationContext.Community,
-                Title = title,
-                Content = content,
+                Content = text,
                 ImageUrl = coverUrl,
                 CreatedAt = DateTime.UtcNow
             };
@@ -405,35 +394,28 @@ public class PostsController : ControllerBase
         if (!await _authorization.CanEditPostAsync(post, me.Value, cancellationToken))
             return Forbid();
 
-        if (!InputValidator.TryNormalizeRequiredText(
-                body.Title,
-                "Título",
-                InputValidationLimits.PostTitleMaxLength,
-                out var title,
-                out var error))
-            return BadRequest(new { error });
-
-        if (!InputValidator.TryNormalizeRequiredText(
+        if (!InputValidator.TryNormalizeOptionalText(
                 body.Content,
                 "Conteúdo",
                 InputValidationLimits.PostContentMaxLength,
-                out var content,
-                out error))
+                out var contentNullable,
+                out var error))
             return BadRequest(new { error });
 
         if (!InputValidator.TryNormalizeHttpsImageUrl(body.ImageUrl, out var imageUrl, out error))
             return BadRequest(new { error });
 
-        if (!InputValidator.TryNormalizeTags(
-                body.Tags,
-                InputValidationLimits.PostTagsMaxCount,
-                InputValidationLimits.TagMaxLength,
-                out var tags,
-                out error))
+        if (!InputValidator.TryNormalizePostHashtags(body.Tags, out var tags, out error))
             return BadRequest(new { error });
 
-        post.Title = title;
-        post.Content = content;
+        var nextText = string.IsNullOrWhiteSpace(contentNullable) ? string.Empty : contentNullable;
+        var hasBodyOrMedia = !string.IsNullOrWhiteSpace(nextText)
+                             || !string.IsNullOrWhiteSpace(imageUrl)
+                             || post.MediaAttachments.Count > 0;
+        if (!hasBodyOrMedia)
+            return BadRequest(new { error = "A publicação precisa de texto ou de mídia (imagem, vídeo ou GIF)." });
+
+        post.Content = nextText;
         post.ImageUrl = imageUrl;
         post.UpdatedAt = DateTime.UtcNow;
 

@@ -412,7 +412,7 @@ public static class DbSeeder
         context.SaveChanges();
 
         /* StartsWith(prefix, StringComparison) não traduz no Npgsql; usar uma sobrecarga traduzível. */
-        if (context.Posts.Any(p => p.CommunityId == techId && p.Title != null && p.Title.StartsWith(postPrefix)))
+        if (context.Posts.Any(p => p.CommunityId == techId && p.Content.StartsWith(postPrefix)))
             return;
 
         var memberIds = context.CommunityMemberships.AsNoTracking()
@@ -440,9 +440,8 @@ public static class DbSeeder
                 UserId = authorId,
                 CommunityId = techId,
                 PublicationContext = PostPublicationContext.Community,
-                Title = $"{postPrefix}{day:yyyy-MM-dd}",
                 Content =
-                    $"Conteúdo de seed para o painel premium da comunidade ({day:yyyy-MM-dd}). Inclui métricas de posts, comentários e gostos.",
+                    $"{postPrefix}[{day:yyyy-MM-dd}] Post de seed para o painel premium: comentários e gostos sintéticos ao longo da timeline.",
                 ImageUrl = dayOffset % 9 == 0 ? $"https://picsum.photos/seed/mtdash{dayOffset}/720/400" : null,
                 CreatedAt = atUtc,
                 UpdatedAt = null,
@@ -454,13 +453,13 @@ public static class DbSeeder
         context.SaveChanges();
 
         var createdPosts = context.Posts.AsNoTracking()
-            .Where(p => p.CommunityId == techId && p.Title != null && p.Title.StartsWith(postPrefix))
+            .Where(p => p.CommunityId == techId && p.Content.StartsWith(postPrefix))
             .OrderBy(p => p.CreatedAt)
             .ToList();
 
         foreach (var post in createdPosts)
         {
-            var tagCount = 2 + rnd.Next(0, 4);
+            var tagCount = 1 + rnd.Next(0, 3);
             for (var t = 0; t < tagCount; t++)
             {
                 var tag = tagPool[(post.Id + t) % tagPool.Length];
@@ -693,9 +692,9 @@ public static class DbSeeder
         if (users.Count == 0 || communities.Count == 0)
             return;
 
-        var templates = new (string Title, string Content, string[] Tags)[]
+        var templates = new (string Hook, string Body, string[] Tags)[]
         {
-            ("Bem-vindas a todas", "Este é um espaço para nos apoiarmos. Como estão hoje?",
+            ("Bem-vindas a todas 💬", "Este é um espaço para nos apoiarmos. Como estão hoje?",
                 new[] { "boas-vindas" }),
             ("Dica de produtividade suave", "Trabalho remoto: pausas curtas fazem diferença. O que funciona para vocês?",
                 new[] { "carreira", "rotina" }),
@@ -735,14 +734,13 @@ public static class DbSeeder
             }
 
             var tpl = templates[i % templates.Length];
-            var title = $"{tpl.Title} #{i + 1}";
-            var content = $"{tpl.Content}\n\n(Conteúdo de seed para testes — post #{i + 1} na comunidade {com.Name}.)";
+            var content =
+                $"{tpl.Hook}\n\n{tpl.Body}\n\n(Seed #{i + 1} · comunidade {com.Name}.)";
             var post = new Post
             {
                 UserId = author.Id,
                 CommunityId = com.Id,
                 PublicationContext = PostPublicationContext.Community,
-                Title = title,
                 Content = content,
                 ImageUrl = i % 7 == 0 ? $"https://picsum.photos/seed/woodypost{i}/720/400" : null,
                 CreatedAt = baseTime.AddHours(i * 3 + rnd.Next(0, 4)),
@@ -764,9 +762,15 @@ public static class DbSeeder
         foreach (var p in postsNoTags)
         {
             var tpl = templates[p.Id % templates.Length];
-            foreach (var t in tpl.Tags.Take(2))
+            var added = 0;
+            foreach (var t in tpl.Tags)
+            {
+                if (added >= 3) break;
                 context.PostTags.Add(new PostTag { PostId = p.Id, Tag = t });
-            if (rnd.Next(0, 2) == 0)
+                added++;
+            }
+
+            if (added < 3 && rnd.Next(0, 2) == 0)
                 context.PostTags.Add(new PostTag { PostId = p.Id, Tag = tagPool[p.Id % tagPool.Length] });
         }
 
@@ -775,12 +779,12 @@ public static class DbSeeder
 
     /// <summary>
     /// Posts com 2–3 fotos pela conta <c>admin</c> (login dev: <c>admin</c> / <c>admin123</c>):
-    /// dois na comunidade <c>geral</c> e um só de perfil. Idempotente (títulos com prefixo <c>[Demo Woody]</c>).
+    /// dois na comunidade <c>geral</c> e um só de perfil. Idempotente (prefixo no texto <c>[Demo Woody]</c>).
     /// </summary>
     private static void SeedAdminGalleryDemoPosts(WoodyDbContext context)
     {
         const string demoPrefix = "[Demo Woody]";
-        if (context.Posts.Any(p => p.Title.StartsWith(demoPrefix)))
+        if (context.Posts.Any(p => p.Content.StartsWith(demoPrefix)))
             return;
 
         var admin = context.Users.FirstOrDefault(u => u.Username == "admin");
@@ -808,9 +812,8 @@ public static class DbSeeder
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
-            Title = $"{demoPrefix} Galeria · 3 fotos",
             Content =
-                "Seed da base de dados: três imagens no mesmo post (media_attachments). Testa o mosaico no feed, o perfil da admin e o bloco «Fotos & Vídeos».",
+                $"{demoPrefix} Galeria · 3 fotos\n\nSeed da base de dados: três imagens no mesmo post (media_attachments). Testa o mosaico no feed, o perfil da admin e o bloco «Fotos & Vídeos».",
             ImageUrl = null,
             CreatedAt = createdAtBase,
             UpdatedAt = null,
@@ -826,9 +829,8 @@ public static class DbSeeder
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
-            Title = $"{demoPrefix} Duo · 2 fotos lado a lado",
             Content =
-                "Segundo exemplo com duas imagens. Útil para validar layout em ecrãs estreitos e o lightbox.",
+                $"{demoPrefix} Duo · 2 fotos lado a lado\n\nSegundo exemplo com duas imagens. Útil para validar layout em ecrãs estreitos e o lightbox.",
             ImageUrl = null,
             CreatedAt = createdAtBase.AddMinutes(12),
             UpdatedAt = null,
@@ -844,9 +846,8 @@ public static class DbSeeder
             UserId = admin.Id,
             CommunityId = null,
             PublicationContext = PostPublicationContext.Profile,
-            Title = $"{demoPrefix} Álbum apenas no perfil",
             Content =
-                "Publicação com contexto de perfil (sem comunidade). Aparece no teu perfil e no grid de fotos.",
+                $"{demoPrefix} Álbum apenas no perfil\n\nPublicação com contexto de perfil (sem comunidade). Aparece no teu perfil e no grid de fotos.",
             ImageUrl = null,
             CreatedAt = createdAtBase.AddMinutes(24),
             UpdatedAt = null,

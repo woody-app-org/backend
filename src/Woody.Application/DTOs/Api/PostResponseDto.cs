@@ -8,7 +8,6 @@ public class PostResponseDto
     public string? CommunityId { get; set; }
     public string AuthorId { get; set; } = null!;
     public UserPublicDto Author { get; set; } = null!;
-    public string Title { get; set; } = null!;
     public string Content { get; set; } = null!;
     public string? ImageUrl { get; set; }
     public List<string>? ImageUrls { get; set; }

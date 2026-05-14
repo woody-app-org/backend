@@ -220,7 +220,6 @@ public class PrivateReadAuthorizationTests
                     PublicationContext = p.PublicationContext == PostPublicationContext.Profile ? "profile" : "community",
                     AuthorId = p.UserId.ToString(),
                     Author = new UserPublicDto { Id = p.UserId.ToString(), Username = p.User.Username, Name = p.User.Username },
-                    Title = p.Title,
                     Content = p.Content,
                     CreatedAt = p.CreatedAt.ToString("o")
                 }).ToList());
@@ -331,7 +330,7 @@ public class PrivateReadAuthorizationTests
         return Assert.IsType<List<PostResponseDto>>(property!.GetValue(ok.Value));
     }
 
-    private static Post CreatePost(int id, int? communityId, string title, string visibility = "public")
+    private static Post CreatePost(int id, int? communityId, string content, string visibility = "public")
     {
         var author = CreateUser(1, "author");
         return new Post
@@ -339,8 +338,7 @@ public class PrivateReadAuthorizationTests
             Id = id,
             UserId = author.Id,
             User = author,
-            Title = title,
-            Content = title,
+            Content = content,
             CreatedAt = DateTime.UtcNow,
             PublicationContext = communityId.HasValue ? PostPublicationContext.Community : PostPublicationContext.Profile,
             CommunityId = communityId,

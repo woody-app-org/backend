@@ -93,6 +93,21 @@ public static class EntityMappers
     public static string ToPublicationContextApi(PostPublicationContext ctx) =>
         ctx == PostPublicationContext.Profile ? "profile" : "community";
 
+    /// <summary>Texto curto para painéis e listas (substitui título removido).</summary>
+    public static string ToPostContentPreview(string? content, int maxChars = 96)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return string.Empty;
+
+        var segments = content.Trim().Split(
+            new[] { ' ', '\r', '\n', '\t' },
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var s = string.Join(" ", segments);
+        if (s.Length <= maxChars)
+            return s;
+        return s[..maxChars].TrimEnd() + "…";
+    }
+
     public static PostCommunityPreviewDto ToCommunityPreview(Community c)
     {
         var utcNow = DateTime.UtcNow;
@@ -148,7 +163,6 @@ public static class EntityMappers
             CommunityId = p.CommunityId?.ToString(),
             AuthorId = p.UserId.ToString(),
             Author = ToUserPublicDto(p.User),
-            Title = p.Title,
             Content = p.Content,
             ImageUrl = imageUrls.Count > 0 ? imageUrls[0] : null,
             ImageUrls = imageUrls.Count > 0 ? imageUrls : null,

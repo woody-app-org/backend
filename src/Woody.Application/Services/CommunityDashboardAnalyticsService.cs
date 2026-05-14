@@ -61,7 +61,7 @@ public class CommunityDashboardAnalyticsService : ICommunityDashboardAnalyticsSe
         var topPosts = topPostsRows.Select(r => new CommunityTopPostAnalyticsDto
         {
             PostId = r.PostId.ToString(),
-            Title = r.Title,
+            ContentPreview = r.ContentPreview,
             CreatedAtUtc = r.CreatedAtUtc,
             LikesCount = r.LikesCount,
             CommentsCount = r.CommentsCount,

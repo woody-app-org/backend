@@ -17,9 +17,11 @@ public static class InputValidationLimits
     public const int ProfileInterestsMaxCount = 12;
     public const int ProfileInterestLabelMaxLength = 40;
 
-    public const int PostTitleMaxLength = 160;
     public const int PostContentMaxLength = 20_000;
-    public const int PostTagsMaxCount = 5;
+    /// <summary>Máximo de hashtags por publicação (produto).</summary>
+    public const int PostHashtagsMaxCount = 3;
+    /// <summary>Comprimento máximo de cada hashtag após normalização (sem <c>#</c>).</summary>
+    public const int PostHashtagMaxLength = 30;
     public const int TagMaxLength = 40;
 
     public const int CommentContentMaxLength = 5_000;

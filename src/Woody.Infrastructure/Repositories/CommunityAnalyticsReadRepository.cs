@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
+using Woody.Application.Mapping;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
 
@@ -87,7 +88,7 @@ public class CommunityAnalyticsReadRepository : ICommunityAnalyticsReadRepositor
             .Select(p => new
             {
                 p.Id,
-                p.Title,
+                p.Content,
                 p.CreatedAt,
                 AuthorUsername = p.User.Username
             })
@@ -117,7 +118,7 @@ public class CommunityAnalyticsReadRepository : ICommunityAnalyticsReadRepositor
                 return new CommunityTopPostAnalyticsRow
                 {
                     PostId = p.Id,
-                    Title = p.Title ?? string.Empty,
+                    ContentPreview = EntityMappers.ToPostContentPreview(p.Content),
                     CreatedAtUtc = p.CreatedAt,
                     LikesCount = lc,
                     CommentsCount = cc,
