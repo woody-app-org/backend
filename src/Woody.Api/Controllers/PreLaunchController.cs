@@ -1,5 +1,4 @@
 using System.Threading;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -36,29 +35,6 @@ public class PreLaunchController : ControllerBase
         _logger = logger;
         _configuration = configuration;
         _environment = environment;
-    }
-
-    [HttpGet("debug/ip")]
-    [AllowAnonymous]
-    public IActionResult DebugIp()
-    {
-        var enabled = Environment.GetEnvironmentVariable("WOODY_DEBUG_IP_ENABLED");
-
-        if (!string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase))
-            return NotFound();
-
-        return Ok(new
-        {
-            remoteIpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            xForwardedFor = Request.Headers["X-Forwarded-For"].ToString(),
-            xRealIp = Request.Headers["X-Real-IP"].ToString(),
-            cfConnectingIp = Request.Headers["CF-Connecting-IP"].ToString(),
-            forwardedProto = Request.Headers["X-Forwarded-Proto"].ToString(),
-            trustPrivateNetworkProxies =
-                HttpContext.RequestServices
-                    .GetRequiredService<IConfiguration>()
-                    .GetValue<bool>("ForwardedHeaders:TrustPrivateNetworkProxies")
-        });
     }
 
     [HttpPost("signups")]
