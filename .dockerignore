@@ -1,0 +1,13 @@
+**/[Bb]in/
+**/[Oo]bj/
+**/.vs/
+**/.vscode/
+**/.idea/
+.git
+.gitignore
+.github
+**/*.md
+**/appsettings.*.local.json
+tests/
+**/TestResults/
+**/*.user

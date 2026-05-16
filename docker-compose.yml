@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:18
+    container_name: woody_postgres
+    environment:
+      POSTGRES_DB: woody_db
+      POSTGRES_USER: woody_user
+      POSTGRES_PASSWORD: woody@123
+    ports:
+      # Desenvolvimento local apenas: não publique esta porta em hosts de produção.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+volumes:
+  pgdata:
