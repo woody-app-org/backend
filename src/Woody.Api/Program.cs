@@ -169,6 +169,8 @@ builder.Services.AddRateLimiter(options =>
         FixedWindowByIp(httpContext, permitLimit: 120, window: TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimitPolicyNames.BetaInviteValidate, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 30, window: TimeSpan.FromMinutes(10)));
+    options.AddPolicy(RateLimitPolicyNames.PreLaunchSignup, httpContext =>
+        FixedWindowByIp(httpContext, permitLimit: 10, window: TimeSpan.FromHours(1)));
 });
 
 if (builder.Environment.IsDevelopment())
@@ -179,6 +181,7 @@ if (builder.Environment.IsDevelopment())
 
 WoodyDbConfiguration.ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
 
+builder.Services.Configure<PreLaunchSecurityOptions>(builder.Configuration.GetSection(PreLaunchSecurityOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
@@ -228,6 +231,7 @@ if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"
     app.UseHttpsRedirection();
 }
 
+app.UseMiddleware<WaitlistFormModeMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<AuthEmailRateLimitPreparationMiddleware>();

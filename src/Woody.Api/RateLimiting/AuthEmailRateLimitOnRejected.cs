@@ -33,6 +33,7 @@ public static class AuthEmailRateLimitOnRejected
         {
             RateLimitPolicyNames.AuthEmailSend => 60,
             RateLimitPolicyNames.AuthEmailVerify => 60,
+            RateLimitPolicyNames.PreLaunchSignup => 3600,
             _ => 30
         };
 
@@ -58,17 +59,24 @@ public static class AuthEmailRateLimitOnRejected
             message = "Muitas tentativas. Aguarde um pouco antes de tentar novamente.";
             code = "EMAIL_VERIFY_RATE_LIMITED";
         }
+        else if (policyName == RateLimitPolicyNames.PreLaunchSignup)
+        {
+            message = "Muitas tentativas. Tente novamente mais tarde.";
+            code = "PRELAUNCH_RATE_LIMITED";
+        }
         else
         {
             message = "Demasiados pedidos. Tente novamente mais tarde.";
             code = "RATE_LIMITED";
         }
 
+        var ipForLog = policyName == RateLimitPolicyNames.PreLaunchSignup ? "(redacted)" : ip;
+
         logger?.LogWarning(
             "Rate limit atingido. Policy={PolicyName}, Path={Path}, ClientIp={ClientIp}, EmailMask={EmailMask}, EmailHash={EmailHash}, RetryAfterSeconds={RetryAfter}",
             policyName,
             httpContext.Request.Path.Value,
-            ip,
+            ipForLog,
             mask ?? "(n/d)",
             hash,
             retrySeconds);

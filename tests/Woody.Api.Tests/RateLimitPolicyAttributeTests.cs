@@ -23,6 +23,7 @@ public class RateLimitPolicyAttributeTests
     [InlineData(typeof(SearchController), nameof(SearchController.Search), RateLimitPolicyNames.PublicApi)]
     [InlineData(typeof(StripeBillingWebhooksController), nameof(StripeBillingWebhooksController.Post), RateLimitPolicyNames.StripeWebhook)]
     [InlineData(typeof(BetaController), nameof(BetaController.ValidateInvite), RateLimitPolicyNames.BetaInviteValidate)]
+    [InlineData(typeof(PreLaunchController), nameof(PreLaunchController.CreateSignup), RateLimitPolicyNames.PreLaunchSignup)]
     public void SensitiveActions_HaveExpectedRateLimitPolicy(Type controllerType, string actionName, string expectedPolicy)
     {
         var method = controllerType.GetMethod(actionName)

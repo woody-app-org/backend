@@ -38,6 +38,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<BetaInvite> BetaInvites { get; set; }
         public virtual DbSet<IdentityVerification> IdentityVerifications { get; set; }
+        public virtual DbSet<PreLaunchSignup> PreLaunchSignups { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -417,6 +418,22 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.ReceivedProfileSignals)
                     .HasForeignKey(s => s.ReceiverUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PreLaunchSignup>(e =>
+            {
+                e.ToTable("pre_launch_signups");
+                e.HasIndex(s => new { s.NormalizedSocialNetwork, s.NormalizedSocialUsername })
+                    .IsUnique()
+                    .HasDatabaseName("ux_pre_launch_signups_network_username");
+                e.Property(s => s.Name).HasMaxLength(120);
+                e.Property(s => s.SocialNetwork).HasMaxLength(32);
+                e.Property(s => s.SocialUsername).HasMaxLength(80);
+                e.Property(s => s.NormalizedSocialNetwork).HasMaxLength(32);
+                e.Property(s => s.NormalizedSocialUsername).HasMaxLength(80);
+                e.Property(s => s.IpHash).HasMaxLength(64);
+                e.Property(s => s.UserAgentHash).HasMaxLength(64);
+                e.Property(s => s.Source).HasMaxLength(128);
             });
 
             base.OnModelCreating(modelBuilder);

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Woody.Infrastructure.Persistence.Context;
@@ -11,9 +12,11 @@ using Woody.Infrastructure.Persistence.Context;
 namespace Woody.Infrastructure.Migrations
 {
     [DbContext(typeof(WoodyDbContext))]
-    partial class WoodyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260515233123_AddPreLaunchSignups")]
+    partial class AddPreLaunchSignups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1302,11 +1305,6 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("IpHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("ip_hash");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -1345,11 +1343,6 @@ namespace Woody.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
-
-                    b.Property<string>("UserAgentHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("user_agent_hash");
 
                     b.HasKey("Id")
                         .HasName("pk_pre_launch_signups");

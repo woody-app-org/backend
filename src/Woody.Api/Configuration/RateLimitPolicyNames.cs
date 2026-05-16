@@ -19,4 +19,5 @@ public static class RateLimitPolicyNames
     public const string AuthenticatedApi = "authenticated-api";
     public const string StripeWebhook = "stripe-webhook";
     public const string BetaInviteValidate = "beta-invite-validate";
+    public const string PreLaunchSignup = "prelaunch-signup";
 }
