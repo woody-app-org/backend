@@ -91,22 +91,30 @@ O `WoodyDbContextFactory` (design-time) também carrega `appsettings.json` de `W
 
 ### 4. Executar a API
 
-A partir de **`src/`**:
+**Recomendado (raiz do backend):** carrega o `.env` e **não** usa perfil de lançamento que sobrescreva o ambiente:
 
 ```powershell
-dotnet run --project .\Woody.Api\ --launch-profile http
+.\run-api.ps1
 ```
 
-- Perfil **`http`**: `http://localhost:5000` (Swagger em `/swagger`). Alinhado com o frontend em dev (`VITE_API_BASE_URL` → `http://localhost:5000`).
-- Perfil **`https`**: também expõe `http://localhost:5000` em conjunto com HTTPS.
+(Isto usa `--no-launch-profile` e URLs `https://localhost:7101` + `http://localhost:5000`, para o `ASPNETCORE_ENVIRONMENT` do `.env` valer de facto.)
 
-Com `.env` na raiz do backend, pode carregar antes de correr a API:
+**Porque o `.env` parecia ser ignorado:** o ficheiro `Properties/launchSettings.json` costumava definir `ASPNETCORE_ENVIRONMENT=Development` nos perfis `http`/`https`. O `dotnet run --launch-profile ...` **aplica essas variáveis por cima** das que vêm do `.env` na mesma sessão — por isso continuavas com seed e `EnableSensitiveDataLogging` mesmo com `Production` no `.env`.
+
+**Manual a partir da raiz deste repositório (`backend/`)**:
 
 ```powershell
 . .\scripts\Load-DotEnv.ps1
 cd src
-dotnet run --project .\Woody.Api\ --launch-profile http
+dotnet run --project .\Woody.Api\ --no-launch-profile --urls "http://localhost:5000"
+# ou HTTPS local:
+dotnet run --project .\Woody.Api\ --no-launch-profile --urls "https://localhost:7101;http://localhost:5000"
 ```
+
+- Com **`ASPNETCORE_ENVIRONMENT=Development`** no `.env`: Swagger em `/swagger` (se estiver registado), seed opcional conforme `Program.cs`.
+- Com **`Production`**: sem seed automático por ambiente, sem logging sensível do EF em runtime (`WoodyDbConfiguration`).
+
+Perfis **`http`** / **`https`** no Visual Studio/Rider continuam a definir URLs; define **`ASPNETCORE_ENVIRONMENT`** no `.env` ou nas propriedades de depuração do IDE se precisares de Development ao premir F5.
 
 ### 5. Frontend (repositório separado)
 
