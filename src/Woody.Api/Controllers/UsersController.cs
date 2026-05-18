@@ -22,6 +22,7 @@ public class UsersController : ControllerBase
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly INotificationService _notificationService;
+    private readonly IStoryRepository _stories;
 
     public UsersController(
         IUserRepository users,
@@ -29,7 +30,8 @@ public class UsersController : ControllerBase
         IFollowRepository follows,
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IStoryRepository stories)
     {
         _users = users;
         _memberships = memberships;
@@ -37,6 +39,7 @@ public class UsersController : ControllerBase
         _posts = posts;
         _postEnrichment = postEnrichment;
         _notificationService = notificationService;
+        _stories = stories;
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -68,10 +71,13 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
 
         var (items, total) = await _follows.ListFollowingPagedAsync(me.Value, page, pageSize, cancellationToken);
+        var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, storyFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -98,8 +104,11 @@ public class UsersController : ControllerBase
         exclude.Add(me.Value);
 
         var users = await _users.ListUsersForSuggestionsAsync(exclude, take, cancellationToken);
+        var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            users.Select(u => u.Id),
+            cancellationToken);
 
-        return Ok(users.Select(EntityMappers.ToUserPublicDto).ToList());
+        return Ok(users.Select(u => EntityMappers.ToUserPublicDto(u, storyFlags.Contains(u.Id))).ToList());
     }
 
     [AllowAnonymous]
@@ -395,10 +404,13 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
 
         var (items, total) = await _follows.ListFollowersPagedAsync(uid, page, pageSize, cancellationToken);
+        var followerStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, followerStoryFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -426,10 +438,13 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
 
         var (items, total) = await _follows.ListFollowingPagedAsync(uid, page, pageSize, cancellationToken);
+        var followingStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, followingStoryFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -526,8 +541,10 @@ public class UsersController : ControllerBase
         var followingCount = await _follows.CountFollowingAsync(userId, cancellationToken);
 
         var isOwnProfile = viewerId.HasValue && viewerId.Value == userId;
+        var hasActiveStories = await _stories.HasActiveStoriesAsync(userId, cancellationToken);
         var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount,
-            includePrivateFields: isOwnProfile);
+            includePrivateFields: isOwnProfile,
+            hasActiveStories: hasActiveStories);
         if (isOwnProfile)
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 

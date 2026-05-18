@@ -10,7 +10,7 @@ public static class EntityMappers
 {
     public static string Iso(DateTime dt) => dt.ToUniversalTime().ToString("o");
 
-    public static UserPublicDto ToUserPublicDto(User u)
+    public static UserPublicDto ToUserPublicDto(User u, bool hasActiveStories = false)
     {
         var utcNow = DateTime.UtcNow;
         return new UserPublicDto
@@ -21,7 +21,8 @@ public static class EntityMappers
             AvatarUrl = u.ProfilePic,
             Bio = u.Bio,
             Pronouns = u.Pronouns,
-            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, utcNow)
+            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, utcNow),
+            HasActiveStories = hasActiveStories
         };
     }
 
@@ -284,7 +285,8 @@ public static class EntityMappers
         List<InterestItemResponseDto>? interests = null,
         int followersCount = 0,
         int followingCount = 0,
-        bool includePrivateFields = false) => new()
+        bool includePrivateFields = false,
+        bool hasActiveStories = false) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -302,6 +304,15 @@ public static class EntityMappers
         IsFollowing = isFollowing,
         FollowersCount = followersCount,
         FollowingCount = followingCount,
-        ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow)
+        ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow),
+        HasActiveStories = hasActiveStories
+    };
+
+    public static string ToStoryMediaTypeApi(StoryMediaType mediaType) => mediaType switch
+    {
+        StoryMediaType.Image => "image",
+        StoryMediaType.Video => "video",
+        StoryMediaType.Text => "text",
+        _ => mediaType.ToString().ToLowerInvariant()
     };
 }

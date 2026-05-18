@@ -3,6 +3,7 @@ using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
+using Woody.Domain.Stories;
 
 namespace Woody.Infrastructure.Persistence.Context
 {
@@ -39,6 +40,8 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<BetaInvite> BetaInvites { get; set; }
         public virtual DbSet<IdentityVerification> IdentityVerifications { get; set; }
         public virtual DbSet<PreLaunchSignup> PreLaunchSignups { get; set; }
+        public virtual DbSet<Story> Stories { get; set; }
+        public virtual DbSet<StoryView> StoryViews { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -417,6 +420,52 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasOne(s => s.ReceiverUser)
                     .WithMany(u => u.ReceivedProfileSignals)
                     .HasForeignKey(s => s.ReceiverUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Story>(e =>
+            {
+                e.ToTable("stories");
+                e.Property(s => s.MediaType).HasConversion<int>();
+                e.Property(s => s.Visibility).HasConversion<int>().HasDefaultValue(StoryVisibility.Public);
+                e.Property(s => s.MediaUrl).HasMaxLength(2048);
+                e.Property(s => s.ThumbnailUrl).HasMaxLength(2048);
+                e.Property(s => s.StorageKey).HasMaxLength(512);
+                e.Property(s => s.Text).HasMaxLength(StoryPolicies.MaxTextLength);
+                e.Property(s => s.BackgroundColor).HasMaxLength(StoryPolicies.MaxBackgroundColorLength);
+                e.Property(s => s.MusicProvider).HasMaxLength(32);
+                e.Property(s => s.MusicTrackId).HasMaxLength(128);
+                e.Property(s => s.MusicTitle).HasMaxLength(256);
+                e.Property(s => s.MusicArtist).HasMaxLength(256);
+                e.Property(s => s.MusicPreviewUrl).HasMaxLength(2048);
+
+                e.HasIndex(s => s.ExpiresAt);
+                e.HasIndex(s => new { s.AuthorUserId, s.ExpiresAt })
+                    .HasFilter("deleted_at IS NULL")
+                    .HasDatabaseName("ix_stories_author_expires_not_deleted");
+
+                e.HasOne(s => s.Author)
+                    .WithMany(u => u.Stories)
+                    .HasForeignKey(s => s.AuthorUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<StoryView>(e =>
+            {
+                e.ToTable("story_views");
+                e.HasIndex(v => new { v.StoryId, v.ViewerUserId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_story_views_story_id_viewer_user_id");
+                e.HasIndex(v => v.ViewedAt);
+
+                e.HasOne(v => v.Story)
+                    .WithMany(s => s.Views)
+                    .HasForeignKey(v => v.StoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(v => v.Viewer)
+                    .WithMany(u => u.StoryViews)
+                    .HasForeignKey(v => v.ViewerUserId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 

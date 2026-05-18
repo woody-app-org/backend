@@ -59,7 +59,7 @@ public class SearchController : ControllerBase
         if (string.Equals(mode, "people", StringComparison.OrdinalIgnoreCase))
         {
             var users = await _users.SearchUsersNoTrackingAsync(n, 50, cancellationToken);
-            return Ok(new { people = users.Select(EntityMappers.ToUserPublicDto).ToList() });
+            return Ok(new { people = users.Select(u => EntityMappers.ToUserPublicDto(u)).ToList() });
         }
 
         if (string.Equals(mode, "communities", StringComparison.OrdinalIgnoreCase))

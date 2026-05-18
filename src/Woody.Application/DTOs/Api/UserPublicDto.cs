@@ -9,4 +9,5 @@ public class UserPublicDto
     public string? Bio { get; set; }
     public string? Pronouns { get; set; }
     public bool ShowProBadge { get; set; }
+    public bool HasActiveStories { get; set; }
 }

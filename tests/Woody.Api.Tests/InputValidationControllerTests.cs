@@ -121,7 +121,8 @@ public class InputValidationControllerTests
             new Mock<IFollowRepository>().Object,
             new Mock<IPostRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
-            new Mock<INotificationService>().Object);
+            new Mock<INotificationService>().Object,
+            new Mock<IStoryRepository>().Object);
         SetUser(controller);
         return controller;
     }

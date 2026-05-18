@@ -63,5 +63,7 @@ namespace Woody.Domain.Entities
         public ICollection<Message> SentMessages { get; set; } = new List<Message>();
         public ICollection<ProfileSignal> SentProfileSignals { get; set; } = new List<ProfileSignal>();
         public ICollection<ProfileSignal> ReceivedProfileSignals { get; set; } = new List<ProfileSignal>();
+        public ICollection<Story> Stories { get; set; } = new List<Story>();
+        public ICollection<StoryView> StoryViews { get; set; } = new List<StoryView>();
     }
 }

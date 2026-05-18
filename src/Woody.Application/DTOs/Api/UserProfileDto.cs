@@ -25,6 +25,7 @@ public class UserProfileDto
     public int FollowersCount { get; set; }
     public int FollowingCount { get; set; }
     public bool ShowProBadge { get; set; }
+    public bool HasActiveStories { get; set; }
 
     /// <summary>Presente apenas em <c>GET /users/me</c> (perfil da própria utilizadora).</summary>
     public UserSubscriptionStateDto? Subscription { get; set; }
