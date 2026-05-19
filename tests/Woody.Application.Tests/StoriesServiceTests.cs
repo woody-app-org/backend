@@ -12,6 +12,7 @@ public class StoriesServiceTests
 {
     private readonly Mock<IStoryRepository> _stories = new();
     private readonly Mock<IUserRepository> _users = new();
+    private readonly Mock<IFollowRepository> _follows = new();
     private readonly Mock<IMediaStorageProvider> _media = new();
     private readonly Mock<IProfileSignalSocialGate> _gate = new();
 
@@ -156,6 +157,45 @@ public class StoriesServiceTests
         Assert.Equal(StoryOperationOutcome.Forbidden, result.Outcome);
     }
 
+    [Fact]
+    public async Task GetStoriesFeedAsync_OrdersSelfFirstThenByRecency()
+    {
+        var now = DateTime.UtcNow;
+        _follows.Setup(f => f.GetFollowedUserIdsAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([2]);
+        _stories.Setup(s => s.ListActiveStoryAuthorsByUserIdsAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new StoryFeedAuthorSummary
+                {
+                    AuthorUserId = 2,
+                    LastCreatedAt = now.AddMinutes(-5),
+                    StoryIds = [20]
+                },
+                new StoryFeedAuthorSummary
+                {
+                    AuthorUserId = 1,
+                    LastCreatedAt = now.AddHours(-1),
+                    StoryIds = [10]
+                }
+            ]);
+        _stories.Setup(s => s.GetStoryIdsViewedByUserAsync(1, It.IsAny<IEnumerable<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<int>());
+        _users.Setup(u => u.GetByIdsNoTrackingAsync(It.IsAny<IReadOnlyCollection<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new User { Id = 1, Username = "me", DisplayName = "Me" },
+                new User { Id = 2, Username = "friend", DisplayName = "Friend" }
+            ]);
+
+        var svc = CreateService();
+        var feed = await svc.GetStoriesFeedAsync(1);
+
+        Assert.Equal(2, feed.Count);
+        Assert.True(feed[0].IsSelf);
+        Assert.Equal("1", feed[0].UserId);
+        Assert.False(feed[0].HasUnviewedStories);
+        Assert.True(feed[1].HasUnviewedStories);
+    }
+
     private StoriesService CreateService() =>
-        new(_stories.Object, _users.Object, _media.Object, _gate.Object);
+        new(_stories.Object, _users.Object, _follows.Object, _media.Object, _gate.Object);
 }
