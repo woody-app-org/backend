@@ -67,13 +67,12 @@ public class RegisterHandler
             throw new ArgumentException(error);
         email = email.ToLowerInvariant();
 
-        if (!InputValidator.TryNormalizeRequiredText(
+        if (!PasswordInputValidator.TryValidateForRegistration(
                 request.Password,
-                "Senha",
                 InputValidationLimits.PasswordMaxLength,
+                minLength: 8,
                 out var password,
-                out error,
-                minLength: 8))
+                out error))
             throw new ArgumentException(error);
 
         if (!InputValidator.TryNormalizeRequiredText(

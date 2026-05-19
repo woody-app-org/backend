@@ -35,6 +35,46 @@ public class LoginHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_StripsWhitespaceFromPasswordBeforeVerification()
+    {
+        var user = new User { Id = 7, Username = "bea", Email = "bea@example.com", Password = "hash", Role = "User" };
+        var hasher = new Mock<IPasswordHasher>();
+        hasher.Setup(x => x.VerifyPasswordWithOutcome("hash", "correct"))
+            .Returns(new PasswordVerificationOutcome(true, false));
+        hasher.Setup(x => x.HashPassword(It.IsAny<string>())).Returns("new-hash");
+
+        var authSessions = new Mock<IAuthSessionService>();
+        authSessions
+            .Setup(x => x.CreateSessionAsync(user, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LoginResultDTO
+            {
+                Token = "access-token",
+                RefreshToken = "refresh-token",
+                User = new AuthUserDto { Id = "7", Username = "bea", Email = "bea@example.com" }
+            });
+
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.GetByUsernameOrEmailAsync("bea")).ReturnsAsync(user);
+        users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        var subscriptions = new Mock<IUserSubscriptionRepository>();
+        subscriptions.Setup(x => x.GetByUserIdNoTrackingAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UserSubscription?)null);
+
+        var sut = new LoginHandler(
+            users.Object,
+            subscriptions.Object,
+            hasher.Object,
+            authSessions.Object,
+            new InMemoryLoginLockoutRepository(),
+            Options.Create(new AuthSecurityOptions()));
+
+        await sut.HandleAsync(new LoginRequestDTO { Username = "bea", Password = " cor rect " });
+
+        hasher.Verify(x => x.VerifyPasswordWithOutcome("hash", "correct"), Times.Once);
+    }
+
+    [Fact]
     public async Task HandleAsync_CreatesSession_WhenCredentialsAreValid()
     {
         var user = new User { Id = 7, Username = "bea", Email = "bea@example.com", Password = "hash", Role = "User" };

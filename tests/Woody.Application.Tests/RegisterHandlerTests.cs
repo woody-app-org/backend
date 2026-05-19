@@ -6,6 +6,7 @@ using Woody.Application.DTOs;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
 using Woody.Application.UseCases.Auth.Register;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 
 namespace Woody.Application.Tests;
@@ -32,6 +33,18 @@ public class RegisterHandlerTests
             sut.HandleAsync(ValidRequest(inviteCode: null)));
 
         Assert.Equal(BetaInviteMessages.RequiredWhenBetaActive, ex.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsPasswordContainingWhitespace()
+    {
+        var sut = CreateSut(betaEnabled: false);
+        var request = ValidRequest();
+        request.Password = "senha 1234";
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => sut.HandleAsync(request));
+
+        Assert.Equal(PasswordInputValidator.ContainsWhitespaceMessage, ex.Message);
     }
 
     [Fact]
