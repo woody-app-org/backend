@@ -170,6 +170,36 @@ public class StoryRepository : IStoryRepository
         return viewed.ToHashSet();
     }
 
+    public async Task<List<StoryFeedAuthorSummary>> ListActiveStoryAuthorsByUserIdsAsync(
+        IEnumerable<int> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        var now = DateTime.UtcNow;
+        var grouped = await ActiveQuery(now)
+            .Where(s => ids.Contains(s.AuthorUserId))
+            .GroupBy(s => s.AuthorUserId)
+            .Select(g => new
+            {
+                AuthorUserId = g.Key,
+                LastCreatedAt = g.Max(s => s.CreatedAt),
+                StoryIds = g.Select(s => s.Id)
+            })
+            .ToListAsync(cancellationToken);
+
+        return grouped
+            .Select(g => new StoryFeedAuthorSummary
+            {
+                AuthorUserId = g.AuthorUserId,
+                LastCreatedAt = g.LastCreatedAt,
+                StoryIds = g.StoryIds.ToList()
+            })
+            .ToList();
+    }
+
     private Task<int> CountActiveStoriesAsync(int authorUserId, DateTime utcNow, CancellationToken cancellationToken) =>
         ActiveQuery(utcNow)
             .Where(s => s.AuthorUserId == authorUserId)

@@ -16,17 +16,20 @@ public class StoriesService : IStoriesService
 
     private readonly IStoryRepository _stories;
     private readonly IUserRepository _users;
+    private readonly IFollowRepository _follows;
     private readonly IMediaStorageProvider _mediaStorage;
     private readonly IProfileSignalSocialGate _socialGate;
 
     public StoriesService(
         IStoryRepository stories,
         IUserRepository users,
+        IFollowRepository follows,
         IMediaStorageProvider mediaStorage,
         IProfileSignalSocialGate socialGate)
     {
         _stories = stories;
         _users = users;
+        _follows = follows;
         _mediaStorage = mediaStorage;
         _socialGate = socialGate;
     }
@@ -184,6 +187,70 @@ public class StoriesService : IStoriesService
         }).ToList();
 
         return new StoryViewsCommandResult(StoryOperationOutcome.Success, dtos);
+    }
+
+    public async Task<IReadOnlyList<StoryFeedItemDto>> GetStoriesFeedAsync(
+        int viewerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var followedIds = await _follows.GetFollowedUserIdsAsync(viewerUserId, cancellationToken);
+        var candidateIds = new HashSet<int>(followedIds) { viewerUserId };
+
+        var authorSummaries = await _stories.ListActiveStoryAuthorsByUserIdsAsync(candidateIds, cancellationToken);
+        if (authorSummaries.Count == 0)
+            return [];
+
+        var visibleSummaries = new List<StoryFeedAuthorSummary>(authorSummaries.Count);
+        foreach (var summary in authorSummaries)
+        {
+            if (summary.AuthorUserId == viewerUserId)
+            {
+                visibleSummaries.Add(summary);
+                continue;
+            }
+
+            if (await _socialGate.AreUsersBlockedEitherWayAsync(viewerUserId, summary.AuthorUserId, cancellationToken))
+                continue;
+
+            visibleSummaries.Add(summary);
+        }
+
+        if (visibleSummaries.Count == 0)
+            return [];
+
+        var allStoryIds = visibleSummaries.SelectMany(s => s.StoryIds).Distinct().ToList();
+        var viewedStoryIds = await _stories.GetStoryIdsViewedByUserAsync(viewerUserId, allStoryIds, cancellationToken);
+
+        var authorIds = visibleSummaries.Select(s => s.AuthorUserId).Distinct().ToList();
+        var users = await _users.GetByIdsNoTrackingAsync(authorIds, cancellationToken);
+        var userById = users.ToDictionary(u => u.Id);
+
+        var items = new List<StoryFeedItemDto>(visibleSummaries.Count);
+        foreach (var summary in visibleSummaries)
+        {
+            if (!userById.TryGetValue(summary.AuthorUserId, out var user))
+                continue;
+
+            var isSelf = summary.AuthorUserId == viewerUserId;
+            var hasUnviewed = !isSelf && summary.StoryIds.Any(id => !viewedStoryIds.Contains(id));
+
+            items.Add(new StoryFeedItemDto
+            {
+                UserId = user.Id.ToString(),
+                DisplayName = user.DisplayName ?? user.Username,
+                Username = user.Username,
+                AvatarUrl = user.ProfilePic,
+                HasActiveStories = true,
+                HasUnviewedStories = hasUnviewed,
+                LastStoryCreatedAt = EntityMappers.Iso(summary.LastCreatedAt),
+                IsSelf = isSelf
+            });
+        }
+
+        return items
+            .OrderByDescending(i => i.IsSelf)
+            .ThenByDescending(i => i.LastStoryCreatedAt)
+            .ToList();
     }
 
     private async Task<StoryDto> MapStoryAsync(Story story, int? viewerUserId, CancellationToken cancellationToken)

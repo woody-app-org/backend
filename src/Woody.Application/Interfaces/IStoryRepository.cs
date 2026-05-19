@@ -1,3 +1,4 @@
+using Woody.Application.Stories;
 using Woody.Domain.Entities;
 
 namespace Woody.Application.Interfaces;
@@ -31,5 +32,9 @@ public interface IStoryRepository
     Task<HashSet<int>> GetStoryIdsViewedByUserAsync(
         int viewerUserId,
         IEnumerable<int> storyIds,
+        CancellationToken cancellationToken = default);
+
+    Task<List<StoryFeedAuthorSummary>> ListActiveStoryAuthorsByUserIdsAsync(
+        IEnumerable<int> userIds,
         CancellationToken cancellationToken = default);
 }

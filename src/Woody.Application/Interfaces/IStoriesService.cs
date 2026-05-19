@@ -50,4 +50,8 @@ public interface IStoriesService
         int currentUserId,
         int storyId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StoryFeedItemDto>> GetStoriesFeedAsync(
+        int viewerUserId,
+        CancellationToken cancellationToken = default);
 }

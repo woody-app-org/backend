@@ -37,6 +37,20 @@ public class StoriesController : ControllerBase
         return ToCreateActionResult(result);
     }
 
+    [HttpGet("stories/feed")]
+    [Authorize(Policy = "VerifiedAccount")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    [ProducesResponseType(typeof(IReadOnlyList<StoryFeedItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<StoryFeedItemDto>>> Feed(CancellationToken cancellationToken)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        var items = await _stories.GetStoriesFeedAsync(me.Value, cancellationToken);
+        return Ok(items);
+    }
+
     [HttpGet("users/{userId:int}/stories")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicyNames.PublicRead)]

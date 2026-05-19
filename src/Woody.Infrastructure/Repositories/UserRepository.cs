@@ -35,6 +35,16 @@ public class UserRepository : IUserRepository
     public async Task<User?> GetByIdNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
+    public async Task<List<User>> GetByIdsNoTrackingAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+
+        return await _context.Users.AsNoTracking()
+            .Where(u => ids.Contains(u.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<User?> GetByIdWithSocialLinksAndInterestsNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()
             .Include(x => x.Subscription)
