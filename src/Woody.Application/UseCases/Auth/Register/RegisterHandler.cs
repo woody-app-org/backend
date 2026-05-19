@@ -79,17 +79,29 @@ public class RegisterHandler
                 request.Cpf,
                 "CPF",
                 InputValidationLimits.CpfMaxLength,
-                out var cpf,
+                out var cpfRaw,
                 out error))
             throw new ArgumentException(error);
+
+        var cpf = CpfInputNormalizer.NormalizeDigits(cpfRaw);
+        if (cpf.Length != 11 || !CpfInputNormalizer.IsValid(cpf))
+            throw new ArgumentException("CPF inválido.");
 
         if (!InputValidator.TryNormalizeHttpsImageUrl(request.AvatarUrl, out var avatarUrl, out error))
             throw new ArgumentException(error);
 
         if (await _users.ExistsUsernameAsync(username))
-            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.UsernameTakenMessage,
+                "username");
         if (await _users.ExistsEmailAsync(email))
-            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.EmailTakenMessage,
+                "email");
+        if (await _users.ExistsCpfAsync(cpf, cancellationToken))
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.CpfTakenMessage,
+                "cpf");
 
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");

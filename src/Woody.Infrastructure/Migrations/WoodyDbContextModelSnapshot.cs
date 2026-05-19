@@ -1639,7 +1639,8 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnName("birth_date");
 
                     b.Property<string>("Cpf")
-                        .HasColumnType("text")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
                         .HasColumnName("cpf");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1718,6 +1719,10 @@ namespace Woody.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
+
+                    b.HasIndex("Cpf")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_cpf");
 
                     b.HasIndex("Email")
                         .IsUnique()

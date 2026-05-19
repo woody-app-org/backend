@@ -19,6 +19,7 @@ public interface IUserRepository
     Task<List<User>> ListUsersForSuggestionsAsync(IReadOnlyCollection<int> excludeUserIds, int take, CancellationToken cancellationToken = default);
     Task<bool> ExistsUsernameAsync(string username);
     Task<bool> ExistsEmailAsync(string email);
+    Task<bool> ExistsCpfAsync(string cpfDigits, CancellationToken cancellationToken = default);
     Task AddAsync(User user);
     Task SaveChangesAsync();
     void Update(User user);

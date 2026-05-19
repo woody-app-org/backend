@@ -68,6 +68,7 @@ public class RegisterHandlerTests
         var users = new Mock<IUserRepository>();
         users.Setup(x => x.ExistsUsernameAsync(It.IsAny<string>())).ReturnsAsync(false);
         users.Setup(x => x.ExistsEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsCpfAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         var codes = new Mock<IEmailVerificationCodeRepository>();
@@ -118,6 +119,7 @@ public class RegisterHandlerTests
         var users = new Mock<IUserRepository>();
         users.Setup(x => x.ExistsUsernameAsync(It.IsAny<string>())).ReturnsAsync(false);
         users.Setup(x => x.ExistsEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsCpfAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         var codes = new Mock<IEmailVerificationCodeRepository>();
@@ -204,11 +206,43 @@ public class RegisterHandlerTests
             identityVerifications.Object);
     }
 
+    [Fact]
+    public async Task HandleAsync_DuplicateUsername_ThrowsRegistrationConflict()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.ExistsUsernameAsync("novauser")).ReturnsAsync(true);
+
+        var sut = CreateSut(betaEnabled: false, users: users);
+
+        var ex = await Assert.ThrowsAsync<RegistrationConflictException>(() =>
+            sut.HandleAsync(ValidRequest()));
+
+        Assert.Equal("username", ex.Field);
+        Assert.Equal(CheckRegistrationAvailabilityHandler.UsernameTakenMessage, ex.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateCpf_ThrowsRegistrationConflict()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.ExistsUsernameAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsCpfAsync("52998224725", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var sut = CreateSut(betaEnabled: false, users: users);
+
+        var ex = await Assert.ThrowsAsync<RegistrationConflictException>(() =>
+            sut.HandleAsync(ValidRequest()));
+
+        Assert.Equal("cpf", ex.Field);
+    }
+
     private static Mock<IUserRepository> CreateDefaultUsersMock()
     {
         var users = new Mock<IUserRepository>();
         users.Setup(x => x.ExistsUsernameAsync(It.IsAny<string>())).ReturnsAsync(false);
         users.Setup(x => x.ExistsEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsCpfAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
         users.Setup(x => x.AddAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
         return users;

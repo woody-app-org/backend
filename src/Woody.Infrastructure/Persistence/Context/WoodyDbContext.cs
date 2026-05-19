@@ -53,6 +53,8 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
+                e.HasIndex(u => u.Cpf).IsUnique();
+                e.Property(u => u.Cpf).HasMaxLength(11);
                 e.Property(u => u.ProfileSignalsIncomingPreference)
                     .HasConversion<int>()
                     .HasDefaultValue(ProfileSignalsIncomingPreference.All);

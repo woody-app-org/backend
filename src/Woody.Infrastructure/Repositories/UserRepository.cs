@@ -87,6 +87,14 @@ public class UserRepository : IUserRepository
     public async Task<bool> ExistsEmailAsync(string email) =>
         await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLowerInvariant());
 
+    public async Task<bool> ExistsCpfAsync(string cpfDigits, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(cpfDigits))
+            return false;
+
+        return await _context.Users.AnyAsync(u => u.Cpf == cpfDigits, cancellationToken);
+    }
+
     public async Task AddAsync(User user)
     {
         await _context.Users.AddAsync(user);
