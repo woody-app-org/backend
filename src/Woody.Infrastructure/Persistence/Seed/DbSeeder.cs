@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.Beta;
 using Woody.Application.Billing;
+using Woody.Application.Posts;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
@@ -437,6 +438,7 @@ public static class DbSeeder
             var authorId = memberIds[dayOffset % memberIds.Count];
             postsBatch.Add(new Post
             {
+                PublicId = PostPublicIdGenerator.Generate(),
                 UserId = authorId,
                 CommunityId = techId,
                 PublicationContext = PostPublicationContext.Community,
@@ -738,6 +740,7 @@ public static class DbSeeder
                 $"{tpl.Hook}\n\n{tpl.Body}\n\n(Seed #{i + 1} · comunidade {com.Name}.)";
             var post = new Post
             {
+                PublicId = PostPublicIdGenerator.Generate(),
                 UserId = author.Id,
                 CommunityId = com.Id,
                 PublicationContext = PostPublicationContext.Community,
@@ -809,6 +812,7 @@ public static class DbSeeder
 
         var p1 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
@@ -826,6 +830,7 @@ public static class DbSeeder
 
         var p2 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
@@ -843,6 +848,7 @@ public static class DbSeeder
 
         var p3 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = null,
             PublicationContext = PostPublicationContext.Profile,

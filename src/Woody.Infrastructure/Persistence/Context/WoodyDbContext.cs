@@ -253,6 +253,12 @@ namespace Woody.Infrastructure.Persistence.Context
 
                 e.HasIndex(p => new { p.PublicationContext, p.UserId });
                 e.HasIndex(p => new { p.UserId, p.PinnedOnProfileAt });
+
+                e.Property(p => p.PublicId)
+                    .HasColumnName("public_id")
+                    .HasMaxLength(16)
+                    .IsRequired();
+                e.HasIndex(p => p.PublicId).IsUnique();
             });
 
             modelBuilder.Entity<MediaAttachment>(e =>

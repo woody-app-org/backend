@@ -35,6 +35,8 @@ public interface IPostRepository
     /// <summary>Total de posts não apagados no contexto da comunidade (para resumo analytics).</summary>
     Task<int> CountNonDeletedCommunityPostsAsync(int communityId, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdNonDeletedWithNavAsync(int id, CancellationToken cancellationToken = default);
+    Task<Post?> GetByPublicIdNonDeletedWithNavAsync(string publicId, CancellationToken cancellationToken = default);
+    Task<bool> ExistsPublicIdAsync(string publicId, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdTrackedAsync(int id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdNonDeletedForCommentLookupAsync(int id, CancellationToken cancellationToken = default);

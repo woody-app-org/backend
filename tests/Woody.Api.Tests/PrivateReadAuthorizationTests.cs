@@ -336,6 +336,7 @@ public class PrivateReadAuthorizationTests
         return new Post
         {
             Id = id,
+            PublicId = $"pst_test{id:D6}",
             UserId = author.Id,
             User = author,
             Content = content,

@@ -15,15 +15,18 @@ public sealed class NotificationService : INotificationService
     private readonly INotificationRepository _notifications;
     private readonly INotificationRealtimePublisher _realtime;
     private readonly IUserRepository _users;
+    private readonly IPostRepository _posts;
 
     public NotificationService(
         INotificationRepository notifications,
         INotificationRealtimePublisher realtime,
-        IUserRepository users)
+        IUserRepository users,
+        IPostRepository posts)
     {
         _notifications = notifications;
         _realtime = realtime;
         _users = users;
+        _posts = posts;
     }
 
     public async Task<NotificationListResponseDto> ListMineAsync(
@@ -101,7 +104,12 @@ public sealed class NotificationService : INotificationService
                 cancellationToken))
             return;
 
-        _notifications.Add(NotificationComposer.PostLiked(postOwnerUserId, actorUserId, postId, now));
+        _notifications.Add(NotificationComposer.PostLiked(
+            postOwnerUserId,
+            actorUserId,
+            postId,
+            now,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
     }
@@ -111,7 +119,13 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == postOwnerUserId)
             return;
 
-        _notifications.Add(NotificationComposer.PostCommented(postOwnerUserId, actorUserId, postId, commentId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.PostCommented(
+            postOwnerUserId,
+            actorUserId,
+            postId,
+            commentId,
+            DateTime.UtcNow,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
     }
@@ -133,7 +147,8 @@ public sealed class NotificationService : INotificationService
             postId,
             parentCommentId,
             replyCommentId,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(parentCommentAuthorUserId, cancellationToken);
     }
@@ -239,6 +254,12 @@ public sealed class NotificationService : INotificationService
             DateTime.UtcNow));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(applicantUserId, cancellationToken);
+    }
+
+    private async Task<string?> ResolvePostPublicIdAsync(int postId, CancellationToken cancellationToken)
+    {
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(postId, cancellationToken);
+        return post?.PublicId;
     }
 
     private async Task<string?> ResolveUsernameAsync(int userId, CancellationToken cancellationToken)

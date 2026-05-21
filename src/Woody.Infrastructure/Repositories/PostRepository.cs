@@ -165,6 +165,30 @@ public class PostRepository : IPostRepository
             .Include(p => p.MediaAttachments)
             .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
+    public async Task<Post?> GetByPublicIdNonDeletedWithNavAsync(string publicId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(publicId))
+            return null;
+
+        var normalized = publicId.Trim();
+        return await _db.Posts.AsNoTracking()
+            .Include(p => p.User).ThenInclude(u => u.Subscription)
+            .Include(p => p.Community).ThenInclude(c => c!.Subscription)
+            .Include(p => p.Tags)
+            .Include(p => p.MediaAttachments)
+            .FirstOrDefaultAsync(p => p.PublicId == normalized && p.DeletedAt == null, cancellationToken);
+    }
+
+    public async Task<bool> ExistsPublicIdAsync(string publicId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(publicId))
+            return false;
+
+        var normalized = publicId.Trim();
+        return await _db.Posts.AsNoTracking()
+            .AnyAsync(p => p.PublicId == normalized, cancellationToken);
+    }
+
     public async Task<Post?> GetByIdTrackedWithTagsAsync(int id, CancellationToken cancellationToken = default) =>
         await _db.Posts
             .Include(p => p.Tags)

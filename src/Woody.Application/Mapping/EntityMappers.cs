@@ -160,6 +160,7 @@ public static class EntityMappers
         return new PostResponseDto
         {
             Id = p.Id.ToString(),
+            PublicId = p.PublicId,
             PublicationContext = ToPublicationContextApi(p.PublicationContext),
             CommunityId = p.CommunityId?.ToString(),
             AuthorId = p.UserId.ToString(),

@@ -15,7 +15,12 @@ public static class NotificationComposer
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static Notification PostLiked(int recipientUserId, int actorUserId, int postId, DateTime createdAtUtc) =>
+    public static Notification PostLiked(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        DateTime createdAtUtc,
+        string? postPublicId = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -23,11 +28,17 @@ public static class NotificationComposer
             Type = NotificationType.PostLike,
             TargetKind = NotificationTargetKind.Post,
             TargetId = postId,
-            MetadataJson = Meta(new Dictionary<string, object?> { ["postId"] = postId }),
+            MetadataJson = Meta(BuildPostMetadata(postId, postPublicId: postPublicId)),
             CreatedAt = createdAtUtc
         };
 
-    public static Notification PostCommented(int recipientUserId, int actorUserId, int postId, int commentId, DateTime createdAtUtc) =>
+    public static Notification PostCommented(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        int commentId,
+        DateTime createdAtUtc,
+        string? postPublicId = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -35,7 +46,7 @@ public static class NotificationComposer
             Type = NotificationType.PostComment,
             TargetKind = NotificationTargetKind.Post,
             TargetId = postId,
-            MetadataJson = Meta(new Dictionary<string, object?> { ["postId"] = postId, ["commentId"] = commentId }),
+            MetadataJson = Meta(BuildPostMetadata(postId, commentId, postPublicId)),
             CreatedAt = createdAtUtc
         };
 
@@ -45,7 +56,8 @@ public static class NotificationComposer
         int postId,
         int parentCommentId,
         int replyCommentId,
-        DateTime createdAtUtc) =>
+        DateTime createdAtUtc,
+        string? postPublicId = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -56,6 +68,7 @@ public static class NotificationComposer
             MetadataJson = Meta(new Dictionary<string, object?>
             {
                 ["postId"] = postId,
+                ["postPublicId"] = string.IsNullOrWhiteSpace(postPublicId) ? null : postPublicId.Trim(),
                 ["parentCommentId"] = parentCommentId,
                 ["commentId"] = replyCommentId
             }),
@@ -170,6 +183,19 @@ public static class NotificationComposer
             }),
             CreatedAt = createdAtUtc
         };
+
+    private static Dictionary<string, object?> BuildPostMetadata(
+        int postId,
+        int? commentId = null,
+        string? postPublicId = null)
+    {
+        var meta = new Dictionary<string, object?> { ["postId"] = postId };
+        if (!string.IsNullOrWhiteSpace(postPublicId))
+            meta["postPublicId"] = postPublicId.Trim();
+        if (commentId.HasValue)
+            meta["commentId"] = commentId.Value;
+        return meta;
+    }
 
     private static string Meta(Dictionary<string, object?> values) =>
         JsonSerializer.Serialize(values, JsonOptions);
