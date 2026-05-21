@@ -52,14 +52,27 @@ public class UsersController : ControllerBase
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("me/communities")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
-    public async Task<ActionResult<List<string>>> GetMyCommunityIds(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<MyCommunitySummaryDto>>> GetMyCommunities(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
         if (id == null)
             return Unauthorized();
 
-        var ids = await _memberships.GetActiveCommunityIdsAsStringsAsync(id.Value, cancellationToken);
-        return Ok(ids);
+        var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(id.Value, cancellationToken);
+        var list = rows
+            .OrderBy(m => m.Community.Name)
+            .Select(m => new MyCommunitySummaryDto
+            {
+                Id = m.CommunityId.ToString(),
+                Slug = m.Community.Slug,
+                Name = m.Community.Name,
+                Role = m.Role,
+                Visibility = m.Community.Visibility,
+                AvatarUrl = m.Community.AvatarUrl,
+                CoverUrl = m.Community.CoverUrl
+            })
+            .ToList();
+        return Ok(list);
     }
 
     [Authorize(Policy = "VerifiedAccount")]
