@@ -62,7 +62,11 @@ public static class NotificationComposer
             CreatedAt = createdAtUtc
         };
 
-    public static Notification NewFollower(int recipientUserId, int actorUserId, DateTime createdAtUtc) =>
+    public static Notification NewFollower(
+        int recipientUserId,
+        int actorUserId,
+        DateTime createdAtUtc,
+        string? actorUsername = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -70,7 +74,7 @@ public static class NotificationComposer
             Type = NotificationType.NewFollower,
             TargetKind = NotificationTargetKind.User,
             TargetId = actorUserId,
-            MetadataJson = Meta(new Dictionary<string, object?> { ["profileUserId"] = actorUserId }),
+            MetadataJson = Meta(BuildActorProfileMetadata(actorUserId, actorUsername)),
             CreatedAt = createdAtUtc
         };
 
@@ -79,7 +83,8 @@ public static class NotificationComposer
         int senderUserId,
         int profileSignalId,
         string profileSignalTypeApi,
-        DateTime createdAtUtc) =>
+        DateTime createdAtUtc,
+        string? senderUsername = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -87,16 +92,23 @@ public static class NotificationComposer
             Type = NotificationType.ProfileSignal,
             TargetKind = NotificationTargetKind.ProfileSignal,
             TargetId = profileSignalId,
-            MetadataJson = Meta(new Dictionary<string, object?>
-            {
-                ["profileUserId"] = senderUserId,
-                ["profileSignalId"] = profileSignalId,
-                ["profileSignalType"] = profileSignalTypeApi
-            }),
+            MetadataJson = Meta(Merge(
+                BuildActorProfileMetadata(senderUserId, senderUsername),
+                new Dictionary<string, object?>
+                {
+                    ["profileUserId"] = senderUserId,
+                    ["profileSignalId"] = profileSignalId,
+                    ["profileSignalType"] = profileSignalTypeApi
+                })),
             CreatedAt = createdAtUtc
         };
 
-    public static Notification MessageRequest(int recipientUserId, int initiatorUserId, int conversationId, DateTime createdAtUtc) =>
+    public static Notification MessageRequest(
+        int recipientUserId,
+        int initiatorUserId,
+        int conversationId,
+        DateTime createdAtUtc,
+        string? initiatorUsername = null) =>
         new()
         {
             RecipientUserId = recipientUserId,
@@ -104,11 +116,9 @@ public static class NotificationComposer
             Type = NotificationType.MessageRequest,
             TargetKind = NotificationTargetKind.Conversation,
             TargetId = conversationId,
-            MetadataJson = Meta(new Dictionary<string, object?>
-            {
-                ["conversationId"] = conversationId,
-                ["profileUserId"] = initiatorUserId
-            }),
+            MetadataJson = Meta(Merge(
+                BuildActorProfileMetadata(initiatorUserId, initiatorUsername),
+                new Dictionary<string, object?> { ["conversationId"] = conversationId })),
             CreatedAt = createdAtUtc
         };
 
@@ -118,7 +128,8 @@ public static class NotificationComposer
         int communityId,
         string communitySlug,
         int joinRequestId,
-        DateTime createdAtUtc) =>
+        DateTime createdAtUtc,
+        string? requesterUsername = null) =>
         new()
         {
             RecipientUserId = moderatorUserId,
@@ -126,13 +137,14 @@ public static class NotificationComposer
             Type = NotificationType.CommunityRequest,
             TargetKind = NotificationTargetKind.JoinRequest,
             TargetId = joinRequestId,
-            MetadataJson = Meta(new Dictionary<string, object?>
-            {
-                ["communityId"] = communityId,
-                ["communitySlug"] = communitySlug,
-                ["joinRequestId"] = joinRequestId,
-                ["profileUserId"] = requesterUserId
-            }),
+            MetadataJson = Meta(Merge(
+                BuildActorProfileMetadata(requesterUserId, requesterUsername),
+                new Dictionary<string, object?>
+                {
+                    ["communityId"] = communityId,
+                    ["communitySlug"] = communitySlug,
+                    ["joinRequestId"] = joinRequestId
+                })),
             CreatedAt = createdAtUtc
         };
 
@@ -161,4 +173,25 @@ public static class NotificationComposer
 
     private static string Meta(Dictionary<string, object?> values) =>
         JsonSerializer.Serialize(values, JsonOptions);
+
+    private static Dictionary<string, object?> BuildActorProfileMetadata(int actorUserId, string? actorUsername)
+    {
+        var meta = new Dictionary<string, object?>
+        {
+            ["profileUserId"] = actorUserId,
+            ["actorUserId"] = actorUserId
+        };
+        if (!string.IsNullOrWhiteSpace(actorUsername))
+            meta["actorUsername"] = actorUsername.Trim();
+        return meta;
+    }
+
+    private static Dictionary<string, object?> Merge(
+        Dictionary<string, object?> primary,
+        Dictionary<string, object?> secondary)
+    {
+        foreach (var (key, value) in secondary)
+            primary[key] = value;
+        return primary;
+    }
 }

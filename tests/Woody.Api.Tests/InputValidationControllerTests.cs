@@ -6,6 +6,7 @@ using Woody.Api.Controllers;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
+using Woody.Application.Services;
 using Woody.Application.Validation;
 using Woody.Domain.Entities;
 
@@ -208,6 +209,7 @@ public class InputValidationControllerTests
         var controller = new UsersController(
             users.Object,
             history.Object,
+            new UsernameResolver(users.Object, history.Object),
             new Mock<ICommunityMembershipRepository>().Object,
             new Mock<IFollowRepository>().Object,
             new Mock<IPostRepository>().Object,

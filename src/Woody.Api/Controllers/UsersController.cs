@@ -8,6 +8,7 @@ using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Application.Mapping;
+using Woody.Application.Services;
 using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
@@ -18,6 +19,7 @@ public class UsersController : ControllerBase
 {
     private readonly IUserRepository _users;
     private readonly IUsernameHistoryRepository _usernameHistory;
+    private readonly UsernameResolver _usernameResolver;
     private readonly ICommunityMembershipRepository _memberships;
     private readonly IFollowRepository _follows;
     private readonly IPostRepository _posts;
@@ -28,6 +30,7 @@ public class UsersController : ControllerBase
     public UsersController(
         IUserRepository users,
         IUsernameHistoryRepository usernameHistory,
+        UsernameResolver usernameResolver,
         ICommunityMembershipRepository memberships,
         IFollowRepository follows,
         IPostRepository posts,
@@ -37,6 +40,7 @@ public class UsersController : ControllerBase
     {
         _users = users;
         _usernameHistory = usernameHistory;
+        _usernameResolver = usernameResolver;
         _memberships = memberships;
         _follows = follows;
         _posts = posts;
@@ -316,6 +320,29 @@ public class UsersController : ControllerBase
         return Ok(profile);
     }
 
+    [AllowAnonymous]
+    [HttpGet("by-username/{username}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    public async Task<ActionResult<UserProfileDto>> GetByUsername(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var resolution = await _usernameResolver.ResolveAsync(username, cancellationToken);
+        if (resolution == null)
+            return NotFound();
+
+        var viewerId = User?.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var profile = await BuildProfileAsync(resolution.Value.UserId, viewerId, cancellationToken);
+        if (profile == null)
+            return NotFound();
+
+        if (resolution.Value.ResolvedViaHistory)
+            profile.CanonicalUsername = resolution.Value.CurrentUsername;
+
+        return Ok(profile);
+    }
+
+    /// <summary>Legado — preferir <c>GET /users/by-username/{username}</c>.</summary>
     [HttpGet("{userId}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserProfileDto>> GetById(

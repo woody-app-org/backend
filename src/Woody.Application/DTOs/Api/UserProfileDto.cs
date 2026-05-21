@@ -7,6 +7,11 @@ public class UserProfileDto
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
     public string? Username { get; set; }
+
+    /// <summary>
+    /// Presente quando o handle pedido era um username antigo; indica o username actual para actualizar a URL.
+    /// </summary>
+    public string? CanonicalUsername { get; set; }
     public string? AvatarUrl { get; set; }
     public string? Pronouns { get; set; }
     public string? BannerUrl { get; set; }

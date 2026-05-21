@@ -30,6 +30,7 @@ public static class DependencyInjectionConfig
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IUsernameHistoryRepository, UsernameHistoryRepository>();
+        builder.Services.AddScoped<UsernameResolver>();
         builder.Services.AddScoped<IBetaInviteRepository, BetaInviteRepository>();
         builder.Services.AddScoped<IWoodyUnitOfWork, WoodyUnitOfWork>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();

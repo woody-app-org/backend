@@ -14,11 +14,16 @@ public sealed class NotificationService : INotificationService
 
     private readonly INotificationRepository _notifications;
     private readonly INotificationRealtimePublisher _realtime;
+    private readonly IUserRepository _users;
 
-    public NotificationService(INotificationRepository notifications, INotificationRealtimePublisher realtime)
+    public NotificationService(
+        INotificationRepository notifications,
+        INotificationRealtimePublisher realtime,
+        IUserRepository users)
     {
         _notifications = notifications;
         _realtime = realtime;
+        _users = users;
     }
 
     public async Task<NotificationListResponseDto> ListMineAsync(
@@ -138,7 +143,11 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == followedUserId)
             return;
 
-        _notifications.Add(NotificationComposer.NewFollower(followedUserId, actorUserId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.NewFollower(
+            followedUserId,
+            actorUserId,
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(actorUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(followedUserId, cancellationToken);
     }
@@ -158,7 +167,8 @@ public sealed class NotificationService : INotificationService
             senderUserId,
             profileSignalId,
             profileSignalTypeApi,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(senderUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(receiverUserId, cancellationToken);
     }
@@ -168,7 +178,12 @@ public sealed class NotificationService : INotificationService
         if (initiatorUserId == recipientUserId)
             return;
 
-        _notifications.Add(NotificationComposer.MessageRequest(recipientUserId, initiatorUserId, conversationId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.MessageRequest(
+            recipientUserId,
+            initiatorUserId,
+            conversationId,
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(initiatorUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(recipientUserId, cancellationToken);
     }
@@ -182,13 +197,21 @@ public sealed class NotificationService : INotificationService
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
+        var requesterUsername = await ResolveUsernameAsync(requesterUserId, cancellationToken);
         var rows = new List<Notification>();
         foreach (var modId in moderatorUserIds.Distinct())
         {
             if (modId == requesterUserId)
                 continue;
 
-            rows.Add(NotificationComposer.CommunityJoinRequest(modId, requesterUserId, communityId, communitySlug, joinRequestId, now));
+            rows.Add(NotificationComposer.CommunityJoinRequest(
+                modId,
+                requesterUserId,
+                communityId,
+                communitySlug,
+                joinRequestId,
+                now,
+                requesterUsername));
         }
 
         if (rows.Count == 0)
@@ -216,6 +239,12 @@ public sealed class NotificationService : INotificationService
             DateTime.UtcNow));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(applicantUserId, cancellationToken);
+    }
+
+    private async Task<string?> ResolveUsernameAsync(int userId, CancellationToken cancellationToken)
+    {
+        var user = await _users.GetByIdNoTrackingAsync(userId, cancellationToken);
+        return user?.Username;
     }
 
     private static JsonElement ParseMetadata(string json)
