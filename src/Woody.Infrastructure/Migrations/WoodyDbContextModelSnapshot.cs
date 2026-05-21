@@ -1707,7 +1707,8 @@ namespace Woody.Infrastructure.Migrations
 
                     b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("username");
 
                     b.Property<string>("VerificationStatus")
@@ -1736,6 +1737,47 @@ namespace Woody.Infrastructure.Migrations
                         .HasDatabaseName("ix_users_username");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UsernameHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("NewUsername")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("new_username");
+
+                    b.Property<string>("OldUsername")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("old_username");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_username_history");
+
+                    b.HasIndex("OldUsername")
+                        .HasDatabaseName("ix_username_history_old_username");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_username_history_user_id");
+
+                    b.ToTable("username_history", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.UserInterest", b =>
@@ -2112,6 +2154,18 @@ namespace Woody.Infrastructure.Migrations
                         .HasConstraintName("fk_identity_verifications_users_user_id");
 
                     b.Navigation("ReviewedBy");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UsernameHistory", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_username_history_users_user_id");
 
                     b.Navigation("User");
                 });

@@ -237,6 +237,47 @@ public class RegisterHandlerTests
         Assert.Equal("cpf", ex.Field);
     }
 
+    [Fact]
+    public async Task HandleAsync_NormalizesUsernameToLowercase()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.ExistsUsernameAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        users.Setup(x => x.ExistsCpfAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+
+        var codes = new Mock<IEmailVerificationCodeRepository>();
+        codes.Setup(x => x.HasConsumedCodeForEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        User? capturedUser = null;
+        users.Setup(x => x.AddAsync(It.IsAny<User>()))
+            .Callback<User>(u => capturedUser = u)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut(betaEnabled: false, users: users, emailCodes: codes);
+
+        var request = ValidRequest();
+        request.Username = "  NOVAUSER ";
+
+        await sut.HandleAsync(request);
+
+        Assert.NotNull(capturedUser);
+        Assert.Equal("novauser", capturedUser!.Username);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsUsernameWithHyphen()
+    {
+        var sut = CreateSut(betaEnabled: false);
+        var request = ValidRequest();
+        request.Username = "user-name";
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => sut.HandleAsync(request));
+
+        Assert.Equal(UsernameInputValidator.InvalidCharactersMessage, ex.Message);
+    }
+
     private static Mock<IUserRepository> CreateDefaultUsersMock()
     {
         var users = new Mock<IUserRepository>();

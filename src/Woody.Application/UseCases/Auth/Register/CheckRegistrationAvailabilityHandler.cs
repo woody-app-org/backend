@@ -25,12 +25,7 @@ public class CheckRegistrationAvailabilityHandler
 
         if (!string.IsNullOrWhiteSpace(request.Username))
         {
-            if (!InputValidator.TryNormalizeRequiredText(
-                    request.Username,
-                    "Nome de utilizador",
-                    InputValidationLimits.UsernameMaxLength,
-                    out var username,
-                    out var error))
+            if (!UsernameInputValidator.TryValidate(request.Username, out var username, out var error))
             {
                 response.Username = new FieldAvailabilityDTO { Available = false, Message = error };
             }

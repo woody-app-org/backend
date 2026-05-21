@@ -10,6 +10,7 @@ namespace Woody.Infrastructure.Persistence.Context
     public class WoodyDbContext : DbContext
     {
         public virtual DbSet<User> Users { get; set; }
+        public virtual DbSet<UsernameHistory> UsernameHistories { get; set; }
         public virtual DbSet<Post> Posts { get; set; }
         public virtual DbSet<Comment> Comments { get; set; }
         public virtual DbSet<Like> Likes { get; set; }
@@ -54,6 +55,7 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
                 e.HasIndex(u => u.Cpf).IsUnique();
+                e.Property(u => u.Username).HasMaxLength(InputValidationLimits.UsernameMaxLength);
                 e.Property(u => u.Cpf).HasMaxLength(11);
                 e.Property(u => u.ProfileSignalsIncomingPreference)
                     .HasConversion<int>()
@@ -67,6 +69,20 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(i => i.Users)
                     .HasForeignKey(u => u.InviteId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<UsernameHistory>(e =>
+            {
+                e.ToTable("username_history");
+                e.HasIndex(h => h.OldUsername);
+                e.HasIndex(h => h.UserId);
+                e.Property(h => h.OldUsername).HasMaxLength(InputValidationLimits.UsernameMaxLength);
+                e.Property(h => h.NewUsername).HasMaxLength(InputValidationLimits.UsernameMaxLength);
+
+                e.HasOne(h => h.User)
+                    .WithMany()
+                    .HasForeignKey(h => h.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<IdentityVerification>(e =>

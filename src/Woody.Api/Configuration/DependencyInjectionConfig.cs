@@ -29,6 +29,7 @@ public static class DependencyInjectionConfig
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUsernameHistoryRepository, UsernameHistoryRepository>();
         builder.Services.AddScoped<IBetaInviteRepository, BetaInviteRepository>();
         builder.Services.AddScoped<IWoodyUnitOfWork, WoodyUnitOfWork>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();

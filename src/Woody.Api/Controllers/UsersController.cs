@@ -17,6 +17,7 @@ namespace Woody.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserRepository _users;
+    private readonly IUsernameHistoryRepository _usernameHistory;
     private readonly ICommunityMembershipRepository _memberships;
     private readonly IFollowRepository _follows;
     private readonly IPostRepository _posts;
@@ -26,6 +27,7 @@ public class UsersController : ControllerBase
 
     public UsersController(
         IUserRepository users,
+        IUsernameHistoryRepository usernameHistory,
         ICommunityMembershipRepository memberships,
         IFollowRepository follows,
         IPostRepository posts,
@@ -34,6 +36,7 @@ public class UsersController : ControllerBase
         IStoryRepository stories)
     {
         _users = users;
+        _usernameHistory = usernameHistory;
         _memberships = memberships;
         _follows = follows;
         _posts = posts;
@@ -180,12 +183,8 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
-        if (!InputValidator.TryNormalizeRequiredText(
-                body.Username,
-                "Nome de utilizador",
-                InputValidationLimits.UsernameMaxLength,
-                out var username,
-                out var error))
+        string? error;
+        if (!UsernameInputValidator.TryValidate(body.Username, out var username, out error))
             return BadRequest(new { error });
 
         if (!InputValidator.TryNormalizeRequiredText(
@@ -239,6 +238,16 @@ public class UsersController : ControllerBase
         {
             if (await _users.ExistsUsernameAsync(username))
                 return Conflict(new { error = "Nome de utilizador já existe." });
+
+            var now = DateTime.UtcNow;
+            await _usernameHistory.AddAsync(new UsernameHistory
+            {
+                UserId = user.Id,
+                OldUsername = user.Username,
+                NewUsername = username,
+                ChangedAt = now
+            }, cancellationToken);
+
             user.Username = username;
         }
 

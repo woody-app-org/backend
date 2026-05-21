@@ -50,12 +50,7 @@ public class RegisterHandler
 
     public async Task<LoginResultDTO> HandleAsync(RegisterRequestDTO request, CancellationToken cancellationToken = default)
     {
-        if (!InputValidator.TryNormalizeRequiredText(
-                request.Username,
-                "Nome de utilizador",
-                InputValidationLimits.UsernameMaxLength,
-                out var username,
-                out var error))
+        if (!UsernameInputValidator.TryValidate(request.Username, out var username, out var error))
             throw new ArgumentException(error);
 
         if (!InputValidator.TryNormalizeRequiredText(

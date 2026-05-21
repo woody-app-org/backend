@@ -2,6 +2,7 @@ namespace Woody.Application.Validation;
 
 public static class InputValidationLimits
 {
+    public const int UsernameMinLength = 3;
     public const int UsernameMaxLength = 30;
     public const int DisplayNameMaxLength = 80;
     public const int EmailMaxLength = 254;
