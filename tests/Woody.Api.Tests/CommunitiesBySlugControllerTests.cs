@@ -151,6 +151,44 @@ public class CommunitiesBySlugControllerTests
         Assert.IsType<NoContentResult>(result);
     }
 
+    // -------------------------------------------------------------------------
+    // IDOR: admin de comunidade A não pode gerir comunidade B
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task PatchBySlug_CommunityAdminA_CannotModerate_CommunityB()
+    {
+        // Admin do utilizador 99 tem permissão apenas na comunidade 1 (slug-a).
+        // Tenta fazer patch na comunidade 2 (slug-b) → deve retornar Forbid.
+        var communityB = SampleCommunity(2, "slug-b", "public");
+        var permission = new Mock<ICommunityPermissionService>();
+        permission
+            .Setup(x => x.CanModerateCommunityAsync(1, 99, It.IsAny<CancellationToken>())).ReturnsAsync(true);   // A
+        permission
+            .Setup(x => x.CanModerateCommunityAsync(2, 99, It.IsAny<CancellationToken>())).ReturnsAsync(false);  // B
+
+        var controller = CreateController(communityB, permission: permission, viewerUserId: 99);
+
+        var result = await controller.PatchBySlug(
+            "slug-b",
+            new CommunityUpdateRequestDTO { Name = "Hacked" },
+            CancellationToken.None);
+
+        Assert.IsType<ForbidResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task MembersBySlug_CommunityAdminA_CannotListMembers_PrivateCommunityB()
+    {
+        // Não-membro da comunidade B não consegue ver os membros (privada).
+        var communityB = SampleCommunity(3, "secret-b", "private");
+        var controller = CreateController(communityB, canReadMembers: false, viewerUserId: 99);
+
+        var result = await controller.MembersBySlug("secret-b", cancellationToken: CancellationToken.None);
+
+        Assert.IsType<ForbidResult>(result.Result);
+    }
+
     [Fact]
     public async Task CommunityPosts_LegacyById_StillWorks()
     {

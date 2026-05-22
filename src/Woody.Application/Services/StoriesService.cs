@@ -92,13 +92,10 @@ public class StoriesService : IStoriesService
         if (authorExists == null)
             return [];
 
-        // TODO: quando bloqueio real existir, negar leitura se _socialGate.AreUsersBlockedEitherWayAsync.
         if (viewerUserId.HasValue && viewerUserId.Value != targetUserId)
         {
-            _ = await _socialGate.AreUsersBlockedEitherWayAsync(
-                viewerUserId.Value,
-                targetUserId,
-                cancellationToken);
+            if (await _socialGate.AreUsersBlockedEitherWayAsync(viewerUserId.Value, targetUserId, cancellationToken))
+                return [];
         }
 
         var stories = await _stories.ListActiveByAuthorAsync(targetUserId, cancellationToken);

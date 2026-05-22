@@ -552,6 +552,11 @@ public class PostsController : ControllerBase
         if (comment == null || comment.PostId != pid)
             return NotFound();
 
+        // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
+        if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
+            && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
+            return NotFound();
+
         await _likes.TryAddCommentLikeAsync(me.Value, cid, cancellationToken);
 
         var counts = await _likes.GetCommentLikeCountsAsync(new[] { cid }, cancellationToken);
@@ -585,6 +590,11 @@ public class PostsController : ControllerBase
 
         var comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken);
         if (comment == null || comment.PostId != pid)
+            return NotFound();
+
+        // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
+        if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
+            && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
             return NotFound();
 
         await _likes.RemoveCommentLikeAsync(me.Value, cid, cancellationToken);

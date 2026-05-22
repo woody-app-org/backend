@@ -140,6 +140,90 @@ public class StoriesServiceTests
         Assert.Empty(list);
     }
 
+    // -------------------------------------------------------------------------
+    // IDOR: block check agora é aplicado (fix fase 4)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetActiveStoriesByUserAsync_ReturnsEmpty_WhenViewerIsBlocked()
+    {
+        _users.Setup(u => u.GetByIdNoTrackingAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Id = 5, Username = "blocked-user" });
+
+        // Viewe 1 está bloqueado pelo utilizador 5 (ou vice-versa).
+        _gate.Setup(g => g.AreUsersBlockedEitherWayAsync(1, 5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var svc = CreateService();
+        var list = await svc.GetActiveStoriesByUserAsync(5, viewerUserId: 1);
+
+        Assert.Empty(list);
+        // Repository de stories NÃO deve ser consultado quando há bloqueio.
+        _stories.Verify(s => s.ListActiveByAuthorAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetActiveStoriesByUserAsync_ReturnsStories_WhenNotBlocked()
+    {
+        var author = new User { Id = 5, Username = "author" };
+        var story = new Story
+        {
+            Id = 10,
+            AuthorUserId = 5,
+            Author = author,
+            Visibility = StoryVisibility.Public,
+            ExpiresAt = DateTime.UtcNow.AddHours(6),
+            MediaType = StoryMediaType.Text
+        };
+
+        _users.Setup(u => u.GetByIdNoTrackingAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(author);
+
+        // Não bloqueado → gate retorna false (default do setUp geral).
+        _stories.Setup(s => s.ListActiveByAuthorAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([story]);
+        _stories.Setup(s => s.GetViewCountsByStoryIdsAsync(It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<int, int> { [10] = 3 });
+        _stories.Setup(s => s.GetStoryIdsViewedByUserAsync(1, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<int>());
+
+        var svc = CreateService();
+        var list = await svc.GetActiveStoriesByUserAsync(5, viewerUserId: 1);
+
+        Assert.Single(list);
+    }
+
+    [Fact]
+    public async Task GetActiveStoriesByUserAsync_ReturnsStories_ForOwnProfile()
+    {
+        var author = new User { Id = 5, Username = "self" };
+        var story = new Story
+        {
+            Id = 11,
+            AuthorUserId = 5,
+            Author = author,
+            Visibility = StoryVisibility.Public,
+            ExpiresAt = DateTime.UtcNow.AddHours(6),
+            MediaType = StoryMediaType.Text
+        };
+
+        _users.Setup(u => u.GetByIdNoTrackingAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(author);
+        _stories.Setup(s => s.ListActiveByAuthorAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([story]);
+        _stories.Setup(s => s.GetViewCountsByStoryIdsAsync(It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<int, int>());
+        _stories.Setup(s => s.GetStoryIdsViewedByUserAsync(5, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<int>());
+
+        var svc = CreateService();
+        // viewer == target → bloco nunca deve ser verificado
+        var list = await svc.GetActiveStoriesByUserAsync(5, viewerUserId: 5);
+
+        Assert.Single(list);
+        _gate.Verify(g => g.AreUsersBlockedEitherWayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task GetStoryViewsAsync_NonAuthor_ReturnsForbidden()
     {

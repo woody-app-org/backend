@@ -106,7 +106,8 @@ public class StoriesController : ControllerBase
         return result.Outcome switch
         {
             StoryOperationOutcome.Success => Ok(result.Views),
-            StoryOperationOutcome.Forbidden => Forbid(),
+            // Forbidden é tratado como NotFound para não confirmar a existência do story ao não-autor.
+            StoryOperationOutcome.Forbidden => NotFound(new { error = result.Error }),
             StoryOperationOutcome.NotFound => NotFound(new { error = result.Error }),
             _ => BadRequest(new { error = result.Error })
         };
