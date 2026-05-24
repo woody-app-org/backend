@@ -30,13 +30,30 @@ public class BadgeSeedTests
             Assert.Equal(1, countAfterSecond);
 
             var seed = assertDb.Badges.Single(b => b.Slug == "seed");
-            Assert.Equal("Seed", seed.Name);
+            Assert.Equal("Raiz", seed.Name);
             Assert.Equal("Presente desde o primeiro dia da Woody.", seed.Description);
             Assert.Equal("seed", seed.IconAssetKey);
             Assert.Equal("founding", seed.Category);
             Assert.Equal("founder", seed.Rarity);
             Assert.True(seed.IsActive);
             Assert.Equal(10, seed.SortOrder);
+
+            var test = assertDb.Badges.Single(b => b.Slug == "test");
+            Assert.Equal("Teste", test.Name);
+            Assert.Equal("test", test.IconAssetKey);
+            Assert.Equal(20, test.SortOrder);
+
+            var user1 = assertDb.Users.FirstOrDefault(u => u.Username == "user1");
+            if (user1 != null)
+            {
+                var hasSeed = assertDb.UserBadges.Any(ub =>
+                    ub.UserId == user1.Id && ub.BadgeId == seed.Id);
+                Assert.True(hasSeed);
+
+                var hasTest = assertDb.UserBadges.Any(ub =>
+                    ub.UserId == user1.Id && ub.BadgeId == test.Id);
+                Assert.True(hasTest);
+            }
         }
     }
 }

@@ -137,7 +137,7 @@ public class UsersByUsernameControllerTests
                 new()
                 {
                     Slug = "seed",
-                    Name = "Seed",
+                    Name = "Raiz",
                     Description = "Presente desde o primeiro dia da Woody.",
                     IconAssetKey = "seed",
                     Category = "founding",

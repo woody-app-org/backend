@@ -39,7 +39,7 @@ public class BadgeAwardServiceTests
                     {
                         Id = 7,
                         Slug = "seed",
-                        Name = "Seed",
+                        Name = "Raiz",
                         Description = "Presente desde o primeiro dia da Woody.",
                         IconAssetKey = "seed",
                         Category = "founding",
@@ -56,7 +56,7 @@ public class BadgeAwardServiceTests
 
         var dto = Assert.Single(result);
         Assert.Equal("seed", dto.Slug);
-        Assert.Equal("Seed", dto.Name);
+        Assert.Equal("Raiz", dto.Name);
         Assert.Equal("Presente desde o primeiro dia da Woody.", dto.Description);
         Assert.Equal("seed", dto.IconAssetKey);
         Assert.Equal("founding", dto.Category);

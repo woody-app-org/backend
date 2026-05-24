@@ -27,6 +27,7 @@ public static class DbSeeder
         SeedUsers(context);
         EnsureSuperAdmin(context);
         SeedBadges(context);
+        SeedDemoUserBadges(context);
         SeedBetaInvites(context);
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
@@ -239,24 +240,96 @@ public static class DbSeeder
 
     private static void SeedBadges(WoodyDbContext context)
     {
-        const string seedSlug = "seed";
-        if (context.Badges.Any(b => b.Slug == seedSlug))
+        EnsureBadgeDefinition(
+            context,
+            slug: "seed",
+            name: "Raiz",
+            description: "Presente desde o primeiro dia da Woody.",
+            iconAssetKey: "seed",
+            category: "founding",
+            rarity: "founder",
+            sortOrder: 10);
+
+        EnsureBadgeDefinition(
+            context,
+            slug: "test",
+            name: "Teste",
+            description: "Insígnia de teste para visualizar múltiplas badges no perfil.",
+            iconAssetKey: "test",
+            category: "founding",
+            rarity: null,
+            sortOrder: 20);
+
+        context.SaveChanges();
+    }
+
+    private static void EnsureBadgeDefinition(
+        WoodyDbContext context,
+        string slug,
+        string name,
+        string description,
+        string iconAssetKey,
+        string category,
+        string? rarity,
+        int sortOrder)
+    {
+        var existing = context.Badges.FirstOrDefault(b => b.Slug == slug);
+        if (existing != null)
+        {
+            existing.Name = name;
+            existing.Description = description;
+            existing.IconAssetKey = iconAssetKey;
+            existing.Category = category;
+            existing.Rarity = rarity;
+            existing.SortOrder = sortOrder;
+            existing.IsActive = true;
             return;
+        }
 
         context.Badges.Add(new Badge
         {
-            Slug = seedSlug,
-            Name = "Seed",
-            Description = "Presente desde o primeiro dia da Woody.",
-            IconAssetKey = "seed",
-            Category = "founding",
-            Rarity = "founder",
+            Slug = slug,
+            Name = name,
+            Description = description,
+            IconAssetKey = iconAssetKey,
+            Category = category,
+            Rarity = rarity,
             IsActive = true,
-            SortOrder = 10,
+            SortOrder = sortOrder,
             CreatedAt = DateTime.UtcNow
         });
+    }
 
-        context.SaveChanges();
+    /// <summary>Insígnias de demo em user1 para QA visual no ambiente de desenvolvimento (idempotente).</summary>
+    private static void SeedDemoUserBadges(WoodyDbContext context)
+    {
+        var user = context.Users.FirstOrDefault(u => u.Username == "user1");
+        if (user == null)
+            return;
+
+        var demoSlugs = new[] { "seed", "test" };
+        var changed = false;
+
+        foreach (var slug in demoSlugs)
+        {
+            var badge = context.Badges.FirstOrDefault(b => b.Slug == slug);
+            if (badge == null)
+                continue;
+
+            if (context.UserBadges.Any(ub => ub.UserId == user.Id && ub.BadgeId == badge.Id))
+                continue;
+
+            context.UserBadges.Add(new UserBadge
+            {
+                UserId = user.Id,
+                BadgeId = badge.Id,
+                EarnedAt = user.CreatedAt
+            });
+            changed = true;
+        }
+
+        if (changed)
+            context.SaveChanges();
     }
 
     private static void SeedBetaInvites(WoodyDbContext context)
