@@ -279,6 +279,17 @@ public static class EntityMappers
         return trimmed[..PrivateDiscoveryDescriptionMaxLength].TrimEnd() + "…";
     }
 
+    public static UserBadgeDto ToUserBadgeDto(UserBadge userBadge) => new()
+    {
+        Slug = userBadge.Badge.Slug,
+        Name = userBadge.Badge.Name,
+        Description = userBadge.Badge.Description,
+        IconAssetKey = userBadge.Badge.IconAssetKey,
+        Category = userBadge.Badge.Category,
+        Rarity = userBadge.Badge.Rarity,
+        EarnedAt = userBadge.EarnedAt
+    };
+
     public static UserProfileDto ToUserProfile(
         User u,
         bool? isFollowing = null,
@@ -287,7 +298,8 @@ public static class EntityMappers
         int followersCount = 0,
         int followingCount = 0,
         bool includePrivateFields = false,
-        bool hasActiveStories = false) => new()
+        bool hasActiveStories = false,
+        List<UserBadgeDto>? badges = null) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -306,7 +318,8 @@ public static class EntityMappers
         FollowersCount = followersCount,
         FollowingCount = followingCount,
         ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow),
-        HasActiveStories = hasActiveStories
+        HasActiveStories = hasActiveStories,
+        Badges = badges ?? new List<UserBadgeDto>()
     };
 
     public static string ToStoryMediaTypeApi(StoryMediaType mediaType) => mediaType switch

@@ -104,9 +104,63 @@ public class UsersByUsernameControllerTests
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
+    [Fact]
+    public async Task GetByUsername_ReturnsBadges_WhenUserHasEarnedBadges()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(x => x.GetByUsernameAsync("badge_user")).ReturnsAsync(new User
+        {
+            Id = 42,
+            Username = "badge_user",
+            DisplayName = "Badge User",
+            Email = "b@example.com",
+            Role = "User",
+            Bio = string.Empty
+        });
+        users.Setup(x => x.GetByIdWithSocialLinksAndInterestsNoTrackingAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Id = 42,
+                Username = "badge_user",
+                DisplayName = "Badge User",
+                Email = "b@example.com",
+                Role = "User",
+                Bio = string.Empty
+            });
+
+        var history = new Mock<IUsernameHistoryRepository>();
+        var earnedAt = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+        var badgeAward = new Mock<IBadgeAwardService>();
+        badgeAward.Setup(x => x.GetUserBadgesAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserBadgeDto>
+            {
+                new()
+                {
+                    Slug = "seed",
+                    Name = "Seed",
+                    Description = "Presente desde o primeiro dia da Woody.",
+                    IconAssetKey = "seed",
+                    Category = "founding",
+                    Rarity = "founder",
+                    EarnedAt = earnedAt
+                }
+            });
+
+        var controller = CreateController(users, history, badgeAward);
+
+        var result = await controller.GetByUsername("badge_user", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<UserProfileDto>(ok.Value);
+        var badge = Assert.Single(dto.Badges);
+        Assert.Equal("seed", badge.Slug);
+        Assert.Equal(earnedAt, badge.EarnedAt);
+    }
+
     private static UsersController CreateController(
         Mock<IUserRepository> users,
-        Mock<IUsernameHistoryRepository> history)
+        Mock<IUsernameHistoryRepository> history,
+        Mock<IBadgeAwardService>? badgeAward = null)
     {
         history.Setup(x => x.AddAsync(It.IsAny<UsernameHistory>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -120,6 +174,13 @@ public class UsersByUsernameControllerTests
         var stories = new Mock<IStoryRepository>();
         stories.Setup(x => x.HasActiveStoriesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
+        var badgeAwardService = badgeAward ?? new Mock<IBadgeAwardService>();
+        if (badgeAward == null)
+        {
+            badgeAwardService.Setup(x => x.GetUserBadgesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<UserBadgeDto>());
+        }
+
         return new UsersController(
             users.Object,
             history.Object,
@@ -129,7 +190,8 @@ public class UsersByUsernameControllerTests
             new Mock<IPostRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
             new Mock<INotificationService>().Object,
-            stories.Object)
+            stories.Object,
+            badgeAwardService.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

@@ -43,6 +43,8 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<PreLaunchSignup> PreLaunchSignups { get; set; }
         public virtual DbSet<Story> Stories { get; set; }
         public virtual DbSet<StoryView> StoryViews { get; set; }
+        public virtual DbSet<Badge> Badges { get; set; }
+        public virtual DbSet<UserBadge> UserBadges { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -507,6 +509,37 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.Property(s => s.IpHash).HasMaxLength(64);
                 e.Property(s => s.UserAgentHash).HasMaxLength(64);
                 e.Property(s => s.Source).HasMaxLength(128);
+            });
+
+            modelBuilder.Entity<Badge>(e =>
+            {
+                e.ToTable("badges");
+                e.HasIndex(b => b.Slug).IsUnique();
+                e.Property(b => b.Slug).HasMaxLength(64);
+                e.Property(b => b.Name).HasMaxLength(120);
+                e.Property(b => b.Description).HasMaxLength(500);
+                e.Property(b => b.IconAssetKey).HasMaxLength(64);
+                e.Property(b => b.Category).HasMaxLength(64);
+                e.Property(b => b.Rarity).HasMaxLength(32);
+            });
+
+            modelBuilder.Entity<UserBadge>(e =>
+            {
+                e.ToTable("user_badges");
+                e.HasIndex(ub => new { ub.UserId, ub.BadgeId }).IsUnique();
+                e.HasIndex(ub => ub.UserId);
+                e.HasIndex(ub => ub.BadgeId);
+                e.Property(ub => ub.MetadataJson).HasColumnType("text");
+
+                e.HasOne(ub => ub.User)
+                    .WithMany()
+                    .HasForeignKey(ub => ub.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(ub => ub.Badge)
+                    .WithMany(b => b.UserBadges)
+                    .HasForeignKey(ub => ub.BadgeId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             base.OnModelCreating(modelBuilder);

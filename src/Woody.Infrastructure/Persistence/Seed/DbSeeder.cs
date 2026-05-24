@@ -26,6 +26,7 @@ public static class DbSeeder
     {
         SeedUsers(context);
         EnsureSuperAdmin(context);
+        SeedBadges(context);
         SeedBetaInvites(context);
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
@@ -234,6 +235,28 @@ public static class DbSeeder
 
         if (context.ChangeTracker.HasChanges())
             context.SaveChanges();
+    }
+
+    private static void SeedBadges(WoodyDbContext context)
+    {
+        const string seedSlug = "seed";
+        if (context.Badges.Any(b => b.Slug == seedSlug))
+            return;
+
+        context.Badges.Add(new Badge
+        {
+            Slug = seedSlug,
+            Name = "Seed",
+            Description = "Presente desde o primeiro dia da Woody.",
+            IconAssetKey = "seed",
+            Category = "founding",
+            Rarity = "founder",
+            IsActive = true,
+            SortOrder = 10,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        context.SaveChanges();
     }
 
     private static void SeedBetaInvites(WoodyDbContext context)

@@ -26,6 +26,7 @@ public class UsersController : ControllerBase
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly INotificationService _notificationService;
     private readonly IStoryRepository _stories;
+    private readonly IBadgeAwardService _badgeAwardService;
 
     public UsersController(
         IUserRepository users,
@@ -36,7 +37,8 @@ public class UsersController : ControllerBase
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
         INotificationService notificationService,
-        IStoryRepository stories)
+        IStoryRepository stories,
+        IBadgeAwardService badgeAwardService)
     {
         _users = users;
         _usernameHistory = usernameHistory;
@@ -47,6 +49,7 @@ public class UsersController : ControllerBase
         _postEnrichment = postEnrichment;
         _notificationService = notificationService;
         _stories = stories;
+        _badgeAwardService = badgeAwardService;
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -591,9 +594,11 @@ public class UsersController : ControllerBase
 
         var isOwnProfile = viewerId.HasValue && viewerId.Value == userId;
         var hasActiveStories = await _stories.HasActiveStoriesAsync(userId, cancellationToken);
+        var badges = await _badgeAwardService.GetUserBadgesAsync(userId, cancellationToken);
         var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount,
             includePrivateFields: isOwnProfile,
-            hasActiveStories: hasActiveStories);
+            hasActiveStories: hasActiveStories,
+            badges: badges);
         if (isOwnProfile)
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 

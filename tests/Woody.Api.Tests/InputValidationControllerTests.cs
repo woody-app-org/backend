@@ -206,6 +206,10 @@ public class InputValidationControllerTests
         history.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        var badgeAward = new Mock<IBadgeAwardService>();
+        badgeAward.Setup(x => x.GetUserBadgesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserBadgeDto>());
+
         var controller = new UsersController(
             users.Object,
             history.Object,
@@ -215,7 +219,8 @@ public class InputValidationControllerTests
             new Mock<IPostRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
             new Mock<INotificationService>().Object,
-            new Mock<IStoryRepository>().Object);
+            new Mock<IStoryRepository>().Object,
+            badgeAward.Object);
         SetUser(controller);
         return controller;
     }

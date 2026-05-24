@@ -32,6 +32,9 @@ public class UserProfileDto
     public bool ShowProBadge { get; set; }
     public bool HasActiveStories { get; set; }
 
+    /// <summary>Insígnias conquistadas (ativas). Distinto de <see cref="ShowProBadge"/>.</summary>
+    public List<UserBadgeDto> Badges { get; set; } = new();
+
     /// <summary>Presente apenas em <c>GET /users/me</c> (perfil da própria utilizadora).</summary>
     public UserSubscriptionStateDto? Subscription { get; set; }
 }

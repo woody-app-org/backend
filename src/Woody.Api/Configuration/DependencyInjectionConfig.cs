@@ -28,6 +28,8 @@ public static class DependencyInjectionConfig
 {
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<IBadgeRepository, BadgeRepository>();
+        builder.Services.AddScoped<IBadgeAwardService, BadgeAwardService>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IUsernameHistoryRepository, UsernameHistoryRepository>();
         builder.Services.AddScoped<UsernameResolver>();
