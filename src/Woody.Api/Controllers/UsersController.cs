@@ -84,6 +84,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         var me = User.GetUserId();
@@ -93,7 +94,9 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowingPagedAsync(me.Value, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowingPagedAsync(
+            me.Value, page, pageSize, normalizedSearch, cancellationToken);
         var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);
@@ -444,6 +447,7 @@ public class UsersController : ControllerBase
         string userId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(userId, out var uid))
@@ -455,7 +459,9 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowersPagedAsync(uid, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowersPagedAsync(
+            uid, page, pageSize, normalizedSearch, cancellationToken);
         var followerStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);
@@ -478,6 +484,7 @@ public class UsersController : ControllerBase
         string userId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(userId, out var uid))
@@ -489,7 +496,9 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowingPagedAsync(uid, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowingPagedAsync(
+            uid, page, pageSize, normalizedSearch, cancellationToken);
         var followingStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);

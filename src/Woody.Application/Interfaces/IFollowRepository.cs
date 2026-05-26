@@ -17,6 +17,7 @@ public interface IFollowRepository
         int followedUserId,
         int page,
         int pageSize,
+        string? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Utilizadores seguidos por <paramref name="followingUserId"/>.</summary>
@@ -24,6 +25,7 @@ public interface IFollowRepository
         int followingUserId,
         int page,
         int pageSize,
+        string? search = null,
         CancellationToken cancellationToken = default);
 
     void Add(Follow follow);

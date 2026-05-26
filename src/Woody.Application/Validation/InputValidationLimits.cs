@@ -47,4 +47,7 @@ public static class InputValidationLimits
     public const int MembershipStatusMaxLength = 20;
 
     public const int JoinRequestRejectionReasonMaxLength = 500;
+
+    /// <summary>Comprimento máximo do parâmetro <c>search</c> em listas de seguidores/seguindo.</summary>
+    public const int FollowListSearchMaxLength = 100;
 }

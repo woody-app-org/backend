@@ -46,10 +46,19 @@ public class FollowRepository : IFollowRepository
         int followedUserId,
         int page,
         int pageSize,
+        string? search = null,
         CancellationToken cancellationToken = default)
     {
         var q = _db.Follows.AsNoTracking()
             .Where(f => f.FollowedUserId == followedUserId);
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            q = q.Where(f =>
+                f.FollowingUser.Username.ToLower().Contains(search)
+                || (f.FollowingUser.DisplayName != null
+                    && f.FollowingUser.DisplayName.ToLower().Contains(search)));
+        }
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
@@ -67,10 +76,19 @@ public class FollowRepository : IFollowRepository
         int followingUserId,
         int page,
         int pageSize,
+        string? search = null,
         CancellationToken cancellationToken = default)
     {
         var q = _db.Follows.AsNoTracking()
             .Where(f => f.FollowingUserId == followingUserId);
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            q = q.Where(f =>
+                f.FollowedUser.Username.ToLower().Contains(search)
+                || (f.FollowedUser.DisplayName != null
+                    && f.FollowedUser.DisplayName.ToLower().Contains(search)));
+        }
 
         var total = await q.CountAsync(cancellationToken);
         var items = await q
