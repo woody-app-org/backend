@@ -7,6 +7,11 @@ public class UserProfileDto
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
     public string? Username { get; set; }
+
+    /// <summary>
+    /// Presente quando o handle pedido era um username antigo; indica o username actual para actualizar a URL.
+    /// </summary>
+    public string? CanonicalUsername { get; set; }
     public string? AvatarUrl { get; set; }
     public string? Pronouns { get; set; }
     public string? BannerUrl { get; set; }
@@ -25,6 +30,10 @@ public class UserProfileDto
     public int FollowersCount { get; set; }
     public int FollowingCount { get; set; }
     public bool ShowProBadge { get; set; }
+    public bool HasActiveStories { get; set; }
+
+    /// <summary>Insígnias conquistadas (ativas). Distinto de <see cref="ShowProBadge"/>.</summary>
+    public List<UserBadgeDto> Badges { get; set; } = new();
 
     /// <summary>Presente apenas em <c>GET /users/me</c> (perfil da própria utilizadora).</summary>
     public UserSubscriptionStateDto? Subscription { get; set; }

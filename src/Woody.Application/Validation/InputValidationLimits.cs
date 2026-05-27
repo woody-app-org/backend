@@ -2,6 +2,7 @@ namespace Woody.Application.Validation;
 
 public static class InputValidationLimits
 {
+    public const int UsernameMinLength = 3;
     public const int UsernameMaxLength = 30;
     public const int DisplayNameMaxLength = 80;
     public const int EmailMaxLength = 254;
@@ -46,4 +47,7 @@ public static class InputValidationLimits
     public const int MembershipStatusMaxLength = 20;
 
     public const int JoinRequestRejectionReasonMaxLength = 500;
+
+    /// <summary>Comprimento máximo do parâmetro <c>search</c> em listas de seguidores/seguindo.</summary>
+    public const int FollowListSearchMaxLength = 100;
 }

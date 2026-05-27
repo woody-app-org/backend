@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.Beta;
 using Woody.Application.Billing;
+using Woody.Application.Posts;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
@@ -25,6 +26,8 @@ public static class DbSeeder
     {
         SeedUsers(context);
         EnsureSuperAdmin(context);
+        SeedBadges(context);
+        SeedDemoUserBadges(context);
         SeedBetaInvites(context);
         EnsureUserSubscriptions(context);
         SeedProDemoSubscription(context);
@@ -235,6 +238,100 @@ public static class DbSeeder
             context.SaveChanges();
     }
 
+    private static void SeedBadges(WoodyDbContext context)
+    {
+        EnsureBadgeDefinition(
+            context,
+            slug: "seed",
+            name: "Raiz",
+            description: "Presente desde o primeiro dia da Woody.",
+            iconAssetKey: "seed",
+            category: "founding",
+            rarity: "founder",
+            sortOrder: 10);
+
+        EnsureBadgeDefinition(
+            context,
+            slug: "test",
+            name: "Teste",
+            description: "Insígnia de teste para visualizar múltiplas badges no perfil.",
+            iconAssetKey: "test",
+            category: "founding",
+            rarity: null,
+            sortOrder: 20);
+
+        context.SaveChanges();
+    }
+
+    private static void EnsureBadgeDefinition(
+        WoodyDbContext context,
+        string slug,
+        string name,
+        string description,
+        string iconAssetKey,
+        string category,
+        string? rarity,
+        int sortOrder)
+    {
+        var existing = context.Badges.FirstOrDefault(b => b.Slug == slug);
+        if (existing != null)
+        {
+            existing.Name = name;
+            existing.Description = description;
+            existing.IconAssetKey = iconAssetKey;
+            existing.Category = category;
+            existing.Rarity = rarity;
+            existing.SortOrder = sortOrder;
+            existing.IsActive = true;
+            return;
+        }
+
+        context.Badges.Add(new Badge
+        {
+            Slug = slug,
+            Name = name,
+            Description = description,
+            IconAssetKey = iconAssetKey,
+            Category = category,
+            Rarity = rarity,
+            IsActive = true,
+            SortOrder = sortOrder,
+            CreatedAt = DateTime.UtcNow
+        });
+    }
+
+    /// <summary>Insígnias de demo em user1 para QA visual no ambiente de desenvolvimento (idempotente).</summary>
+    private static void SeedDemoUserBadges(WoodyDbContext context)
+    {
+        var user = context.Users.FirstOrDefault(u => u.Username == "user1");
+        if (user == null)
+            return;
+
+        var demoSlugs = new[] { "seed", "test" };
+        var changed = false;
+
+        foreach (var slug in demoSlugs)
+        {
+            var badge = context.Badges.FirstOrDefault(b => b.Slug == slug);
+            if (badge == null)
+                continue;
+
+            if (context.UserBadges.Any(ub => ub.UserId == user.Id && ub.BadgeId == badge.Id))
+                continue;
+
+            context.UserBadges.Add(new UserBadge
+            {
+                UserId = user.Id,
+                BadgeId = badge.Id,
+                EarnedAt = user.CreatedAt
+            });
+            changed = true;
+        }
+
+        if (changed)
+            context.SaveChanges();
+    }
+
     private static void SeedBetaInvites(WoodyDbContext context)
     {
         var raw = Environment.GetEnvironmentVariable("WOODY_DEV_BETA_INVITE_CODE")?.Trim();
@@ -437,6 +534,7 @@ public static class DbSeeder
             var authorId = memberIds[dayOffset % memberIds.Count];
             postsBatch.Add(new Post
             {
+                PublicId = PostPublicIdGenerator.Generate(),
                 UserId = authorId,
                 CommunityId = techId,
                 PublicationContext = PostPublicationContext.Community,
@@ -738,6 +836,7 @@ public static class DbSeeder
                 $"{tpl.Hook}\n\n{tpl.Body}\n\n(Seed #{i + 1} · comunidade {com.Name}.)";
             var post = new Post
             {
+                PublicId = PostPublicIdGenerator.Generate(),
                 UserId = author.Id,
                 CommunityId = com.Id,
                 PublicationContext = PostPublicationContext.Community,
@@ -809,6 +908,7 @@ public static class DbSeeder
 
         var p1 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
@@ -826,6 +926,7 @@ public static class DbSeeder
 
         var p2 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = geral.Id,
             PublicationContext = PostPublicationContext.Community,
@@ -843,6 +944,7 @@ public static class DbSeeder
 
         var p3 = new Post
         {
+            PublicId = PostPublicIdGenerator.Generate(),
             UserId = admin.Id,
             CommunityId = null,
             PublicationContext = PostPublicationContext.Profile,

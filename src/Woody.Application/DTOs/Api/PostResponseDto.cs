@@ -3,6 +3,8 @@ namespace Woody.Application.DTOs.Api;
 public class PostResponseDto
 {
     public string Id { get; set; } = null!;
+    /// <summary>Identificador público opaco para URLs partilháveis (<c>pst_…</c>).</summary>
+    public string PublicId { get; set; } = null!;
     /// <summary><c>profile</c> ou <c>community</c> — discrimina feeds e UI.</summary>
     public string PublicationContext { get; set; } = null!;
     public string? CommunityId { get; set; }

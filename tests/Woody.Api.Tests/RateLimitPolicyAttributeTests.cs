@@ -10,6 +10,7 @@ public class RateLimitPolicyAttributeTests
     [Theory]
     [InlineData(typeof(AuthController), nameof(AuthController.Login), RateLimitPolicyNames.AuthLogin)]
     [InlineData(typeof(AuthController), nameof(AuthController.Register), RateLimitPolicyNames.AuthRegister)]
+    [InlineData(typeof(AuthController), nameof(AuthController.CheckRegistrationAvailability), RateLimitPolicyNames.AuthRegister)]
     [InlineData(typeof(AuthController), nameof(AuthController.SendVerificationCode), RateLimitPolicyNames.AuthEmailSend)]
     [InlineData(typeof(AuthController), nameof(AuthController.ResendVerificationCode), RateLimitPolicyNames.AuthEmailSend)]
     [InlineData(typeof(AuthController), nameof(AuthController.VerifyEmailCode), RateLimitPolicyNames.AuthEmailVerify)]

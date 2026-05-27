@@ -3,12 +3,14 @@ using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
+using Woody.Domain.Stories;
 
 namespace Woody.Infrastructure.Persistence.Context
 {
     public class WoodyDbContext : DbContext
     {
         public virtual DbSet<User> Users { get; set; }
+        public virtual DbSet<UsernameHistory> UsernameHistories { get; set; }
         public virtual DbSet<Post> Posts { get; set; }
         public virtual DbSet<Comment> Comments { get; set; }
         public virtual DbSet<Like> Likes { get; set; }
@@ -39,6 +41,10 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<BetaInvite> BetaInvites { get; set; }
         public virtual DbSet<IdentityVerification> IdentityVerifications { get; set; }
         public virtual DbSet<PreLaunchSignup> PreLaunchSignups { get; set; }
+        public virtual DbSet<Story> Stories { get; set; }
+        public virtual DbSet<StoryView> StoryViews { get; set; }
+        public virtual DbSet<Badge> Badges { get; set; }
+        public virtual DbSet<UserBadge> UserBadges { get; set; }
 
         public WoodyDbContext(DbContextOptions<WoodyDbContext> options) : base(options)
         {
@@ -50,6 +56,9 @@ namespace Woody.Infrastructure.Persistence.Context
             {
                 e.HasIndex(u => u.Username).IsUnique();
                 e.HasIndex(u => u.Email).IsUnique();
+                e.HasIndex(u => u.Cpf).IsUnique();
+                e.Property(u => u.Username).HasMaxLength(InputValidationLimits.UsernameMaxLength);
+                e.Property(u => u.Cpf).HasMaxLength(11);
                 e.Property(u => u.ProfileSignalsIncomingPreference)
                     .HasConversion<int>()
                     .HasDefaultValue(ProfileSignalsIncomingPreference.All);
@@ -62,6 +71,20 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(i => i.Users)
                     .HasForeignKey(u => u.InviteId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<UsernameHistory>(e =>
+            {
+                e.ToTable("username_history");
+                e.HasIndex(h => h.OldUsername);
+                e.HasIndex(h => h.UserId);
+                e.Property(h => h.OldUsername).HasMaxLength(InputValidationLimits.UsernameMaxLength);
+                e.Property(h => h.NewUsername).HasMaxLength(InputValidationLimits.UsernameMaxLength);
+
+                e.HasOne(h => h.User)
+                    .WithMany()
+                    .HasForeignKey(h => h.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<IdentityVerification>(e =>
@@ -232,6 +255,12 @@ namespace Woody.Infrastructure.Persistence.Context
 
                 e.HasIndex(p => new { p.PublicationContext, p.UserId });
                 e.HasIndex(p => new { p.UserId, p.PinnedOnProfileAt });
+
+                e.Property(p => p.PublicId)
+                    .HasColumnName("public_id")
+                    .HasMaxLength(16)
+                    .IsRequired();
+                e.HasIndex(p => p.PublicId).IsUnique();
             });
 
             modelBuilder.Entity<MediaAttachment>(e =>
@@ -420,6 +449,52 @@ namespace Woody.Infrastructure.Persistence.Context
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            modelBuilder.Entity<Story>(e =>
+            {
+                e.ToTable("stories");
+                e.Property(s => s.MediaType).HasConversion<int>();
+                e.Property(s => s.Visibility).HasConversion<int>().HasDefaultValue(StoryVisibility.Public);
+                e.Property(s => s.MediaUrl).HasMaxLength(2048);
+                e.Property(s => s.ThumbnailUrl).HasMaxLength(2048);
+                e.Property(s => s.StorageKey).HasMaxLength(512);
+                e.Property(s => s.Text).HasMaxLength(StoryPolicies.MaxTextLength);
+                e.Property(s => s.BackgroundColor).HasMaxLength(StoryPolicies.MaxBackgroundColorLength);
+                e.Property(s => s.MusicProvider).HasMaxLength(32);
+                e.Property(s => s.MusicTrackId).HasMaxLength(128);
+                e.Property(s => s.MusicTitle).HasMaxLength(256);
+                e.Property(s => s.MusicArtist).HasMaxLength(256);
+                e.Property(s => s.MusicPreviewUrl).HasMaxLength(2048);
+
+                e.HasIndex(s => s.ExpiresAt);
+                e.HasIndex(s => new { s.AuthorUserId, s.ExpiresAt })
+                    .HasFilter("deleted_at IS NULL")
+                    .HasDatabaseName("ix_stories_author_expires_not_deleted");
+
+                e.HasOne(s => s.Author)
+                    .WithMany(u => u.Stories)
+                    .HasForeignKey(s => s.AuthorUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<StoryView>(e =>
+            {
+                e.ToTable("story_views");
+                e.HasIndex(v => new { v.StoryId, v.ViewerUserId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_story_views_story_id_viewer_user_id");
+                e.HasIndex(v => v.ViewedAt);
+
+                e.HasOne(v => v.Story)
+                    .WithMany(s => s.Views)
+                    .HasForeignKey(v => v.StoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(v => v.Viewer)
+                    .WithMany(u => u.StoryViews)
+                    .HasForeignKey(v => v.ViewerUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<PreLaunchSignup>(e =>
             {
                 e.ToTable("pre_launch_signups");
@@ -434,6 +509,37 @@ namespace Woody.Infrastructure.Persistence.Context
                 e.Property(s => s.IpHash).HasMaxLength(64);
                 e.Property(s => s.UserAgentHash).HasMaxLength(64);
                 e.Property(s => s.Source).HasMaxLength(128);
+            });
+
+            modelBuilder.Entity<Badge>(e =>
+            {
+                e.ToTable("badges");
+                e.HasIndex(b => b.Slug).IsUnique();
+                e.Property(b => b.Slug).HasMaxLength(64);
+                e.Property(b => b.Name).HasMaxLength(120);
+                e.Property(b => b.Description).HasMaxLength(500);
+                e.Property(b => b.IconAssetKey).HasMaxLength(64);
+                e.Property(b => b.Category).HasMaxLength(64);
+                e.Property(b => b.Rarity).HasMaxLength(32);
+            });
+
+            modelBuilder.Entity<UserBadge>(e =>
+            {
+                e.ToTable("user_badges");
+                e.HasIndex(ub => new { ub.UserId, ub.BadgeId }).IsUnique();
+                e.HasIndex(ub => ub.UserId);
+                e.HasIndex(ub => ub.BadgeId);
+                e.Property(ub => ub.MetadataJson).HasColumnType("text");
+
+                e.HasOne(ub => ub.User)
+                    .WithMany()
+                    .HasForeignKey(ub => ub.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(ub => ub.Badge)
+                    .WithMany(b => b.UserBadges)
+                    .HasForeignKey(ub => ub.BadgeId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             base.OnModelCreating(modelBuilder);

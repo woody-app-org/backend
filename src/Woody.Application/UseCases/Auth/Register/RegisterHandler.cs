@@ -50,12 +50,7 @@ public class RegisterHandler
 
     public async Task<LoginResultDTO> HandleAsync(RegisterRequestDTO request, CancellationToken cancellationToken = default)
     {
-        if (!InputValidator.TryNormalizeRequiredText(
-                request.Username,
-                "Nome de utilizador",
-                InputValidationLimits.UsernameMaxLength,
-                out var username,
-                out var error))
+        if (!UsernameInputValidator.TryValidate(request.Username, out var username, out var error))
             throw new ArgumentException(error);
 
         if (!InputValidator.TryNormalizeRequiredText(
@@ -67,30 +62,41 @@ public class RegisterHandler
             throw new ArgumentException(error);
         email = email.ToLowerInvariant();
 
-        if (!InputValidator.TryNormalizeRequiredText(
+        if (!PasswordInputValidator.TryValidateForRegistration(
                 request.Password,
-                "Senha",
                 InputValidationLimits.PasswordMaxLength,
+                minLength: 8,
                 out var password,
-                out error,
-                minLength: 8))
+                out error))
             throw new ArgumentException(error);
 
         if (!InputValidator.TryNormalizeRequiredText(
                 request.Cpf,
                 "CPF",
                 InputValidationLimits.CpfMaxLength,
-                out var cpf,
+                out var cpfRaw,
                 out error))
             throw new ArgumentException(error);
+
+        var cpf = CpfInputNormalizer.NormalizeDigits(cpfRaw);
+        if (cpf.Length != 11 || !CpfInputNormalizer.IsValid(cpf))
+            throw new ArgumentException("CPF inválido.");
 
         if (!InputValidator.TryNormalizeHttpsImageUrl(request.AvatarUrl, out var avatarUrl, out error))
             throw new ArgumentException(error);
 
         if (await _users.ExistsUsernameAsync(username))
-            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.UsernameTakenMessage,
+                "username");
         if (await _users.ExistsEmailAsync(email))
-            throw new InvalidOperationException("Não foi possível concluir o cadastro. Verifique os dados e tente novamente.");
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.EmailTakenMessage,
+                "email");
+        if (await _users.ExistsCpfAsync(cpf, cancellationToken))
+            throw new RegistrationConflictException(
+                CheckRegistrationAvailabilityHandler.CpfTakenMessage,
+                "cpf");
 
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");

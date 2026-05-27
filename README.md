@@ -58,7 +58,6 @@ Defina também:
 - `Resend__FromEmail` (remetente usado no envio do código)
 - `Resend__FromName` (opcional, nome do remetente)
 - `CORS_ORIGINS` em produção, com as origens exatas do frontend separadas por vírgula
-- `PRELAUNCH_HASH_SECRET` ou `PreLaunch__HashSecret` (segredo forte para o fluxo de pré-inscrição em produção — ver secção «Primeiro release»)
 
 Parâmetros de verificação de e-mail (com valores padrão no `appsettings.json`, sobrescrevíveis por env vars):
 
@@ -117,54 +116,7 @@ dotnet run --project .\Woody.Api\ --no-launch-profile --urls "https://localhost:
 
 Perfis **`http`** / **`https`** no Visual Studio/Rider continuam a definir URLs; define **`ASPNETCORE_ENVIRONMENT`** no `.env` ou nas propriedades de depuração do IDE se precisares de Development ao premir F5.
 
-### 5. Primeiro release (produção / Railway)
-
-A V1 pública foca-se no **cadastro pré-lançamento** (`POST /api/prelaunch/signups`). O processo de arranque em **`Production`** valida **toda** a configuração da API (`Jwt`, `Resend`, `EmailVerification`, `Billing`, `CORS_ORIGINS`, etc.) — não existe modo “só waitlist” no código; todas as variáveis abaixo têm de estar definidas no serviço (ou a aplicação **não inicia**). Detalhe: `Program.cs`, `ValidateProductionDeployment`, `ValidateResendOptions`.
-
-#### Docker (imagem na raiz do `backend/`)
-
-```powershell
-docker build -t woody-api .
-# Exemplo mínimo; em produção injeta todas as variáveis (Railway, etc.)
-docker run --rm -p 8080:8080 -e PORT=8080 woody-api
-```
-
-O **`Dockerfile`** define `ASPNETCORE_ENVIRONMENT=Production`, `PORT=8080` e `ENTRYPOINT ["dotnet", "Woody.Api.dll"]`. O Kestrel escuta em `0.0.0.0:$PORT` quando `PORT` existe (`ConfigureRailwayPort` em `Program.cs`).
-
-#### Railway (resumo)
-
-| Campo | Valor |
-|--------|--------|
-| **Root Directory** | Pasta onde estão `Woody.sln` e `Dockerfile` (se o mono-repo tiver frontend, apontar para a subpasta `backend`). |
-| **Dockerfile** | `Dockerfile` (raiz do backend). |
-| **Porta** | `8080` (ou o que o Railway injetar em `PORT` — o código usa `PORT`). |
-| **Health check** | **`/health`** (liveness) ou **`/health/ready`** (inclui PostgreSQL; se a BD falhar, responde 503). |
-
-**Migrações:** o Dockerfile **não** corre `dotnet ef`. Aplica-as uma vez (CI, job one-shot ou máquina com SDK) contra a mesma `DATABASE_URL` do serviço:
-
-```powershell
-cd src
-dotnet ef database update --project .\Woody.Infrastructure\ --startup-project .\Woody.Api\
-```
-
-#### Variáveis obrigatórias / críticas no primeiro release
-
-| Variável | Notas |
-|----------|--------|
-| `DATABASE_URL` ou `ConnectionStrings__DefaultConnection` | PostgreSQL (`DatabaseConnectionResolver`). |
-| `CORS_ORIGINS` | Origens do frontend, separadas por vírgula. Em `Production` **é obrigatório** (senão a API não arranca). |
-| `Jwt__Secret` | Mínimo **32** caracteres em `Production` (`Program.cs`). |
-| `Resend__ApiKey`, `Resend__FromEmail` | Obrigatórios no arranque (`ValidateResendOptions`). |
-| `PRELAUNCH_HASH_SECRET` ou `PreLaunch__HashSecret` | Segredo forte para hash de IP/UA no pré-lançamento; **não deixar vazio** em produção (`PreLaunchController.ResolveHashSecret`). |
-| `ForwardedHeaders__TrustPrivateNetworkProxies` | `true` recomendado atrás do proxy do Railway para **IP real** em rate limit e pré-inscrição (`Program.cs`). |
-| `PUBLIC_LAUNCH_MODE` | Opcional: `waitlist_form` bloqueia o resto da API e deixa só pré-inscrição + health + CORS preflight (`WaitlistFormModeMiddleware`). |
-| `WOODY_ENABLE_DEV_SEED` | Não definir como `true` em produção. |
-
-Stripe: se preencheres chaves/URLs de billing em produção, `ValidateProductionStripeOptions` exige HTTPS e secrets — vê `Program.cs`. Se Stripe estiver vazio no config, essa validação extra não corre.
-
-Checklist adicional: `SECURITY_DEPLOY_CHECKLIST.md`.
-
-### 6. Frontend (repositório separado)
+### 5. Frontend (repositório separado)
 
 No projeto **woody-frontend**:
 
@@ -195,11 +147,9 @@ dotnet ef database update NomeDaMigracaoAnterior --project .\Woody.Infrastructur
 ```
 backend/
 ├── Woody.sln
-├── Dockerfile            # Build/publish Production (Railway, etc.)
-├── docker-compose.yml    # Postgres local
-├── .env.example          # Modelo (versionado)
-├── .env                  # Local — NÃO commitar
-├── run-api.ps1
+├── docker-compose.yml      # Postgres local
+├── .env.example            # Modelo (versionado)
+├── .env                    # Local — NÃO commitar
 ├── run-migrations.ps1
 ├── scripts/
 │   └── Load-DotEnv.ps1
@@ -208,14 +158,4 @@ backend/
     ├── Woody.Application/
     ├── Woody.Domain/
     └── Woody.Infrastructure/   # EF Core, migrações, seed
-```
-
-## Build e testes (antes do release)
-
-Na raiz do `backend/`:
-
-```powershell
-dotnet restore Woody.sln
-dotnet build Woody.sln -c Release
-dotnet test Woody.sln -c Release
 ```

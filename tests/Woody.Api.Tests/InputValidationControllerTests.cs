@@ -6,6 +6,7 @@ using Woody.Api.Controllers;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
+using Woody.Application.Services;
 using Woody.Application.Validation;
 using Woody.Domain.Entities;
 
@@ -86,6 +87,85 @@ public class InputValidationControllerTests
         users.Verify(x => x.SaveChangesAsync(), Times.Never);
     }
 
+    [Fact]
+    public async Task PatchProfile_RejectsUsernameWithSlash()
+    {
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdTrackedAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Id = 10,
+                Username = "ana",
+                Email = "ana@example.com",
+                Role = "User",
+                DisplayName = "Ana"
+            });
+
+        var controller = CreateUsersController(users);
+
+        var result = await controller.PatchMe(new UpdateProfileRequestDTO
+        {
+            Name = "Ana",
+            Username = "ana/test"
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        users.Verify(x => x.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task PatchProfile_RecordsUsernameHistory_WhenUsernameChanges()
+    {
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdTrackedAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Id = 10,
+                Username = "ana",
+                Email = "ana@example.com",
+                Role = "User",
+                DisplayName = "Ana",
+                Bio = string.Empty
+            });
+        users.Setup(x => x.ExistsUsernameAsync("ana_nova")).ReturnsAsync(false);
+        users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
+        users.Setup(x => x.GetInterestsTrackedByUserIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserInterest>());
+
+        var history = new Mock<IUsernameHistoryRepository>();
+        UsernameHistory? captured = null;
+        history.Setup(x => x.AddAsync(It.IsAny<UsernameHistory>(), It.IsAny<CancellationToken>()))
+            .Callback<UsernameHistory, CancellationToken>((entry, _) => captured = entry)
+            .Returns(Task.CompletedTask);
+
+        users.Setup(x => x.GetByIdWithSocialLinksAndInterestsNoTrackingAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int uid, CancellationToken _) => new User
+            {
+                Id = uid,
+                Username = "ana_nova",
+                Email = "ana@example.com",
+                Role = "User",
+                DisplayName = "Ana",
+                Bio = string.Empty
+            });
+
+        var controller = CreateUsersController(users, history);
+
+        var result = await controller.PatchMe(new UpdateProfileRequestDTO
+        {
+            Name = "Ana",
+            Username = " ANA_NOVA "
+        }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(captured);
+        Assert.Equal("ana", captured!.OldUsername);
+        Assert.Equal("ana_nova", captured.NewUsername);
+        Assert.Equal(10, captured.UserId);
+    }
+
     private static PostsController CreatePostsController(Mock<IPostRepository>? posts = null)
     {
         var controller = new PostsController(
@@ -113,15 +193,34 @@ public class InputValidationControllerTests
         return controller;
     }
 
-    private static UsersController CreateUsersController(Mock<IUserRepository> users)
+    private static UsersController CreateUsersController(
+        Mock<IUserRepository> users,
+        Mock<IUsernameHistoryRepository>? usernameHistory = null)
     {
+        var history = usernameHistory ?? new Mock<IUsernameHistoryRepository>();
+        if (usernameHistory == null)
+        {
+            history.Setup(x => x.AddAsync(It.IsAny<UsernameHistory>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+        }
+        history.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var badgeAward = new Mock<IBadgeAwardService>();
+        badgeAward.Setup(x => x.GetUserBadgesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserBadgeDto>());
+
         var controller = new UsersController(
             users.Object,
+            history.Object,
+            new UsernameResolver(users.Object, history.Object),
             new Mock<ICommunityMembershipRepository>().Object,
             new Mock<IFollowRepository>().Object,
             new Mock<IPostRepository>().Object,
             new Mock<IPostEnrichmentService>().Object,
-            new Mock<INotificationService>().Object);
+            new Mock<INotificationService>().Object,
+            new Mock<IStoryRepository>().Object,
+            badgeAward.Object);
         SetUser(controller);
         return controller;
     }

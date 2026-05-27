@@ -10,7 +10,7 @@ public static class EntityMappers
 {
     public static string Iso(DateTime dt) => dt.ToUniversalTime().ToString("o");
 
-    public static UserPublicDto ToUserPublicDto(User u)
+    public static UserPublicDto ToUserPublicDto(User u, bool hasActiveStories = false)
     {
         var utcNow = DateTime.UtcNow;
         return new UserPublicDto
@@ -21,7 +21,8 @@ public static class EntityMappers
             AvatarUrl = u.ProfilePic,
             Bio = u.Bio,
             Pronouns = u.Pronouns,
-            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, utcNow)
+            ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, utcNow),
+            HasActiveStories = hasActiveStories
         };
     }
 
@@ -159,6 +160,7 @@ public static class EntityMappers
         return new PostResponseDto
         {
             Id = p.Id.ToString(),
+            PublicId = p.PublicId,
             PublicationContext = ToPublicationContextApi(p.PublicationContext),
             CommunityId = p.CommunityId?.ToString(),
             AuthorId = p.UserId.ToString(),
@@ -277,6 +279,17 @@ public static class EntityMappers
         return trimmed[..PrivateDiscoveryDescriptionMaxLength].TrimEnd() + "…";
     }
 
+    public static UserBadgeDto ToUserBadgeDto(UserBadge userBadge) => new()
+    {
+        Slug = userBadge.Badge.Slug,
+        Name = userBadge.Badge.Name,
+        Description = userBadge.Badge.Description,
+        IconAssetKey = userBadge.Badge.IconAssetKey,
+        Category = userBadge.Badge.Category,
+        Rarity = userBadge.Badge.Rarity,
+        EarnedAt = userBadge.EarnedAt
+    };
+
     public static UserProfileDto ToUserProfile(
         User u,
         bool? isFollowing = null,
@@ -284,7 +297,9 @@ public static class EntityMappers
         List<InterestItemResponseDto>? interests = null,
         int followersCount = 0,
         int followingCount = 0,
-        bool includePrivateFields = false) => new()
+        bool includePrivateFields = false,
+        bool hasActiveStories = false,
+        List<UserBadgeDto>? badges = null) => new()
     {
         Id = u.Id.ToString(),
         Name = u.DisplayName ?? u.Username,
@@ -302,6 +317,16 @@ public static class EntityMappers
         IsFollowing = isFollowing,
         FollowersCount = followersCount,
         FollowingCount = followingCount,
-        ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow)
+        ShowProBadge = SubscriptionEntitlement.ShouldShowProBadge(u.Subscription, DateTime.UtcNow),
+        HasActiveStories = hasActiveStories,
+        Badges = badges ?? new List<UserBadgeDto>()
+    };
+
+    public static string ToStoryMediaTypeApi(StoryMediaType mediaType) => mediaType switch
+    {
+        StoryMediaType.Image => "image",
+        StoryMediaType.Video => "video",
+        StoryMediaType.Text => "text",
+        _ => mediaType.ToString().ToLowerInvariant()
     };
 }

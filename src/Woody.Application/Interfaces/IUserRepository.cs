@@ -9,6 +9,7 @@ public interface IUserRepository
     Task<User?> GetByUsernameOrEmailAsync(string login);
     Task<User?> GetByIdAsync(int id);
     Task<User?> GetByIdNoTrackingAsync(int id, CancellationToken cancellationToken = default);
+    Task<List<User>> GetByIdsNoTrackingAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default);
     Task<User?> GetByIdWithSocialLinksAndInterestsNoTrackingAsync(int id, CancellationToken cancellationToken = default);
     Task<User?> GetByIdTrackedAsync(int id, CancellationToken cancellationToken = default);
     Task<List<UserInterest>> GetInterestsTrackedByUserIdAsync(int userId, CancellationToken cancellationToken = default);
@@ -18,6 +19,7 @@ public interface IUserRepository
     Task<List<User>> ListUsersForSuggestionsAsync(IReadOnlyCollection<int> excludeUserIds, int take, CancellationToken cancellationToken = default);
     Task<bool> ExistsUsernameAsync(string username);
     Task<bool> ExistsEmailAsync(string email);
+    Task<bool> ExistsCpfAsync(string cpfDigits, CancellationToken cancellationToken = default);
     Task AddAsync(User user);
     Task SaveChangesAsync();
     void Update(User user);

@@ -14,11 +14,19 @@ public sealed class NotificationService : INotificationService
 
     private readonly INotificationRepository _notifications;
     private readonly INotificationRealtimePublisher _realtime;
+    private readonly IUserRepository _users;
+    private readonly IPostRepository _posts;
 
-    public NotificationService(INotificationRepository notifications, INotificationRealtimePublisher realtime)
+    public NotificationService(
+        INotificationRepository notifications,
+        INotificationRealtimePublisher realtime,
+        IUserRepository users,
+        IPostRepository posts)
     {
         _notifications = notifications;
         _realtime = realtime;
+        _users = users;
+        _posts = posts;
     }
 
     public async Task<NotificationListResponseDto> ListMineAsync(
@@ -96,7 +104,12 @@ public sealed class NotificationService : INotificationService
                 cancellationToken))
             return;
 
-        _notifications.Add(NotificationComposer.PostLiked(postOwnerUserId, actorUserId, postId, now));
+        _notifications.Add(NotificationComposer.PostLiked(
+            postOwnerUserId,
+            actorUserId,
+            postId,
+            now,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
     }
@@ -106,7 +119,13 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == postOwnerUserId)
             return;
 
-        _notifications.Add(NotificationComposer.PostCommented(postOwnerUserId, actorUserId, postId, commentId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.PostCommented(
+            postOwnerUserId,
+            actorUserId,
+            postId,
+            commentId,
+            DateTime.UtcNow,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
     }
@@ -128,7 +147,8 @@ public sealed class NotificationService : INotificationService
             postId,
             parentCommentId,
             replyCommentId,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            await ResolvePostPublicIdAsync(postId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(parentCommentAuthorUserId, cancellationToken);
     }
@@ -138,7 +158,11 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == followedUserId)
             return;
 
-        _notifications.Add(NotificationComposer.NewFollower(followedUserId, actorUserId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.NewFollower(
+            followedUserId,
+            actorUserId,
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(actorUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(followedUserId, cancellationToken);
     }
@@ -158,7 +182,8 @@ public sealed class NotificationService : INotificationService
             senderUserId,
             profileSignalId,
             profileSignalTypeApi,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(senderUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(receiverUserId, cancellationToken);
     }
@@ -168,7 +193,12 @@ public sealed class NotificationService : INotificationService
         if (initiatorUserId == recipientUserId)
             return;
 
-        _notifications.Add(NotificationComposer.MessageRequest(recipientUserId, initiatorUserId, conversationId, DateTime.UtcNow));
+        _notifications.Add(NotificationComposer.MessageRequest(
+            recipientUserId,
+            initiatorUserId,
+            conversationId,
+            DateTime.UtcNow,
+            await ResolveUsernameAsync(initiatorUserId, cancellationToken)));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(recipientUserId, cancellationToken);
     }
@@ -182,13 +212,21 @@ public sealed class NotificationService : INotificationService
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
+        var requesterUsername = await ResolveUsernameAsync(requesterUserId, cancellationToken);
         var rows = new List<Notification>();
         foreach (var modId in moderatorUserIds.Distinct())
         {
             if (modId == requesterUserId)
                 continue;
 
-            rows.Add(NotificationComposer.CommunityJoinRequest(modId, requesterUserId, communityId, communitySlug, joinRequestId, now));
+            rows.Add(NotificationComposer.CommunityJoinRequest(
+                modId,
+                requesterUserId,
+                communityId,
+                communitySlug,
+                joinRequestId,
+                now,
+                requesterUsername));
         }
 
         if (rows.Count == 0)
@@ -216,6 +254,18 @@ public sealed class NotificationService : INotificationService
             DateTime.UtcNow));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(applicantUserId, cancellationToken);
+    }
+
+    private async Task<string?> ResolvePostPublicIdAsync(int postId, CancellationToken cancellationToken)
+    {
+        var post = await _posts.GetByIdNonDeletedForCommentLookupAsync(postId, cancellationToken);
+        return post?.PublicId;
+    }
+
+    private async Task<string?> ResolveUsernameAsync(int userId, CancellationToken cancellationToken)
+    {
+        var user = await _users.GetByIdNoTrackingAsync(userId, cancellationToken);
+        return user?.Username;
     }
 
     private static JsonElement ParseMetadata(string json)

@@ -28,7 +28,11 @@ public static class DependencyInjectionConfig
 {
     public static void ResolveDependencyInjection(this WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<IBadgeRepository, BadgeRepository>();
+        builder.Services.AddScoped<IBadgeAwardService, BadgeAwardService>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUsernameHistoryRepository, UsernameHistoryRepository>();
+        builder.Services.AddScoped<UsernameResolver>();
         builder.Services.AddScoped<IBetaInviteRepository, BetaInviteRepository>();
         builder.Services.AddScoped<IWoodyUnitOfWork, WoodyUnitOfWork>();
         builder.Services.AddScoped<IBillingWebhookReceiptRepository, BillingWebhookReceiptRepository>();
@@ -54,6 +58,8 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IProfileSignalSocialGate, NoOpProfileSignalSocialGate>();
         builder.Services.AddScoped<IProfileSignalRepository, ProfileSignalRepository>();
         builder.Services.AddScoped<IProfileSignalService, ProfileSignalService>();
+        builder.Services.AddScoped<IStoryRepository, StoryRepository>();
+        builder.Services.AddScoped<IStoriesService, StoriesService>();
         builder.Services.AddScoped<ICommunityRepository, CommunityRepository>();
         builder.Services.AddScoped<ICommunityMembershipRepository, CommunityMembershipRepository>();
         builder.Services.AddScoped<IJoinRequestRepository, JoinRequestRepository>();
@@ -159,5 +165,6 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IAdminVerificationService, AdminVerificationService>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();
+        builder.Services.AddScoped<CheckRegistrationAvailabilityHandler>();
     }
 }

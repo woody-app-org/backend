@@ -254,6 +254,145 @@ public class PreLaunchSignupIntegrationTests
         Assert.Equal("PRELAUNCH_RATE_LIMITED", doc.RootElement.GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task Signup_WhenSignupsEnabledTrue_StillPersists()
+    {
+        await using var factory = new PreLaunchApiFactory(signupsEnabled: true);
+        var client = factory.CreateClient();
+
+        var res = await client.PostAsJsonAsync(
+            "/api/prelaunch/signups",
+            new
+            {
+                name = "Enabled",
+                socialNetwork = "instagram",
+                socialUsername = "enabled_user",
+                acceptedContact = true
+            });
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<WoodyDbContext>();
+        Assert.Equal(1, await db.PreLaunchSignups.CountAsync(s => s.NormalizedSocialUsername == "enabled_user"));
+    }
+
+    [Fact]
+    public async Task Signup_WhenSignupsDisabled_Returns410_DoesNotPersist()
+    {
+        await using var factory = new PreLaunchApiFactory(signupsEnabled: false);
+        var client = factory.CreateClient();
+
+        var res = await client.PostAsJsonAsync(
+            "/api/prelaunch/signups",
+            new
+            {
+                name = "Closed",
+                socialNetwork = "instagram",
+                socialUsername = "closed_user",
+                acceptedContact = true
+            });
+
+        Assert.Equal(HttpStatusCode.Gone, res.StatusCode);
+        var json = await res.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal("PRELAUNCH_CLOSED", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal(
+            "As inscrições antecipadas foram encerradas.",
+            doc.RootElement.GetProperty("message").GetString());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<WoodyDbContext>();
+        Assert.Equal(0, await db.PreLaunchSignups.CountAsync(s => s.NormalizedSocialUsername == "closed_user"));
+    }
+
+    [Fact]
+    public async Task Signup_WhenSignupsDisabled_InvalidPayload_Returns410NotValidation()
+    {
+        await using var factory = new PreLaunchApiFactory(signupsEnabled: false);
+        var client = factory.CreateClient();
+
+        var res = await client.PostAsJsonAsync(
+            "/api/prelaunch/signups",
+            new
+            {
+                name = "Bad",
+                socialNetwork = "myspace",
+                socialUsername = "baduser",
+                acceptedContact = true
+            });
+
+        Assert.Equal(HttpStatusCode.Gone, res.StatusCode);
+        var json = await res.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal("PRELAUNCH_CLOSED", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Signup_WhenSignupsDisabled_HoneypotFilled_Returns410_DoesNotPersist()
+    {
+        await using var factory = new PreLaunchApiFactory(signupsEnabled: false);
+        var client = factory.CreateClient();
+
+        var before = await CountAsync(factory);
+
+        var res = await client.PostAsJsonAsync(
+            "/api/prelaunch/signups",
+            new
+            {
+                name = "Bot",
+                socialNetwork = "instagram",
+                socialUsername = "botuser",
+                acceptedContact = true,
+                website = "https://spam.example"
+            });
+
+        Assert.Equal(HttpStatusCode.Gone, res.StatusCode);
+        Assert.Equal(before, await CountAsync(factory));
+    }
+
+    [Fact]
+    public async Task Signup_WhenSignupsDisabled_PreservesExistingRows()
+    {
+        var dbName = Guid.NewGuid().ToString();
+
+        await using (var openFactory = new PreLaunchApiFactory(signupsEnabled: true, databaseName: dbName))
+        {
+            var client = openFactory.CreateClient();
+            var res = await client.PostAsJsonAsync(
+                "/api/prelaunch/signups",
+                new
+                {
+                    name = "Existing",
+                    socialNetwork = "instagram",
+                    socialUsername = "existing_user",
+                    acceptedContact = true
+                });
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        }
+
+        await using var closedFactory = new PreLaunchApiFactory(signupsEnabled: false, databaseName: dbName);
+        var closedClient = closedFactory.CreateClient();
+
+        var blocked = await closedClient.PostAsJsonAsync(
+            "/api/prelaunch/signups",
+            new
+            {
+                name = "New",
+                socialNetwork = "instagram",
+                socialUsername = "new_user",
+                acceptedContact = true
+            });
+
+        Assert.Equal(HttpStatusCode.Gone, blocked.StatusCode);
+
+        await using var scope = closedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<WoodyDbContext>();
+        Assert.Equal(1, await db.PreLaunchSignups.CountAsync());
+        Assert.Equal(1, await db.PreLaunchSignups.CountAsync(s => s.NormalizedSocialUsername == "existing_user"));
+        Assert.Equal(0, await db.PreLaunchSignups.CountAsync(s => s.NormalizedSocialUsername == "new_user"));
+    }
+
     private static async Task<int> CountAsync(PreLaunchApiFactory factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();
@@ -263,7 +402,14 @@ public class PreLaunchSignupIntegrationTests
 
     private sealed class PreLaunchApiFactory : WebApplicationFactory<Program>
     {
-        private readonly string _databaseName = Guid.NewGuid().ToString();
+        private readonly string _databaseName;
+        private readonly bool _signupsEnabled;
+
+        public PreLaunchApiFactory(bool signupsEnabled = true, string? databaseName = null)
+        {
+            _signupsEnabled = signupsEnabled;
+            _databaseName = databaseName ?? Guid.NewGuid().ToString();
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -283,7 +429,7 @@ public class PreLaunchSignupIntegrationTests
             });
         }
 
-        private static Dictionary<string, string?> BuildSettings() => new()
+        private Dictionary<string, string?> BuildSettings() => new()
         {
             ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=woody_tests;Username=postgres;Password=postgres",
             ["Jwt:Secret"] = "test-secret-that-is-at-least-32-chars",
@@ -296,7 +442,8 @@ public class PreLaunchSignupIntegrationTests
             ["EmailVerification:MaxAttempts"] = "5",
             ["AuthSecurity:MaxFailedLoginAttempts"] = "5",
             ["AuthSecurity:LockoutMinutes"] = "15",
-            ["PreLaunch:HashSecret"] = "test-prelaunch-hash-secret-32bytes!!"
+            ["PreLaunch:HashSecret"] = "test-prelaunch-hash-secret-32bytes!!",
+            ["PreLaunch:SignupsEnabled"] = _signupsEnabled ? "true" : "false",
         };
     }
 }

@@ -2,6 +2,7 @@ using Woody.Application.DTOs;
 using Woody.Application.Configuration;
 using Woody.Application.Interfaces;
 using Woody.Application.Interfaces.Security;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Microsoft.Extensions.Options;
 
@@ -50,7 +51,7 @@ public class LoginHandler
             throw new UnauthorizedAccessException(InvalidCredentialsMessage);
 
         var user = await _userRepository.GetByUsernameOrEmailAsync(login);
-        var password = request.Password ?? string.Empty;
+        var password = PasswordInputValidator.NormalizeForLogin(request.Password);
         var verification = user == null
             ? new PasswordVerificationOutcome(false, false)
             : _passwordHasher.VerifyPasswordWithOutcome(user.Password, password);

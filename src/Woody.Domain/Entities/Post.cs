@@ -6,6 +6,9 @@ namespace Woody.Domain.Entities
     {
         public int Id { get; set; }
 
+        /// <summary>Identificador público opaco para URLs (<c>pst_…</c>). O <see cref="Id"/> interno permanece para FKs.</summary>
+        public string PublicId { get; set; } = null!;
+
         public int UserId { get; set; }
         public User User { get; set; } = null!;
 

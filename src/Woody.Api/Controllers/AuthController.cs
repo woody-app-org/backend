@@ -16,6 +16,7 @@ public class AuthController : ControllerBase
 {
     private readonly LoginHandler _loginHandler;
     private readonly RegisterHandler _registerHandler;
+    private readonly CheckRegistrationAvailabilityHandler _checkAvailabilityHandler;
     private readonly IEmailVerificationService _emailVerificationService;
     private readonly IAuthSessionService _authSessions;
     private readonly ILogger<AuthController> _logger;
@@ -23,12 +24,14 @@ public class AuthController : ControllerBase
     public AuthController(
         LoginHandler loginHandler,
         RegisterHandler registerHandler,
+        CheckRegistrationAvailabilityHandler checkAvailabilityHandler,
         IEmailVerificationService emailVerificationService,
         IAuthSessionService authSessions,
         ILogger<AuthController> logger)
     {
         _loginHandler = loginHandler;
         _registerHandler = registerHandler;
+        _checkAvailabilityHandler = checkAvailabilityHandler;
         _emailVerificationService = emailVerificationService;
         _authSessions = authSessions;
         _logger = logger;
@@ -59,10 +62,29 @@ public class AuthController : ControllerBase
             var result = await _registerHandler.HandleAsync(request, cancellationToken);
             return Ok(result);
         }
+        catch (RegistrationConflictException ex)
+        {
+            return Conflict(new { error = ex.Message, field = ex.Field });
+        }
         catch (ArgumentException ex)
         {
             return BadRequest(new { error = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Verifica se username, e-mail e/ou CPF já estão em uso antes do cadastro.</summary>
+    [HttpPost("check-availability")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRegister)]
+    public async Task<IActionResult> CheckRegistrationAvailability(
+        [FromBody] CheckRegistrationAvailabilityRequestDTO request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _checkAvailabilityHandler.HandleAsync(request, cancellationToken);
+        return Ok(result);
     }
 
     [HttpPost("send-verification")]

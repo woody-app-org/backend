@@ -8,6 +8,7 @@ using Woody.Application.DTOs.Api;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Application.Mapping;
+using Woody.Application.Services;
 using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
@@ -17,39 +18,64 @@ namespace Woody.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserRepository _users;
+    private readonly IUsernameHistoryRepository _usernameHistory;
+    private readonly UsernameResolver _usernameResolver;
     private readonly ICommunityMembershipRepository _memberships;
     private readonly IFollowRepository _follows;
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly INotificationService _notificationService;
+    private readonly IStoryRepository _stories;
+    private readonly IBadgeAwardService _badgeAwardService;
 
     public UsersController(
         IUserRepository users,
+        IUsernameHistoryRepository usernameHistory,
+        UsernameResolver usernameResolver,
         ICommunityMembershipRepository memberships,
         IFollowRepository follows,
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IStoryRepository stories,
+        IBadgeAwardService badgeAwardService)
     {
         _users = users;
+        _usernameHistory = usernameHistory;
+        _usernameResolver = usernameResolver;
         _memberships = memberships;
         _follows = follows;
         _posts = posts;
         _postEnrichment = postEnrichment;
         _notificationService = notificationService;
+        _stories = stories;
+        _badgeAwardService = badgeAwardService;
     }
 
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("me/communities")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
-    public async Task<ActionResult<List<string>>> GetMyCommunityIds(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<MyCommunitySummaryDto>>> GetMyCommunities(CancellationToken cancellationToken)
     {
         var id = User.GetUserId();
         if (id == null)
             return Unauthorized();
 
-        var ids = await _memberships.GetActiveCommunityIdsAsStringsAsync(id.Value, cancellationToken);
-        return Ok(ids);
+        var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(id.Value, cancellationToken);
+        var list = rows
+            .OrderBy(m => m.Community.Name)
+            .Select(m => new MyCommunitySummaryDto
+            {
+                Id = m.CommunityId.ToString(),
+                Slug = m.Community.Slug,
+                Name = m.Community.Name,
+                Role = m.Role,
+                Visibility = m.Community.Visibility,
+                AvatarUrl = m.Community.AvatarUrl,
+                CoverUrl = m.Community.CoverUrl
+            })
+            .ToList();
+        return Ok(list);
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -58,6 +84,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyFollowing(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         var me = User.GetUserId();
@@ -67,11 +94,16 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowingPagedAsync(me.Value, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowingPagedAsync(
+            me.Value, page, pageSize, normalizedSearch, cancellationToken);
+        var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, storyFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -98,8 +130,11 @@ public class UsersController : ControllerBase
         exclude.Add(me.Value);
 
         var users = await _users.ListUsersForSuggestionsAsync(exclude, take, cancellationToken);
+        var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            users.Select(u => u.Id),
+            cancellationToken);
 
-        return Ok(users.Select(EntityMappers.ToUserPublicDto).ToList());
+        return Ok(users.Select(u => EntityMappers.ToUserPublicDto(u, storyFlags.Contains(u.Id))).ToList());
     }
 
     [AllowAnonymous]
@@ -171,12 +206,8 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
-        if (!InputValidator.TryNormalizeRequiredText(
-                body.Username,
-                "Nome de utilizador",
-                InputValidationLimits.UsernameMaxLength,
-                out var username,
-                out var error))
+        string? error;
+        if (!UsernameInputValidator.TryValidate(body.Username, out var username, out error))
             return BadRequest(new { error });
 
         if (!InputValidator.TryNormalizeRequiredText(
@@ -230,6 +261,16 @@ public class UsersController : ControllerBase
         {
             if (await _users.ExistsUsernameAsync(username))
                 return Conflict(new { error = "Nome de utilizador já existe." });
+
+            var now = DateTime.UtcNow;
+            await _usernameHistory.AddAsync(new UsernameHistory
+            {
+                UserId = user.Id,
+                OldUsername = user.Username,
+                NewUsername = username,
+                ChangedAt = now
+            }, cancellationToken);
+
             user.Username = username;
         }
 
@@ -298,6 +339,29 @@ public class UsersController : ControllerBase
         return Ok(profile);
     }
 
+    [AllowAnonymous]
+    [HttpGet("by-username/{username}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    public async Task<ActionResult<UserProfileDto>> GetByUsername(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var resolution = await _usernameResolver.ResolveAsync(username, cancellationToken);
+        if (resolution == null)
+            return NotFound();
+
+        var viewerId = User?.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var profile = await BuildProfileAsync(resolution.Value.UserId, viewerId, cancellationToken);
+        if (profile == null)
+            return NotFound();
+
+        if (resolution.Value.ResolvedViaHistory)
+            profile.CanonicalUsername = resolution.Value.CurrentUsername;
+
+        return Ok(profile);
+    }
+
+    /// <summary>Legado — preferir <c>GET /users/by-username/{username}</c>.</summary>
     [HttpGet("{userId}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<UserProfileDto>> GetById(
@@ -383,6 +447,7 @@ public class UsersController : ControllerBase
         string userId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(userId, out var uid))
@@ -394,11 +459,16 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowersPagedAsync(uid, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowersPagedAsync(
+            uid, page, pageSize, normalizedSearch, cancellationToken);
+        var followerStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, followerStoryFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -414,6 +484,7 @@ public class UsersController : ControllerBase
         string userId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(userId, out var uid))
@@ -425,11 +496,16 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var (items, total) = await _follows.ListFollowingPagedAsync(uid, page, pageSize, cancellationToken);
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var (items, total) = await _follows.ListFollowingPagedAsync(
+            uid, page, pageSize, normalizedSearch, cancellationToken);
+        var followingStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
+            items.Select(u => u.Id),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<UserPublicDto>
         {
-            Items = items.Select(EntityMappers.ToUserPublicDto).ToList(),
+            Items = items.Select(u => EntityMappers.ToUserPublicDto(u, followingStoryFlags.Contains(u.Id))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = total,
@@ -526,8 +602,12 @@ public class UsersController : ControllerBase
         var followingCount = await _follows.CountFollowingAsync(userId, cancellationToken);
 
         var isOwnProfile = viewerId.HasValue && viewerId.Value == userId;
+        var hasActiveStories = await _stories.HasActiveStoriesAsync(userId, cancellationToken);
+        var badges = await _badgeAwardService.GetUserBadgesAsync(userId, cancellationToken);
         var profile = EntityMappers.ToUserProfile(u, following, links, interests, followersCount, followingCount,
-            includePrivateFields: isOwnProfile);
+            includePrivateFields: isOwnProfile,
+            hasActiveStories: hasActiveStories,
+            badges: badges);
         if (isOwnProfile)
             profile.Subscription = SubscriptionDtoMapper.ToStateDto(u.Subscription, DateTime.UtcNow);
 

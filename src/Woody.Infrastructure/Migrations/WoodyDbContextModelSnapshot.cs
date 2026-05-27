@@ -22,6 +22,71 @@ namespace Woody.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Woody.Domain.Entities.Badge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("IconAssetKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("icon_asset_key");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Rarity")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("rarity");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("slug");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_badges");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_badges_slug");
+
+                    b.ToTable("badges", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.BetaInvite", b =>
                 {
                     b.Property<int>("Id")
@@ -1228,6 +1293,12 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("pinned_on_profile_at");
 
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("public_id");
+
                     b.Property<int>("PublicationContext")
                         .HasColumnType("integer")
                         .HasColumnName("publication_context");
@@ -1245,6 +1316,10 @@ namespace Woody.Infrastructure.Migrations
 
                     b.HasIndex("CommunityId")
                         .HasDatabaseName("ix_posts_community_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_posts_public_id");
 
                     b.HasIndex("PublicationContext", "UserId")
                         .HasDatabaseName("ix_posts_publication_context_user_id");
@@ -1482,6 +1557,141 @@ namespace Woody.Infrastructure.Migrations
                     b.ToTable("refresh_token_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.Story", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("author_user_id");
+
+                    b.Property<string>("BackgroundColor")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("background_color");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int>("MediaType")
+                        .HasColumnType("integer")
+                        .HasColumnName("media_type");
+
+                    b.Property<string>("MediaUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("media_url");
+
+                    b.Property<string>("MusicArtist")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("music_artist");
+
+                    b.Property<string>("MusicPreviewUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("music_preview_url");
+
+                    b.Property<string>("MusicProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("music_provider");
+
+                    b.Property<string>("MusicTitle")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("music_title");
+
+                    b.Property<string>("MusicTrackId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("music_track_id");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("text");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("thumbnail_url");
+
+                    b.Property<int>("Visibility")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stories");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_stories_expires_at");
+
+                    b.HasIndex("AuthorUserId", "ExpiresAt")
+                        .HasDatabaseName("ix_stories_author_expires_not_deleted")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.ToTable("stories", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.StoryView", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("StoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("story_id");
+
+                    b.Property<DateTime>("ViewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("viewed_at");
+
+                    b.Property<int>("ViewerUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("viewer_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_story_views");
+
+                    b.HasIndex("ViewedAt")
+                        .HasDatabaseName("ix_story_views_viewed_at");
+
+                    b.HasIndex("ViewerUserId")
+                        .HasDatabaseName("ix_story_views_viewer_user_id");
+
+                    b.HasIndex("StoryId", "ViewerUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_story_views_story_id_viewer_user_id");
+
+                    b.ToTable("story_views", (string)null);
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -1504,7 +1714,8 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnName("birth_date");
 
                     b.Property<string>("Cpf")
-                        .HasColumnType("text")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
                         .HasColumnName("cpf");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1571,7 +1782,8 @@ namespace Woody.Infrastructure.Migrations
 
                     b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("username");
 
                     b.Property<string>("VerificationStatus")
@@ -1583,6 +1795,10 @@ namespace Woody.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
+
+                    b.HasIndex("Cpf")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_cpf");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -1596,6 +1812,47 @@ namespace Woody.Infrastructure.Migrations
                         .HasDatabaseName("ix_users_username");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UserBadge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BadgeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("badge_id");
+
+                    b.Property<DateTime>("EarnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("earned_at");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("text")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_badges");
+
+                    b.HasIndex("BadgeId")
+                        .HasDatabaseName("ix_user_badges_badge_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_badges_user_id");
+
+                    b.HasIndex("UserId", "BadgeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_badges_user_id_badge_id");
+
+                    b.ToTable("user_badges", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.UserInterest", b =>
@@ -1725,6 +1982,47 @@ namespace Woody.Infrastructure.Migrations
                         .HasFilter("provider_subscription_id IS NOT NULL");
 
                     b.ToTable("subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UsernameHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("NewUsername")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("new_username");
+
+                    b.Property<string>("OldUsername")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("old_username");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_username_history");
+
+                    b.HasIndex("OldUsername")
+                        .HasDatabaseName("ix_username_history_old_username");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_username_history_user_id");
+
+                    b.ToTable("username_history", (string)null);
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Comment", b =>
@@ -2142,6 +2440,39 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.Story", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.User", "Author")
+                        .WithMany("Stories")
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stories_users_author_user_id");
+
+                    b.Navigation("Author");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.StoryView", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Story", "Story")
+                        .WithMany("Views")
+                        .HasForeignKey("StoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_story_views_stories_story_id");
+
+                    b.HasOne("Woody.Domain.Entities.User", "Viewer")
+                        .WithMany("StoryViews")
+                        .HasForeignKey("ViewerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_story_views_users_viewer_user_id");
+
+                    b.Navigation("Story");
+
+                    b.Navigation("Viewer");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.User", b =>
                 {
                     b.HasOne("Woody.Domain.Entities.BetaInvite", "Invite")
@@ -2151,6 +2482,27 @@ namespace Woody.Infrastructure.Migrations
                         .HasConstraintName("fk_users_beta_invites_invite_id");
 
                     b.Navigation("Invite");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UserBadge", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.Badge", "Badge")
+                        .WithMany("UserBadges")
+                        .HasForeignKey("BadgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badges_badges_badge_id");
+
+                    b.HasOne("Woody.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badges_users_user_id");
+
+                    b.Navigation("Badge");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.UserInterest", b =>
@@ -2187,6 +2539,23 @@ namespace Woody.Infrastructure.Migrations
                         .HasConstraintName("fk_subscriptions_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.UsernameHistory", b =>
+                {
+                    b.HasOne("Woody.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_username_history_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Woody.Domain.Entities.Badge", b =>
+                {
+                    b.Navigation("UserBadges");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.BetaInvite", b =>
@@ -2239,6 +2608,11 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("Tags");
                 });
 
+            modelBuilder.Entity("Woody.Domain.Entities.Story", b =>
+                {
+                    b.Navigation("Views");
+                });
+
             modelBuilder.Entity("Woody.Domain.Entities.User", b =>
                 {
                     b.Navigation("Comments");
@@ -2282,6 +2656,10 @@ namespace Woody.Infrastructure.Migrations
                     b.Navigation("SentProfileSignals");
 
                     b.Navigation("SocialLinks");
+
+                    b.Navigation("Stories");
+
+                    b.Navigation("StoryViews");
 
                     b.Navigation("Subscription");
                 });

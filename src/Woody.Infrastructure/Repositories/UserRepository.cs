@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.Interfaces;
+using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Infrastructure.Persistence.Context;
 
@@ -17,8 +18,11 @@ public class UserRepository : IUserRepository
     public async Task<User?> GetByEmailAsync(string email) =>
         await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
-    public async Task<User?> GetByUsernameAsync(string username) =>
-        await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+    public async Task<User?> GetByUsernameAsync(string username)
+    {
+        var normalized = UsernameInputValidator.Normalize(username);
+        return await _context.Users.FirstOrDefaultAsync(u => u.Username == normalized);
+    }
 
     public async Task<User?> GetByUsernameOrEmailAsync(string login)
     {
@@ -26,7 +30,7 @@ public class UserRepository : IUserRepository
         if (normalized.Contains('@', StringComparison.Ordinal))
             return await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalized.ToLowerInvariant());
 
-        return await _context.Users.FirstOrDefaultAsync(u => u.Username == normalized);
+        return await _context.Users.FirstOrDefaultAsync(u => u.Username == UsernameInputValidator.Normalize(normalized));
     }
 
     public async Task<User?> GetByIdAsync(int id) =>
@@ -34,6 +38,16 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByIdNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+
+    public async Task<List<User>> GetByIdsNoTrackingAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+
+        return await _context.Users.AsNoTracking()
+            .Where(u => ids.Contains(u.Id))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<User?> GetByIdWithSocialLinksAndInterestsNoTrackingAsync(int id, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()
@@ -71,11 +85,22 @@ public class UserRepository : IUserRepository
             .Take(take)
             .ToListAsync(cancellationToken);
 
-    public async Task<bool> ExistsUsernameAsync(string username) =>
-        await _context.Users.AnyAsync(u => u.Username == username);
+    public async Task<bool> ExistsUsernameAsync(string username)
+    {
+        var normalized = UsernameInputValidator.Normalize(username);
+        return await _context.Users.AnyAsync(u => u.Username == normalized);
+    }
 
     public async Task<bool> ExistsEmailAsync(string email) =>
         await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLowerInvariant());
+
+    public async Task<bool> ExistsCpfAsync(string cpfDigits, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(cpfDigits))
+            return false;
+
+        return await _context.Users.AnyAsync(u => u.Cpf == cpfDigits, cancellationToken);
+    }
 
     public async Task AddAsync(User user)
     {

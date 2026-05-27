@@ -170,6 +170,7 @@ public class CommunitiesController : ControllerBase
         return Ok(list.Select(c => EntityMappers.ToCommunityDto(c, viewerSeesPrivateInterior: false)).ToList());
     }
 
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}</c>.</remarks>
     [AllowAnonymous]
     [HttpGet("{id:int}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
@@ -215,6 +216,22 @@ public class CommunitiesController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpGet("by-slug/{slug}/posts")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> CommunityPostsBySlug(
+        string slug,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var cid = await ResolveCommunityIdBySlugOrNullAsync(slug, cancellationToken);
+        if (cid == null)
+            return NotFound();
+        return await CommunityPosts(cid.Value, page, pageSize, cancellationToken);
+    }
+
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/posts</c>.</remarks>
+    [AllowAnonymous]
     [HttpGet("{id:int}/posts")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PaginatedResponseDto<PostResponseDto>>> CommunityPosts(
@@ -255,6 +272,7 @@ public class CommunitiesController : ControllerBase
         });
     }
 
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/join-requests</c>.</remarks>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{id:int}/join-requests")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
@@ -280,7 +298,7 @@ public class CommunitiesController : ControllerBase
         }));
     }
 
-    /// <summary>Estado do pedido de entrada da própria utilizadora nesta comunidade (para reidratar UI após reload).</summary>
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/join-requests/me</c>.</remarks>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/join-requests/me")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
@@ -380,6 +398,7 @@ public class CommunitiesController : ControllerBase
         };
     }
 
+    /// <remarks>Legado: preferir <c>POST /api/communities/by-slug/{slug}/join-requests/me/cancel</c>.</remarks>
     /// <summary>A própria utilizadora cancela o pedido de entrada pendente.</summary>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpPost("{communityId}/join-requests/me/cancel")]
@@ -407,6 +426,7 @@ public class CommunitiesController : ControllerBase
         return NoContent();
     }
 
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/members</c>.</remarks>
     [AllowAnonymous]
     [HttpGet("{communityId}/members")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
@@ -446,6 +466,7 @@ public class CommunitiesController : ControllerBase
         });
     }
 
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/members/me</c>.</remarks>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/members/me")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
@@ -467,6 +488,7 @@ public class CommunitiesController : ControllerBase
         return Ok(new { isMember = true, role = row.Role, premiumCapabilities = caps });
     }
 
+    /// <remarks>Legado: preferir <c>GET /api/communities/by-slug/{slug}/premium/analytics</c>.</remarks>
     /// <summary>Dashboard analytics (staff + plano premium da comunidade). Fonte de verdade: servidor.</summary>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpGet("{communityId}/premium/analytics")]
@@ -620,6 +642,7 @@ public class CommunitiesController : ControllerBase
         };
     }
 
+    /// <remarks>Legado: preferir <c>PATCH /api/communities/by-slug/{slug}</c>.</remarks>
     [Authorize(Policy = "VerifiedAccount")]
     [HttpPatch("{communityId}")]
     [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
@@ -926,6 +949,181 @@ public class CommunitiesController : ControllerBase
         comm.UpdatedAt = DateTime.UtcNow;
         await _communities.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    // --- Rotas por slug (preferidas em APIs públicas) ---
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("by-slug/{slug}/join-requests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<IActionResult> PendingJoinRequestsBySlug(string slug, CancellationToken cancellationToken)
+    {
+        var cid = await ResolveCommunityIdBySlugOrNullAsync(slug, cancellationToken);
+        if (cid == null)
+            return NotFound();
+        return await PendingJoinRequests(cid.Value, cancellationToken);
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("by-slug/{slug}/join-requests/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> MyJoinRequestBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => MyJoinRequest(id.ToString(), cancellationToken), cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("by-slug/{slug}/join-requests/me/cancel")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> CancelMyJoinRequestBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => CancelMyJoinRequest(id.ToString(), cancellationToken), cancellationToken);
+
+    [AllowAnonymous]
+    [HttpGet("by-slug/{slug}/members")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    public Task<ActionResult<PaginatedResponseDto<CommunityMemberItemDto>>> MembersBySlug(
+        string slug,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => Members(id.ToString(), page, pageSize, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("by-slug/{slug}/members/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> MyMembershipBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => MyMembership(id.ToString(), cancellationToken), cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("by-slug/{slug}/premium/analytics")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<ActionResult<CommunityPremiumDashboardAnalyticsDto>> CommunityPremiumAnalyticsBySlug(
+        string slug,
+        [FromQuery] int days = 30,
+        CancellationToken cancellationToken = default) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => CommunityPremiumAnalytics(id.ToString(), days, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("by-slug/{slug}/post-boosts")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<ActionResult<IReadOnlyList<CommunityPostBoostListItemDto>>> ListCommunityPostBoostsBySlug(
+        string slug,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => ListCommunityPostBoosts(id.ToString(), cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("by-slug/{slug}/posts/{postId}/boost")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<ActionResult<CommunityPostBoostResponseDto>> BoostCommunityPostBySlug(
+        string slug,
+        string postId,
+        [FromBody] CommunityPostBoostActivateRequestDto? body,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => BoostCommunityPost(id.ToString(), postId, body, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpDelete("by-slug/{slug}/posts/{postId}/boost")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> UnboostCommunityPostBySlug(
+        string slug,
+        string postId,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => UnboostCommunityPost(id.ToString(), postId, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPatch("by-slug/{slug}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<ActionResult<CommunityResponseDto>> PatchBySlug(
+        string slug,
+        [FromBody] CommunityUpdateRequestDTO body,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => Patch(id.ToString(), body, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("by-slug/{slug}/members")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> JoinPublicBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => JoinPublic(id.ToString(), cancellationToken), cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("by-slug/{slug}/join-requests")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> RequestJoinBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => RequestJoin(id.ToString(), cancellationToken), cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpDelete("by-slug/{slug}/members/me")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> LeaveBySlug(string slug, CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(slug, id => Leave(id.ToString(), cancellationToken), cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpDelete("by-slug/{slug}/members/{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> RemoveMemberBySlug(
+        string slug,
+        string userId,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => RemoveMember(id.ToString(), userId, cancellationToken),
+            cancellationToken);
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPatch("by-slug/{slug}/members/{userId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public Task<IActionResult> PatchMemberBySlug(
+        string slug,
+        string userId,
+        [FromBody] MembershipPatchRequestDTO body,
+        CancellationToken cancellationToken) =>
+        ResolveSlugAndRunAsync(
+            slug,
+            id => PatchMember(id.ToString(), userId, body, cancellationToken),
+            cancellationToken);
+
+    private async Task<int?> ResolveCommunityIdBySlugOrNullAsync(string slug, CancellationToken cancellationToken)
+    {
+        var c = await _communities.GetBySlugWithTagsNoTrackingAsync(slug, cancellationToken);
+        return c?.Id;
+    }
+
+    private async Task<IActionResult> ResolveSlugAndRunAsync(
+        string slug,
+        Func<int, Task<IActionResult>> action,
+        CancellationToken cancellationToken)
+    {
+        var cid = await ResolveCommunityIdBySlugOrNullAsync(slug, cancellationToken);
+        if (cid == null)
+            return NotFound();
+        return await action(cid.Value);
+    }
+
+    private async Task<ActionResult<T>> ResolveSlugAndRunAsync<T>(
+        string slug,
+        Func<int, Task<ActionResult<T>>> action,
+        CancellationToken cancellationToken)
+    {
+        var cid = await ResolveCommunityIdBySlugOrNullAsync(slug, cancellationToken);
+        if (cid == null)
+            return NotFound();
+        return await action(cid.Value);
     }
 
     private async Task<bool> ViewerSeesPrivateCommunityInteriorAsync(

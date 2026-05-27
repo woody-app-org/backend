@@ -12,6 +12,7 @@ using Woody.Domain.Media;
 using Woody.Domain.Posts;
 using Woody.Application.Mapping;
 using Woody.Application.Media;
+using Woody.Application.Posts;
 using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
@@ -72,6 +73,27 @@ public class PostsController : ControllerBase
     };
 
     [AllowAnonymous]
+    [HttpGet("by-public-id/{publicId}")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
+    public async Task<ActionResult<PostResponseDto>> GetByPublicId(string publicId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(publicId))
+            return BadRequest();
+
+        var viewerId = User?.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+
+        var post = await _posts.GetByPublicIdNonDeletedWithNavAsync(publicId, cancellationToken);
+        if (post == null)
+            return NotFound();
+        if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
+            return NotFound();
+
+        var list = await _postEnrichment.ToPostDtosAsync(new[] { post }, viewerId, cancellationToken);
+        return Ok(list[0]);
+    }
+
+    /// <summary>Legado — preferir <c>GET /posts/by-public-id/{publicId}</c>.</summary>
+    [AllowAnonymous]
     [HttpGet("{postId}")]
     [EnableRateLimiting(RateLimitPolicyNames.PublicApi)]
     public async Task<ActionResult<PostResponseDto>> GetById(string postId, CancellationToken cancellationToken)
@@ -79,7 +101,7 @@ public class PostsController : ControllerBase
         if (!int.TryParse(postId, out var pid))
             return BadRequest();
 
-        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        var viewerId = User?.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
         var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
@@ -178,6 +200,7 @@ public class PostsController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             };
         }
+        await PostPublicIdAssigner.AssignUniqueAsync(_posts, post, cancellationToken);
         _posts.Add(post);
         await _posts.SaveChangesAsync(cancellationToken);
 
@@ -217,7 +240,7 @@ public class PostsController : ControllerBase
                ?? throw new InvalidOperationException("Post not found after create.");
 
         var dto = await _postEnrichment.ToPostDtosAsync(new[] { post }, me, cancellationToken);
-        return CreatedAtAction(nameof(GetById), new { postId = post.Id.ToString() }, dto[0]);
+        return CreatedAtAction(nameof(GetByPublicId), new { publicId = post.PublicId }, dto[0]);
     }
 
     private sealed record NormalizedPostMediaRow(
@@ -529,6 +552,11 @@ public class PostsController : ControllerBase
         if (comment == null || comment.PostId != pid)
             return NotFound();
 
+        // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
+        if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
+            && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
+            return NotFound();
+
         await _likes.TryAddCommentLikeAsync(me.Value, cid, cancellationToken);
 
         var counts = await _likes.GetCommentLikeCountsAsync(new[] { cid }, cancellationToken);
@@ -562,6 +590,11 @@ public class PostsController : ControllerBase
 
         var comment = await _comments.GetByIdNonDeletedWithAuthorAsync(cid, cancellationToken);
         if (comment == null || comment.PostId != pid)
+            return NotFound();
+
+        // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
+        if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
+            && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
             return NotFound();
 
         await _likes.RemoveCommentLikeAsync(me.Value, cid, cancellationToken);
