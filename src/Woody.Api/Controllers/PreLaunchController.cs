@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Woody.Api.Configuration;
 using Woody.Api.RateLimiting;
@@ -25,17 +26,20 @@ public class PreLaunchController : ControllerBase
     private readonly ILogger<PreLaunchController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
+    private readonly PreLaunchSecurityOptions _preLaunchOptions;
 
     public PreLaunchController(
         WoodyDbContext db,
         ILogger<PreLaunchController> logger,
         IConfiguration configuration,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IOptions<PreLaunchSecurityOptions> preLaunchOptions)
     {
         _db = db;
         _logger = logger;
         _configuration = configuration;
         _environment = environment;
+        _preLaunchOptions = preLaunchOptions.Value;
     }
 
     [HttpGet("debug/ip")]
@@ -68,6 +72,16 @@ public class PreLaunchController : ControllerBase
         [FromBody] PreLaunchSignupRequest? request,
         CancellationToken cancellationToken)
     {
+        if (!_preLaunchOptions.SignupsEnabled)
+        {
+            _logger.LogInformation("Pre-launch signup rejected: signups closed.");
+            return StatusCode(StatusCodes.Status410Gone, new
+            {
+                code = "PRELAUNCH_CLOSED",
+                message = "As inscrições antecipadas foram encerradas."
+            });
+        }
+
         if (request is null)
             return BadRequest(new { message = "Requisição inválida." });
 
