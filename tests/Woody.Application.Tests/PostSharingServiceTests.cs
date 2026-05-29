@@ -34,7 +34,9 @@ public class PostSharingServiceTests
         dm.Setup(x => x.SendSharedPostMessageAsync(1, 99, 10, "olá", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MessageResponseDto { Id = 5, ConversationId = 99 });
 
-        var svc = new PostSharingService(posts.Object, auth.Object, visibility.Object, conversations.Object, dm.Object);
+        var notificationSvc = new Mock<INotificationService>();
+
+        var svc = new PostSharingService(posts.Object, auth.Object, visibility.Object, conversations.Object, dm.Object, notificationSvc.Object);
 
         var result = await svc.ShareToConversationAsync(1, 10, new SharePostToConversationRequestDto
         {
@@ -69,7 +71,8 @@ public class PostSharingServiceTests
             auth.Object,
             visibility.Object,
             new Mock<IConversationRepository>().Object,
-            dm.Object);
+            dm.Object,
+            new Mock<INotificationService>().Object);
 
         var ex = await Assert.ThrowsAsync<ForbiddenException>(() =>
             svc.ShareToConversationAsync(1, 11, new SharePostToConversationRequestDto { RecipientUserId = 2 }));
@@ -100,7 +103,8 @@ public class PostSharingServiceTests
             auth.Object,
             visibility.Object,
             new Mock<IConversationRepository>().Object,
-            dm.Object);
+            dm.Object,
+            new Mock<INotificationService>().Object);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             svc.ShareToConversationAsync(1, 12, new SharePostToConversationRequestDto { RecipientUserId = 2 }));

@@ -4,6 +4,7 @@ using Woody.Application.Interfaces;
 using Woody.Application.Mapping;
 using Woody.Application.Notifications;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.Services;
 
@@ -147,6 +148,36 @@ public sealed class NotificationService : INotificationService
             commentId,
             DateTime.UtcNow,
             await ResolvePostPublicIdAsync(postId, cancellationToken)));
+        await _notifications.SaveChangesAsync(cancellationToken);
+        await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
+    }
+
+    public async Task NotifyPostSharedAsync(
+        int actorUserId,
+        int postOwnerUserId,
+        int postId,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorUserId == postOwnerUserId)
+            return;
+
+        if (await ShouldSuppressBetweenUsersAsync(actorUserId, postOwnerUserId, cancellationToken))
+            return;
+
+        var owner = await _users.GetByIdNoTrackingAsync(postOwnerUserId, cancellationToken);
+        if (owner == null || owner.VerificationStatus != VerificationStatus.Approved)
+            return;
+
+        var postPublicId = await ResolvePostPublicIdAsync(postId, cancellationToken);
+        if (postPublicId == null)
+            return;
+
+        _notifications.Add(NotificationComposer.PostShared(
+            postOwnerUserId,
+            actorUserId,
+            postId,
+            DateTime.UtcNow,
+            postPublicId));
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(postOwnerUserId, cancellationToken);
     }

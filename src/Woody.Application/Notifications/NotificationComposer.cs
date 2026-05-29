@@ -135,6 +135,23 @@ public static class NotificationComposer
             CreatedAt = createdAtUtc
         };
 
+    public static Notification PostShared(
+        int recipientUserId,
+        int actorUserId,
+        int postId,
+        DateTime createdAtUtc,
+        string? postPublicId = null) =>
+        new()
+        {
+            RecipientUserId = recipientUserId,
+            ActorUserId = actorUserId,
+            Type = NotificationType.PostShared,
+            TargetKind = NotificationTargetKind.Post,
+            TargetId = postId,
+            MetadataJson = Meta(BuildPostMetadata(postId, postPublicId: postPublicId)),
+            CreatedAt = createdAtUtc
+        };
+
     public static Notification CommunityJoinRequest(
         int moderatorUserId,
         int requesterUserId,

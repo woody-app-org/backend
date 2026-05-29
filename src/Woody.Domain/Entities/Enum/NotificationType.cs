@@ -10,5 +10,6 @@ public enum NotificationType
     ProfileSignal = 5,
     MessageRequest = 6,
     CommunityRequest = 7,
-    CommunityRequestApproved = 8
+    CommunityRequestApproved = 8,
+    PostShared = 9
 }

@@ -14,19 +14,22 @@ public sealed class PostSharingService : IPostSharingService
     private readonly IUserRelationshipVisibilityService _visibility;
     private readonly IConversationRepository _conversations;
     private readonly IDirectMessagingService _directMessaging;
+    private readonly INotificationService _notifications;
 
     public PostSharingService(
         IPostRepository posts,
         IResourceAuthorizationService authorization,
         IUserRelationshipVisibilityService visibility,
         IConversationRepository conversations,
-        IDirectMessagingService directMessaging)
+        IDirectMessagingService directMessaging,
+        INotificationService notifications)
     {
         _posts = posts;
         _authorization = authorization;
         _visibility = visibility;
         _conversations = conversations;
         _directMessaging = directMessaging;
+        _notifications = notifications;
     }
 
     public async Task<SharePostToConversationResponseDto> ShareToConversationAsync(
@@ -87,6 +90,8 @@ public sealed class PostSharingService : IPostSharingService
             postId,
             text,
             cancellationToken);
+
+        await _notifications.NotifyPostSharedAsync(actorUserId, post.UserId, postId, cancellationToken);
 
         return new SharePostToConversationResponseDto
         {

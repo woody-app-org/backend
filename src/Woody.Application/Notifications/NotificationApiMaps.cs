@@ -15,6 +15,7 @@ public static class NotificationTypeApiMap
         NotificationType.MessageRequest => "message_request",
         NotificationType.CommunityRequest => "community_request",
         NotificationType.CommunityRequestApproved => "community_request_approved",
+        NotificationType.PostShared => "post_shared",
         _ => type.ToString().ToLowerInvariant()
     };
 }

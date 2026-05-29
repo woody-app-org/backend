@@ -26,6 +26,8 @@ public interface INotificationService
 
     Task NotifyPostCommentAsync(int actorUserId, int postOwnerUserId, int postId, int commentId, CancellationToken cancellationToken = default);
 
+    Task NotifyPostSharedAsync(int actorUserId, int postOwnerUserId, int postId, CancellationToken cancellationToken = default);
+
     Task NotifyCommentReplyAsync(
         int actorUserId,
         int parentCommentAuthorUserId,
