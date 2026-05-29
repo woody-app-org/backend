@@ -47,10 +47,14 @@ public class FollowRepository : IFollowRepository
         int page,
         int pageSize,
         string? search = null,
+        IReadOnlyCollection<int>? excludeUserIds = null,
         CancellationToken cancellationToken = default)
     {
         var q = _db.Follows.AsNoTracking()
             .Where(f => f.FollowedUserId == followedUserId);
+
+        if (excludeUserIds is { Count: > 0 })
+            q = q.Where(f => !excludeUserIds.Contains(f.FollowingUserId));
 
         if (!string.IsNullOrEmpty(search))
         {
@@ -77,10 +81,14 @@ public class FollowRepository : IFollowRepository
         int page,
         int pageSize,
         string? search = null,
+        IReadOnlyCollection<int>? excludeUserIds = null,
         CancellationToken cancellationToken = default)
     {
         var q = _db.Follows.AsNoTracking()
             .Where(f => f.FollowingUserId == followingUserId);
+
+        if (excludeUserIds is { Count: > 0 })
+            q = q.Where(f => !excludeUserIds.Contains(f.FollowedUserId));
 
         if (!string.IsNullOrEmpty(search))
         {

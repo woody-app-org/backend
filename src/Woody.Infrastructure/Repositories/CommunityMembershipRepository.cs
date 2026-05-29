@@ -39,10 +39,19 @@ public class CommunityMembershipRepository : ICommunityMembershipRepository
                 cancellationToken);
 
     public async Task<(List<CommunityMembership> Rows, int Total)> ListActiveMembersPagedOrderedAsync(
-        int communityId, int page, int pageSize, CancellationToken cancellationToken = default)
+        int communityId,
+        int page,
+        int pageSize,
+        IReadOnlyCollection<int>? excludeUserIds = null,
+        CancellationToken cancellationToken = default)
     {
         var q = _db.CommunityMemberships.AsNoTracking()
-            .Where(m => m.CommunityId == communityId && m.Status == "active")
+            .Where(m => m.CommunityId == communityId && m.Status == "active");
+
+        if (excludeUserIds is { Count: > 0 })
+            q = q.Where(m => !excludeUserIds.Contains(m.UserId));
+
+        q = q
             .Include(m => m.User).ThenInclude(u => u.Subscription)
             .OrderBy(m => m.Role == "owner" ? 0 : m.Role == "admin" ? 1 : 2)
             .ThenBy(m => m.User.DisplayName ?? m.User.Username)

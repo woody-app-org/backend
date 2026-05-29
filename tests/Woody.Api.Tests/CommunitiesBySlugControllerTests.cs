@@ -18,7 +18,7 @@ public class CommunitiesBySlugControllerTests
     {
         var community = SampleCommunity(5, "club-woody", "public");
         var posts = new Mock<IPostRepository>();
-        posts.Setup(x => x.ListByCommunityIdPagedAsync(5, 1, 10, It.IsAny<CancellationToken>()))
+        posts.Setup(x => x.ListByCommunityIdPagedAsync(5, 1, 10, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<Post>(), 0));
 
         var enrichment = new Mock<IPostEnrichmentService>();
@@ -194,7 +194,7 @@ public class CommunitiesBySlugControllerTests
     {
         var community = SampleCommunity(15, "legacy-club", "public");
         var posts = new Mock<IPostRepository>();
-        posts.Setup(x => x.ListByCommunityIdPagedAsync(15, 1, 10, It.IsAny<CancellationToken>()))
+        posts.Setup(x => x.ListByCommunityIdPagedAsync(15, 1, 10, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<Post>(), 0));
 
         var enrichment = new Mock<IPostEnrichmentService>();
@@ -270,7 +270,8 @@ public class CommunitiesBySlugControllerTests
             Mock.Of<ICommunityDashboardAnalyticsService>(),
             Mock.Of<ICommunityPostBoostService>(),
             authorization.Object,
-            Mock.Of<INotificationService>());
+            Mock.Of<INotificationService>(),
+            UserBlockTestHelpers.CreateVisibilityMock().Object);
 
         var identity = viewerUserId.HasValue
             ? new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, viewerUserId.Value.ToString()) }, "Test")

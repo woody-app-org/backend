@@ -13,6 +13,7 @@ using Woody.Domain.Posts;
 using Woody.Application.Mapping;
 using Woody.Application.Media;
 using Woody.Application.Posts;
+using Woody.Application.Utilities;
 using Woody.Application.Validation;
 
 namespace Woody.Api.Controllers;
@@ -32,6 +33,7 @@ public class PostsController : ControllerBase
     private readonly IContentPinningService _pinning;
     private readonly IResourceAuthorizationService _authorization;
     private readonly INotificationService _notificationService;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public PostsController(
         IPostRepository posts,
@@ -42,7 +44,8 @@ public class PostsController : ControllerBase
         IPostEnrichmentService postEnrichment,
         IContentPinningService pinning,
         IResourceAuthorizationService authorization,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IUserRelationshipVisibilityService visibility)
     {
         _posts = posts;
         _communities = communities;
@@ -53,6 +56,7 @@ public class PostsController : ControllerBase
         _pinning = pinning;
         _authorization = authorization;
         _notificationService = notificationService;
+        _visibility = visibility;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -497,6 +501,9 @@ public class PostsController : ControllerBase
         if (postForLike == null || !await _authorization.CanReadPostAsync(postForLike, me, cancellationToken))
             return NotFound();
 
+        if (await _visibility.AreUsersBlockedEitherWayAsync(me.Value, postForLike.UserId, cancellationToken))
+            return NotFound();
+
         var added = await _likes.TryAddPostLikeAsync(me.Value, pid, cancellationToken);
         if (added)
             await _notificationService.NotifyPostLikedAsync(me.Value, postForLike.UserId, pid, cancellationToken);
@@ -552,6 +559,9 @@ public class PostsController : ControllerBase
         if (comment == null || comment.PostId != pid)
             return NotFound();
 
+        if (await _visibility.AreUsersBlockedEitherWayAsync(me.Value, comment.AuthorId, cancellationToken))
+            return NotFound();
+
         // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
         if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
             && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
@@ -592,6 +602,9 @@ public class PostsController : ControllerBase
         if (comment == null || comment.PostId != pid)
             return NotFound();
 
+        if (await _visibility.AreUsersBlockedEitherWayAsync(me.Value, comment.AuthorId, cancellationToken))
+            return NotFound();
+
         // Comentário oculto pelo autor: trata como inexistente para quem não tem permissão de moderação.
         if (comment.HiddenByPostAuthorAt.HasValue && post.UserId != me.Value
             && !await _authorization.CanModeratePostCommentsAsync(post, me.Value, cancellationToken))
@@ -623,6 +636,13 @@ public class PostsController : ControllerBase
 
         var postAuthorId = post!.UserId;
         var comments = await _comments.ListActiveForPostWithAuthorAsync(pid, cancellationToken);
+
+        if (viewerId.HasValue)
+        {
+            var hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(viewerId.Value, cancellationToken);
+            comments = CommentBlockFilter.FilterForViewer(comments, hiddenIds);
+        }
+
         var commentIds = comments.Select(c => c.Id).ToList();
         var likeCounts = commentIds.Count > 0
             ? await _likes.GetCommentLikeCountsAsync(commentIds, cancellationToken)
@@ -659,6 +679,9 @@ public class PostsController : ControllerBase
             return NotFound();
 
         var postAuthorId = post!.UserId;
+
+        if (await _visibility.AreUsersBlockedEitherWayAsync(me.Value, postAuthorId, cancellationToken))
+            return NotFound();
 
         var wantsGif = CommentGifAttachmentValidator.HasAnyGifField(
             body.GifUrl,
@@ -729,6 +752,10 @@ public class PostsController : ControllerBase
             parentComment = await _comments.GetByIdNonDeletedWithAuthorAsync(pcid, cancellationToken);
             if (parentComment == null || parentComment.PostId != pid)
                 return BadRequest(new { error = "Comentário pai inválido." });
+
+            if (await _visibility.AreUsersBlockedEitherWayAsync(me.Value, parentComment.AuthorId, cancellationToken))
+                return NotFound();
+
             parentId = pcid;
         }
 

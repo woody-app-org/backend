@@ -35,6 +35,7 @@ public class CommunitiesController : ControllerBase
     private readonly ICommunityPostBoostService _communityPostBoosts;
     private readonly IResourceAuthorizationService _authorization;
     private readonly INotificationService _notificationService;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public CommunitiesController(
         ICommunityRepository communities,
@@ -50,7 +51,8 @@ public class CommunitiesController : ControllerBase
         ICommunityDashboardAnalyticsService communityDashboardAnalytics,
         ICommunityPostBoostService communityPostBoosts,
         IResourceAuthorizationService authorization,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IUserRelationshipVisibilityService visibility)
     {
         _communities = communities;
         _memberships = memberships;
@@ -66,6 +68,7 @@ public class CommunitiesController : ControllerBase
         _communityPostBoosts = communityPostBoosts;
         _authorization = authorization;
         _notificationService = notificationService;
+        _visibility = visibility;
     }
 
     /// <summary>Cria comunidade: exige benefícios Pro (<see cref="IUserEntitlementService.CanCreateCommunityAsync"/>); ownership e moderação seguem a membership.</summary>
@@ -257,7 +260,12 @@ public class CommunitiesController : ControllerBase
                 return Forbid();
         }
 
-        var (posts, total) = await _posts.ListByCommunityIdPagedAsync(id, page, pageSize, cancellationToken);
+        var (posts, total) = await _posts.ListByCommunityIdPagedAsync(
+            id,
+            page,
+            pageSize,
+            await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken),
+            cancellationToken);
 
         var items = await _postEnrichment.ToPostDtosAsync(posts, viewerId, cancellationToken);
 
@@ -449,7 +457,12 @@ public class CommunitiesController : ControllerBase
         if (!await _authorization.CanReadCommunityMembersAsync(community, viewerId, cancellationToken))
             return Forbid();
 
-        var (rows, total) = await _memberships.ListActiveMembersPagedOrderedAsync(cid, page, pageSize, cancellationToken);
+        var (rows, total) = await _memberships.ListActiveMembersPagedOrderedAsync(
+            cid,
+            page,
+            pageSize,
+            await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken),
+            cancellationToken);
 
         return Ok(new PaginatedResponseDto<CommunityMemberItemDto>
         {
@@ -1142,6 +1155,17 @@ public class CommunitiesController : ControllerBase
             c.Id,
             cancellationToken);
         return member != null;
+    }
+
+    private async Task<IReadOnlyCollection<int>?> GetHiddenUserIdsExcludeAsync(
+        int? viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!viewerUserId.HasValue)
+            return null;
+
+        var hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(viewerUserId.Value, cancellationToken);
+        return hiddenIds.Count > 0 ? hiddenIds : null;
     }
 
     private static bool MembershipIsBanned(CommunityMembership? m) =>

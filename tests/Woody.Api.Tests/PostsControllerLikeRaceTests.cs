@@ -49,7 +49,8 @@ public class PostsControllerLikeRaceTests
             new Mock<IPostEnrichmentService>().Object,
             new Mock<IContentPinningService>().Object,
             authorization.Object,
-            new Mock<INotificationService>().Object)
+            new Mock<INotificationService>().Object,
+            UserBlockTestHelpers.CreateVisibilityMock().Object)
         {
             ControllerContext = new ControllerContext
             {

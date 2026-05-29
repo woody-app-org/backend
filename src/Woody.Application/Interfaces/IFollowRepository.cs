@@ -18,6 +18,7 @@ public interface IFollowRepository
         int page,
         int pageSize,
         string? search = null,
+        IReadOnlyCollection<int>? excludeUserIds = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Utilizadores seguidos por <paramref name="followingUserId"/>.</summary>
@@ -26,6 +27,7 @@ public interface IFollowRepository
         int page,
         int pageSize,
         string? search = null,
+        IReadOnlyCollection<int>? excludeUserIds = null,
         CancellationToken cancellationToken = default);
 
     void Add(Follow follow);

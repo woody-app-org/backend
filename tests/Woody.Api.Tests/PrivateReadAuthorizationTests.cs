@@ -284,7 +284,8 @@ public class PrivateReadAuthorizationTests
             Mock.Of<ICommunityDashboardAnalyticsService>(),
             Mock.Of<ICommunityPostBoostService>(),
             Mock.Of<IResourceAuthorizationService>(),
-            Mock.Of<INotificationService>());
+            Mock.Of<INotificationService>(),
+            UserBlockTestHelpers.CreateVisibilityMock().Object);
 
         SetUser(controller, viewerUserId);
         return controller;
@@ -304,7 +305,7 @@ public class PrivateReadAuthorizationTests
         var memberRows = members?.ToList() ?? new List<CommunityMembership>();
         var memberships = new Mock<ICommunityMembershipRepository>();
         memberships
-            .Setup(x => x.ListActiveMembersPagedOrderedAsync(community.Id, 1, 20, It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListActiveMembersPagedOrderedAsync(community.Id, 1, 20, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((memberRows, memberRows.Count));
 
         var authorization = new Mock<IResourceAuthorizationService>();
@@ -326,7 +327,8 @@ public class PrivateReadAuthorizationTests
             Mock.Of<ICommunityDashboardAnalyticsService>(),
             Mock.Of<ICommunityPostBoostService>(),
             authorization.Object,
-            Mock.Of<INotificationService>());
+            Mock.Of<INotificationService>(),
+            UserBlockTestHelpers.CreateVisibilityMock().Object);
 
         SetUser(controller, viewerUserId);
         return controller;

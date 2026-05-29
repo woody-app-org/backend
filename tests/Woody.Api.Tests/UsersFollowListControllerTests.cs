@@ -20,7 +20,7 @@ public class UsersFollowListControllerTests
             .ReturnsAsync(new User { Id = 1, Username = "profile", Email = "p@x.com", Password = "h", Role = "User" });
 
         var follows = new Mock<IFollowRepository>();
-        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 20, null, It.IsAny<CancellationToken>()))
+        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 20, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<User>(), 0));
 
         var stories = new Mock<IStoryRepository>();
@@ -33,7 +33,7 @@ public class UsersFollowListControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         follows.Verify(
-            x => x.ListFollowersPagedAsync(1, 1, 20, null, It.IsAny<CancellationToken>()),
+            x => x.ListFollowersPagedAsync(1, 1, 20, null, null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -55,7 +55,7 @@ public class UsersFollowListControllerTests
         };
 
         var follows = new Mock<IFollowRepository>();
-        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 20, "ana_souza", It.IsAny<CancellationToken>()))
+        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 20, "ana_souza", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<User> { follower }, 1));
 
         var stories = new Mock<IStoryRepository>();
@@ -72,7 +72,7 @@ public class UsersFollowListControllerTests
         Assert.Single(dto.Items);
         Assert.Equal("ana_souza", dto.Items[0].Username);
         follows.Verify(
-            x => x.ListFollowersPagedAsync(1, 1, 20, "ana_souza", It.IsAny<CancellationToken>()),
+            x => x.ListFollowersPagedAsync(1, 1, 20, "ana_souza", null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -84,7 +84,7 @@ public class UsersFollowListControllerTests
             .ReturnsAsync(new User { Id = 1, Username = "profile", Email = "p@x.com", Password = "h", Role = "User" });
 
         var follows = new Mock<IFollowRepository>();
-        follows.Setup(x => x.ListFollowingPagedAsync(1, 1, 20, null, It.IsAny<CancellationToken>()))
+        follows.Setup(x => x.ListFollowingPagedAsync(1, 1, 20, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<User>(), 0));
 
         var stories = new Mock<IStoryRepository>();
@@ -96,7 +96,7 @@ public class UsersFollowListControllerTests
         await controller.GetUserFollowingList("1", page: 1, pageSize: 20, search: "   ", cancellationToken: CancellationToken.None);
 
         follows.Verify(
-            x => x.ListFollowingPagedAsync(1, 1, 20, null, It.IsAny<CancellationToken>()),
+            x => x.ListFollowingPagedAsync(1, 1, 20, null, null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -104,7 +104,7 @@ public class UsersFollowListControllerTests
     public async Task GetMyFollowing_WithSearch_PassesNormalizedSearchToRepository()
     {
         var follows = new Mock<IFollowRepository>();
-        follows.Setup(x => x.ListFollowingPagedAsync(7, 1, 20, "carla", It.IsAny<CancellationToken>()))
+        follows.Setup(x => x.ListFollowingPagedAsync(7, 1, 20, "carla", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<User>(), 0));
 
         var stories = new Mock<IStoryRepository>();
@@ -117,7 +117,7 @@ public class UsersFollowListControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         follows.Verify(
-            x => x.ListFollowingPagedAsync(7, 1, 20, "carla", It.IsAny<CancellationToken>()),
+            x => x.ListFollowingPagedAsync(7, 1, 20, "carla", null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -139,7 +139,7 @@ public class UsersFollowListControllerTests
         };
 
         var follows = new Mock<IFollowRepository>();
-        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 1, "ana", It.IsAny<CancellationToken>()))
+        follows.Setup(x => x.ListFollowersPagedAsync(1, 1, 1, "ana", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<User> { follower }, 2));
 
         var stories = new Mock<IStoryRepository>();
@@ -161,7 +161,7 @@ public class UsersFollowListControllerTests
         Assert.True(dto.HasNextPage);
         Assert.False(dto.HasPreviousPage);
         follows.Verify(
-            x => x.ListFollowersPagedAsync(1, 1, 1, "ana", It.IsAny<CancellationToken>()),
+            x => x.ListFollowersPagedAsync(1, 1, 1, "ana", null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -200,7 +200,7 @@ public class UsersFollowListControllerTests
             new Mock<INotificationService>().Object,
             stories.Object,
             badgeAward.Object,
-            new Mock<IUserRelationshipVisibilityService>().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

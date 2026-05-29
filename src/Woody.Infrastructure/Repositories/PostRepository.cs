@@ -121,14 +121,23 @@ public class PostRepository : IPostRepository
     }
 
     public async Task<(List<Post> Items, int Total)> ListByCommunityIdPagedAsync(
-        int communityId, int page, int pageSize, CancellationToken cancellationToken = default)
+        int communityId,
+        int page,
+        int pageSize,
+        IReadOnlyCollection<int>? excludeAuthorUserIds = null,
+        CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var q = _db.Posts.AsNoTracking()
             .Where(p =>
                 p.CommunityId == communityId
                 && p.DeletedAt == null
-                && p.PublicationContext == PostPublicationContext.Community)
+                && p.PublicationContext == PostPublicationContext.Community);
+
+        if (excludeAuthorUserIds is { Count: > 0 })
+            q = q.Where(p => !excludeAuthorUserIds.Contains(p.UserId));
+
+        q = q
             .Include(p => p.User).ThenInclude(u => u.Subscription)
             .Include(p => p.Community).ThenInclude(c => c!.Subscription)
             .Include(p => p.Tags)

@@ -99,7 +99,7 @@ public class UsersController : ControllerBase
 
         var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
         var (items, total) = await _follows.ListFollowingPagedAsync(
-            me.Value, page, pageSize, normalizedSearch, cancellationToken);
+            me.Value, page, pageSize, normalizedSearch, await GetHiddenUserIdsExcludeAsync(me.Value, cancellationToken), cancellationToken);
         var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);
@@ -479,9 +479,10 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
         var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
         var (items, total) = await _follows.ListFollowersPagedAsync(
-            uid, page, pageSize, normalizedSearch, cancellationToken);
+            uid, page, pageSize, normalizedSearch, await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken), cancellationToken);
         var followerStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);
@@ -516,9 +517,10 @@ public class UsersController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
         var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
         var (items, total) = await _follows.ListFollowingPagedAsync(
-            uid, page, pageSize, normalizedSearch, cancellationToken);
+            uid, page, pageSize, normalizedSearch, await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken), cancellationToken);
         var followingStoryFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             items.Select(u => u.Id),
             cancellationToken);
@@ -666,6 +668,17 @@ public class UsersController : ControllerBase
 
         var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);
         return Ok(new FollowMutationResponseDto { IsFollowing = false, FollowersCount = followersCount });
+    }
+
+    private async Task<IReadOnlyCollection<int>?> GetHiddenUserIdsExcludeAsync(
+        int? viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!viewerUserId.HasValue)
+            return null;
+
+        var hiddenIds = await _relationshipVisibility.GetHiddenUserIdsForViewerAsync(viewerUserId.Value, cancellationToken);
+        return hiddenIds.Count > 0 ? hiddenIds : null;
     }
 
     private async Task<UserProfileDto?> BuildProfileAsync(int userId, int? viewerId, CancellationToken cancellationToken)

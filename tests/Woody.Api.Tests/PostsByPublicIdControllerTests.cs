@@ -108,7 +108,8 @@ public class PostsByPublicIdControllerTests
             enrichment.Object,
             new Mock<IContentPinningService>().Object,
             auth.Object,
-            new Mock<INotificationService>().Object)
+            new Mock<INotificationService>().Object,
+            UserBlockTestHelpers.CreateVisibilityMock().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
