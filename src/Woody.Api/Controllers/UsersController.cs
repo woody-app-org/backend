@@ -154,8 +154,13 @@ public class UsersController : ControllerBase
         if (!int.TryParse(userId, out var uid))
             return BadRequest();
 
-        var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(uid, cancellationToken);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        if (viewerId.HasValue
+            && viewerId.Value != uid
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, uid, cancellationToken))
+            return NotFound();
+
+        var rows = await _memberships.ListActiveWithCommunityAndTagsByUserAsync(uid, cancellationToken);
 
         HashSet<int>? viewerMemberCommunityIds = null;
         if (viewerId.HasValue && viewerId.Value != uid)
@@ -476,10 +481,15 @@ public class UsersController : ControllerBase
         if (await _users.GetByIdNoTrackingAsync(uid, cancellationToken) == null)
             return NotFound();
 
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        if (viewerId.HasValue
+            && viewerId.Value != uid
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, uid, cancellationToken))
+            return NotFound();
+
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
         var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
         var (items, total) = await _follows.ListFollowersPagedAsync(
             uid, page, pageSize, normalizedSearch, await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken), cancellationToken);
@@ -514,10 +524,15 @@ public class UsersController : ControllerBase
         if (await _users.GetByIdNoTrackingAsync(uid, cancellationToken) == null)
             return NotFound();
 
+        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        if (viewerId.HasValue
+            && viewerId.Value != uid
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, uid, cancellationToken))
+            return NotFound();
+
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
         var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
         var (items, total) = await _follows.ListFollowingPagedAsync(
             uid, page, pageSize, normalizedSearch, await GetHiddenUserIdsExcludeAsync(viewerId, cancellationToken), cancellationToken);

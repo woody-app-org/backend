@@ -89,6 +89,8 @@ public class PostsController : ControllerBase
         var post = await _posts.GetByPublicIdNonDeletedWithNavAsync(publicId, cancellationToken);
         if (post == null)
             return NotFound();
+        if (await IsAuthorHiddenFromViewerAsync(post.UserId, viewerId, cancellationToken))
+            return NotFound();
         if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
 
@@ -109,6 +111,8 @@ public class PostsController : ControllerBase
 
         var post = await _posts.GetByIdNonDeletedWithNavAsync(pid, cancellationToken);
         if (post == null)
+            return NotFound();
+        if (await IsAuthorHiddenFromViewerAsync(post.UserId, viewerId, cancellationToken))
             return NotFound();
         if (!await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
             return NotFound();
@@ -245,6 +249,20 @@ public class PostsController : ControllerBase
 
         var dto = await _postEnrichment.ToPostDtosAsync(new[] { post }, me, cancellationToken);
         return CreatedAtAction(nameof(GetByPublicId), new { publicId = post.PublicId }, dto[0]);
+    }
+
+    private async Task<bool> IsAuthorHiddenFromViewerAsync(
+        int authorUserId,
+        int? viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!viewerUserId.HasValue || viewerUserId.Value == authorUserId)
+            return false;
+
+        return await _visibility.AreUsersBlockedEitherWayAsync(
+            viewerUserId.Value,
+            authorUserId,
+            cancellationToken);
     }
 
     private sealed record NormalizedPostMediaRow(
