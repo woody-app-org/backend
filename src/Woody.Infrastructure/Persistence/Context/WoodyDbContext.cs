@@ -15,6 +15,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<Comment> Comments { get; set; }
         public virtual DbSet<Like> Likes { get; set; }
         public virtual DbSet<Follow> Follows { get; set; }
+        public virtual DbSet<UserBlock> UserBlocks { get; set; }
         public virtual DbSet<Community> Communities { get; set; }
         public virtual DbSet<CommunityTag> CommunityTags { get; set; }
         public virtual DbSet<CommunityMembership> CommunityMemberships { get; set; }
@@ -301,6 +302,27 @@ namespace Woody.Infrastructure.Persistence.Context
                 .WithMany(u => u.Followers)
                 .HasForeignKey(f => f.FollowedUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserBlock>(e =>
+            {
+                e.ToTable(
+                    "user_blocks",
+                    t => t.HasCheckConstraint("ck_user_blocks_not_self", "blocker_user_id <> blocked_user_id"));
+
+                e.HasIndex(b => new { b.BlockerUserId, b.BlockedUserId }).IsUnique();
+                e.HasIndex(b => b.BlockerUserId);
+                e.HasIndex(b => b.BlockedUserId);
+
+                e.HasOne(b => b.BlockerUser)
+                    .WithMany()
+                    .HasForeignKey(b => b.BlockerUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(b => b.BlockedUser)
+                    .WithMany()
+                    .HasForeignKey(b => b.BlockedUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             modelBuilder.Entity<Comment>(e =>
             {

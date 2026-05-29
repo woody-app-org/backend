@@ -191,7 +191,8 @@ public class UsersByUsernameControllerTests
             new Mock<IPostEnrichmentService>().Object,
             new Mock<INotificationService>().Object,
             stories.Object,
-            badgeAwardService.Object)
+            badgeAwardService.Object,
+            new Mock<IUserRelationshipVisibilityService>().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

@@ -199,7 +199,8 @@ public class UsersFollowListControllerTests
             new Mock<IPostEnrichmentService>().Object,
             new Mock<INotificationService>().Object,
             stories.Object,
-            badgeAward.Object)
+            badgeAward.Object,
+            new Mock<IUserRelationshipVisibilityService>().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

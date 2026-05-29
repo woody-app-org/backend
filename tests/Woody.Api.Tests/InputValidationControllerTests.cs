@@ -220,7 +220,8 @@ public class InputValidationControllerTests
             new Mock<IPostEnrichmentService>().Object,
             new Mock<INotificationService>().Object,
             new Mock<IStoryRepository>().Object,
-            badgeAward.Object);
+            badgeAward.Object,
+            new Mock<IUserRelationshipVisibilityService>().Object);
         SetUser(controller);
         return controller;
     }

@@ -55,7 +55,9 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
-        builder.Services.AddScoped<IProfileSignalSocialGate, NoOpProfileSignalSocialGate>();
+        builder.Services.AddScoped<IUserBlockRepository, UserBlockRepository>();
+        builder.Services.AddScoped<IUserRelationshipVisibilityService, UserRelationshipVisibilityService>();
+        builder.Services.AddScoped<IProfileSignalSocialGate, ProfileSignalSocialGate>();
         builder.Services.AddScoped<IProfileSignalRepository, ProfileSignalRepository>();
         builder.Services.AddScoped<IProfileSignalService, ProfileSignalService>();
         builder.Services.AddScoped<IStoryRepository, StoryRepository>();

@@ -27,6 +27,7 @@ public class UsersController : ControllerBase
     private readonly INotificationService _notificationService;
     private readonly IStoryRepository _stories;
     private readonly IBadgeAwardService _badgeAwardService;
+    private readonly IUserRelationshipVisibilityService _relationshipVisibility;
 
     public UsersController(
         IUserRepository users,
@@ -38,7 +39,8 @@ public class UsersController : ControllerBase
         IPostEnrichmentService postEnrichment,
         INotificationService notificationService,
         IStoryRepository stories,
-        IBadgeAwardService badgeAwardService)
+        IBadgeAwardService badgeAwardService,
+        IUserRelationshipVisibilityService relationshipVisibility)
     {
         _users = users;
         _usernameHistory = usernameHistory;
@@ -50,6 +52,7 @@ public class UsersController : ControllerBase
         _notificationService = notificationService;
         _stories = stories;
         _badgeAwardService = badgeAwardService;
+        _relationshipVisibility = relationshipVisibility;
     }
 
     [Authorize(Policy = "VerifiedAccount")]
@@ -546,6 +549,80 @@ public class UsersController : ControllerBase
 
         var followersCount = await _follows.CountFollowersAsync(targetId, cancellationToken);
         return Ok(new FollowMutationResponseDto { IsFollowing = true, FollowersCount = followersCount });
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("{userId}/block")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<IActionResult> BlockUser(string userId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(userId, out var targetId))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        if (me.Value == targetId)
+            return BadRequest(new { error = "Não podes bloquear a ti própria." });
+
+        try
+        {
+            await _relationshipVisibility.BlockAsync(me.Value, targetId, cancellationToken);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
+        return NoContent();
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpDelete("{userId}/block")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<IActionResult> UnblockUser(string userId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(userId, out var targetId))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        await _relationshipVisibility.UnblockAsync(me.Value, targetId, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpGet("me/blocked-users")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthenticatedApi)]
+    public async Task<ActionResult<PaginatedResponseDto<UserPublicDto>>> GetMyBlockedUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var normalizedSearch = FollowListSearchNormalizer.Normalize(search);
+        var result = await _relationshipVisibility.ListBlockedByUserPagedAsync(
+            me.Value,
+            page,
+            pageSize,
+            normalizedSearch,
+            cancellationToken);
+
+        return Ok(result);
     }
 
     [Authorize(Policy = "VerifiedAccount")]
