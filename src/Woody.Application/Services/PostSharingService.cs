@@ -81,6 +81,9 @@ public sealed class PostSharingService : IPostSharingService
         if (!await _authorization.CanReadPostAsync(post, recipientUserId, cancellationToken))
             throw new ForbiddenException(GenericShareError);
 
+        if (await _visibility.AreUsersBlockedEitherWayAsync(actorUserId, post.UserId, cancellationToken))
+            throw new ForbiddenException(GenericShareError);
+
         if (await _visibility.AreUsersBlockedEitherWayAsync(actorUserId, recipientUserId, cancellationToken))
             throw new ForbiddenException(GenericShareError);
 
