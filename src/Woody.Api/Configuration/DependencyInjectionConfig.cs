@@ -71,6 +71,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IMessageRepository, MessageRepository>();
         builder.Services.AddScoped<IDirectMessagingService, DirectMessagingService>();
         builder.Services.AddScoped<IPostSharingService, PostSharingService>();
+        builder.Services.AddScoped<IPostSharePageService, PostSharePageService>();
         builder.Services.AddSingleton<IDirectMessageRealtimePublisher, DirectMessageRealtimePublisher>();
         builder.Services.AddSingleton<INotificationRealtimePublisher, NotificationRealtimePublisher>();
         builder.Services.AddScoped<IContentReportRepository, ContentReportRepository>();

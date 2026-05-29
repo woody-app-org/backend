@@ -189,6 +189,7 @@ builder.Services.Configure<AuthSecurityOptions>(builder.Configuration.GetSection
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
 builder.Services.Configure<BetaAccessOptions>(builder.Configuration.GetSection("BetaAccess"));
 builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection("MediaStorage"));
+builder.Services.Configure<PublicShareOptions>(builder.Configuration.GetSection(PublicShareOptions.SectionName));
 builder.Services.Configure<VerificationStorageOptions>(builder.Configuration.GetSection("VerificationStorage"));
 builder.Services.Configure<FormOptions>(options =>
 {
