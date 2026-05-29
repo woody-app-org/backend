@@ -156,7 +156,7 @@ public sealed class PostsControllerCommentLikeTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -211,7 +211,7 @@ public sealed class PostsControllerCommentLikeTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -269,7 +269,7 @@ public sealed class PostsControllerCommentLikeTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -324,7 +324,7 @@ public sealed class PostsControllerCommentLikeTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {

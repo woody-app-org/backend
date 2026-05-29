@@ -324,7 +324,7 @@ public class UserBlockPrivacyPhase3Tests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             (notifications ?? new Mock<INotificationService>()).Object,
-            (visibility ?? UserBlockTestHelpers.CreateVisibilityMock()).Object)
+            (visibility ?? UserBlockTestHelpers.CreateVisibilityMock()).Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

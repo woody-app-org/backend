@@ -386,7 +386,7 @@ public class IborSecurityTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object);
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object);
 
         SetUser(controller, userId);
         return controller;

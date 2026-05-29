@@ -158,7 +158,8 @@ public class UserBlockPrivacyFinalReviewTests
             new Mock<IContentPinningService>().Object,
             auth.Object,
             new Mock<INotificationService>().Object,
-            visibility.Object);
+            visibility.Object,
+            new Mock<IPostSharingService>().Object);
 
         var identity = viewerUserId.HasValue
             ? new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, viewerUserId.Value.ToString())], "Test")

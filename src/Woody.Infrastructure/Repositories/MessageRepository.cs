@@ -38,6 +38,9 @@ public class MessageRepository : IMessageRepository
 
     private static string? BuildPreview(Message m)
     {
+        if (m.SharedPostId != null)
+            return "Publicação partilhada";
+
         if (!string.IsNullOrWhiteSpace(m.Body))
         {
             var t = m.Body.Trim();
@@ -59,6 +62,9 @@ public class MessageRepository : IMessageRepository
         var items = await baseQuery
             .Include(m => m.Sender)
             .Include(m => m.MediaAttachments)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.User)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.Community)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.MediaAttachments)
             .OrderBy(m => m.CreatedAt)
             .ThenBy(m => m.Id)
             .Skip((page - 1) * pageSize)
@@ -75,6 +81,9 @@ public class MessageRepository : IMessageRepository
         _db.Messages
             .Include(m => m.Sender)
             .Include(m => m.MediaAttachments)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.User)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.Community)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.MediaAttachments)
             .FirstOrDefaultAsync(m => m.Id == messageId && m.ConversationId == conversationId, cancellationToken);
 
     public Task<Message?> GetNoTrackingByIdInConversationAsync(
@@ -84,6 +93,9 @@ public class MessageRepository : IMessageRepository
         _db.Messages.AsNoTracking()
             .Include(m => m.Sender)
             .Include(m => m.MediaAttachments)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.User)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.Community)
+            .Include(m => m.SharedPost!).ThenInclude(p => p.MediaAttachments)
             .FirstOrDefaultAsync(m => m.Id == messageId && m.ConversationId == conversationId, cancellationToken);
 
     public void Add(Message message) => _db.Messages.Add(message);

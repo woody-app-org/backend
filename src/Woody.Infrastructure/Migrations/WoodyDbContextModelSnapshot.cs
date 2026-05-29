@@ -1173,11 +1173,18 @@ namespace Woody.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sender_user_id");
 
+                    b.Property<int?>("SharedPostId")
+                        .HasColumnType("integer")
+                        .HasColumnName("shared_post_id");
+
                     b.HasKey("Id")
                         .HasName("pk_messages");
 
                     b.HasIndex("SenderUserId")
                         .HasDatabaseName("ix_messages_sender_user_id");
+
+                    b.HasIndex("SharedPostId")
+                        .HasDatabaseName("ix_messages_shared_post_id");
 
                     b.HasIndex("ConversationId", "CreatedAt")
                         .HasDatabaseName("ix_messages_conversation_id_created_at");
@@ -2390,9 +2397,17 @@ namespace Woody.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_messages_users_sender_user_id");
 
+                    b.HasOne("Woody.Domain.Entities.Post", "SharedPost")
+                        .WithMany()
+                        .HasForeignKey("SharedPostId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_messages_posts_shared_post_id");
+
                     b.Navigation("Conversation");
 
                     b.Navigation("Sender");
+
+                    b.Navigation("SharedPost");
                 });
 
             modelBuilder.Entity("Woody.Domain.Entities.Notification", b =>

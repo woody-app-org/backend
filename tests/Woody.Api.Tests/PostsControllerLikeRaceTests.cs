@@ -50,7 +50,7 @@ public class PostsControllerLikeRaceTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {

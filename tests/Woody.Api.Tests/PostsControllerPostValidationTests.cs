@@ -55,7 +55,7 @@ public sealed class PostsControllerPostValidationTests
             new Mock<IContentPinningService>().Object,
             new Mock<IResourceAuthorizationService>().Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object);
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object);
 
         controller.ControllerContext = new ControllerContext
         {

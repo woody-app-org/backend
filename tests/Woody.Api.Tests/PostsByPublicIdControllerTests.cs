@@ -109,7 +109,7 @@ public class PostsByPublicIdControllerTests
             new Mock<IContentPinningService>().Object,
             auth.Object,
             new Mock<INotificationService>().Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

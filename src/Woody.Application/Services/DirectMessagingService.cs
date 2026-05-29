@@ -3,6 +3,7 @@ using Woody.Application.Exceptions;
 using Woody.Application.Interfaces;
 using Woody.Application.Mapping;
 using Woody.Application.Media;
+using Woody.Application.Posts;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 using Woody.Domain.Media;
@@ -25,6 +26,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private readonly IDirectMessageRealtimePublisher _realtime;
     private readonly INotificationService _notificationService;
     private readonly IUserRelationshipVisibilityService _visibility;
+    private readonly IResourceAuthorizationService _authorization;
 
     public DirectMessagingService(
         IConversationRepository conversations,
@@ -33,7 +35,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
         IUserRepository users,
         IDirectMessageRealtimePublisher realtime,
         INotificationService notificationService,
-        IUserRelationshipVisibilityService visibility)
+        IUserRelationshipVisibilityService visibility,
+        IResourceAuthorizationService authorization)
     {
         _conversations = conversations;
         _messages = messages;
@@ -42,6 +45,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         _realtime = realtime;
         _notificationService = notificationService;
         _visibility = visibility;
+        _authorization = authorization;
     }
 
     public async Task<ConversationResponseDto> StartOrGetConversationAsync(
@@ -287,11 +291,68 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         return new ConversationMessagesPageDto
         {
-            Items = MessageDtoMapper.ToResponseList(items),
+            Items = await MapMessagesForViewerAsync(items, actorUserId, cancellationToken),
             Total = total,
             Page = page,
             PageSize = pageSize
         };
+    }
+
+    public async Task<MessageResponseDto> SendSharedPostMessageAsync(
+        int actorUserId,
+        int conversationId,
+        int sharedPostId,
+        string? body,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _conversations.GetTrackedByIdForParticipantAsync(
+            conversationId,
+            actorUserId,
+            cancellationToken);
+        if (conversation == null)
+            throw new KeyNotFoundException("Conversa não encontrada.");
+
+        if (!DirectMessageConversationPolicy.MaySendMessage(conversation, actorUserId))
+            throw new ForbiddenException("Não foi possível compartilhar esta publicação.");
+
+        if (await _visibility.AreUsersBlockedEitherWayAsync(
+                actorUserId,
+                OtherParticipantId(conversation, actorUserId),
+                cancellationToken))
+            throw new ForbiddenException("Não foi possível compartilhar esta publicação.");
+
+        var text = string.IsNullOrWhiteSpace(body) ? null : body.Trim();
+        if (text != null && text.Length > MaxMessageBodyLength)
+            throw new ArgumentException($"O texto não pode exceder {MaxMessageBodyLength} caracteres.");
+
+        var utcNow = DateTime.UtcNow;
+        var message = new Message
+        {
+            ConversationId = conversationId,
+            SenderUserId = actorUserId,
+            Body = text,
+            SharedPostId = sharedPostId,
+            CreatedAt = utcNow
+        };
+
+        conversation.UpdatedAt = utcNow;
+        _messages.Add(message);
+        await _messages.SaveChangesAsync(cancellationToken);
+
+        var persisted = await _messages.GetNoTrackingByIdInConversationAsync(
+            conversationId,
+            message.Id,
+            cancellationToken);
+        if (persisted == null)
+            throw new InvalidOperationException("Não foi possível carregar a mensagem após o envio.");
+
+        var messageDto = await MapMessageForViewerAsync(persisted, actorUserId, cancellationToken);
+        await _realtime.BroadcastMessageCreatedAsync(
+            messageDto,
+            conversation.UserLowId,
+            conversation.UserHighId,
+            cancellationToken);
+        return messageDto;
     }
 
     public async Task<MessageResponseDto> SendMessageAsync(
@@ -373,7 +434,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (persisted == null)
             throw new InvalidOperationException("Não foi possível carregar a mensagem após o envio.");
 
-        var messageDto = MessageDtoMapper.ToResponse(persisted);
+        var messageDto = await MapMessageForViewerAsync(persisted, actorUserId, cancellationToken);
         await _realtime.BroadcastMessageCreatedAsync(
             messageDto,
             conversation.UserLowId,
@@ -425,7 +486,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (persisted == null)
             throw new InvalidOperationException("Não foi possível carregar a mensagem após a edição.");
 
-        var messageDto = MessageDtoMapper.ToResponse(persisted);
+        var messageDto = await MapMessageForViewerAsync(persisted, actorUserId, cancellationToken);
         var pair = await _conversations.GetParticipantPairIdsNoTrackingAsync(conversationId, cancellationToken);
         if (pair != null)
         {
@@ -482,7 +543,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
             cancellationToken);
         if (deletedSnapshot != null)
         {
-            var dto = MessageDtoMapper.ToResponse(deletedSnapshot);
+            var dto = await MapMessageForViewerAsync(deletedSnapshot, actorUserId, cancellationToken);
             var pair = await _conversations.GetParticipantPairIdsNoTrackingAsync(conversationId, cancellationToken);
             if (pair != null)
             {
@@ -651,6 +712,35 @@ public sealed class DirectMessagingService : IDirectMessagingService
         }
 
         return list;
+    }
+
+    private async Task<MessageResponseDto> MapMessageForViewerAsync(
+        Message message,
+        int viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        SharedPostPreviewDto? shared = null;
+        if (message.SharedPostId != null)
+        {
+            shared = await SharedPostPreviewBuilder.ForViewerAsync(
+                message.SharedPost,
+                viewerUserId,
+                _authorization,
+                cancellationToken);
+        }
+
+        return MessageDtoMapper.ToResponse(message, shared);
+    }
+
+    private async Task<IReadOnlyList<MessageResponseDto>> MapMessagesForViewerAsync(
+        IReadOnlyList<Message> messages,
+        int viewerUserId,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<MessageResponseDto>(messages.Count);
+        foreach (var message in messages)
+            result.Add(await MapMessageForViewerAsync(message, viewerUserId, cancellationToken));
+        return result;
     }
 
     private static string? TrimOrNull(string? raw) =>

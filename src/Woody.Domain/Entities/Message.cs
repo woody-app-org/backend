@@ -20,5 +20,9 @@ public class Message
     public DateTime? EditedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>Post partilhado nesta mensagem (preview renderizado no chat).</summary>
+    public int? SharedPostId { get; set; }
+    public Post? SharedPost { get; set; }
+
     public ICollection<MediaAttachment> MediaAttachments { get; set; } = new List<MediaAttachment>();
 }

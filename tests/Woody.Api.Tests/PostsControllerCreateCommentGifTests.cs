@@ -105,7 +105,7 @@ public sealed class PostsControllerCreateCommentGifTests
             new Mock<IContentPinningService>().Object,
             authorization.Object,
             notifications.Object,
-            UserBlockTestHelpers.CreateVisibilityMock().Object)
+            UserBlockTestHelpers.CreateVisibilityMock().Object, new Mock<IPostSharingService>().Object)
         {
             ControllerContext = new ControllerContext
             {

@@ -39,6 +39,13 @@ public interface IDirectMessagingService
         SendConversationMessageRequestDto body,
         CancellationToken cancellationToken = default);
 
+    Task<MessageResponseDto> SendSharedPostMessageAsync(
+        int actorUserId,
+        int conversationId,
+        int sharedPostId,
+        string? body,
+        CancellationToken cancellationToken = default);
+
     Task<MessageResponseDto> EditMessageAsync(
         int actorUserId,
         int conversationId,

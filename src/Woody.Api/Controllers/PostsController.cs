@@ -5,6 +5,7 @@ using Woody.Api.Configuration;
 using Woody.Api.Extensions;
 using Woody.Application.DTOs;
 using Woody.Application.DTOs.Api;
+using Woody.Application.Exceptions;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
@@ -34,6 +35,7 @@ public class PostsController : ControllerBase
     private readonly IResourceAuthorizationService _authorization;
     private readonly INotificationService _notificationService;
     private readonly IUserRelationshipVisibilityService _visibility;
+    private readonly IPostSharingService _postSharing;
 
     public PostsController(
         IPostRepository posts,
@@ -45,7 +47,8 @@ public class PostsController : ControllerBase
         IContentPinningService pinning,
         IResourceAuthorizationService authorization,
         INotificationService notificationService,
-        IUserRelationshipVisibilityService visibility)
+        IUserRelationshipVisibilityService visibility,
+        IPostSharingService postSharing)
     {
         _posts = posts;
         _communities = communities;
@@ -57,6 +60,7 @@ public class PostsController : ControllerBase
         _authorization = authorization;
         _notificationService = notificationService;
         _visibility = visibility;
+        _postSharing = postSharing;
     }
 
     private IActionResult FromPinningOutcome(ContentPinningOutcome outcome) => outcome switch
@@ -909,5 +913,31 @@ public class PostsController : ControllerBase
 
         var outcome = await _pinning.UnpinCommentOnPostAsync(me.Value, pid, cid, cancellationToken);
         return FromPinningOutcome(outcome);
+    }
+
+    [Authorize(Policy = "VerifiedAccount")]
+    [HttpPost("{postId}/share-to-conversation")]
+    [EnableRateLimiting(RateLimitPolicyNames.ContentCreate)]
+    public async Task<ActionResult<SharePostToConversationResponseDto>> ShareToConversation(
+        string postId,
+        [FromBody] SharePostToConversationRequestDto body,
+        CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(postId, out var pid))
+            return BadRequest();
+
+        var me = User.GetUserId();
+        if (me == null)
+            return Unauthorized();
+
+        try
+        {
+            var result = await _postSharing.ShareToConversationAsync(me.Value, pid, body, cancellationToken);
+            return Ok(result);
+        }
+        catch (ForbiddenException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

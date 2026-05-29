@@ -423,6 +423,11 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany(u => u.SentMessages)
                     .HasForeignKey(m => m.SenderUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(m => m.SharedPost)
+                    .WithMany()
+                    .HasForeignKey(m => m.SharedPostId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Notification>(e =>

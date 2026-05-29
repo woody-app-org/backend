@@ -1,4 +1,4 @@
-﻿namespace Woody.Api.Tests;
+namespace Woody.Api.Tests;
 
 public class UnitTest1
 {

@@ -113,6 +113,7 @@ public class DirectMessagingBlockTests
             (users ?? new Mock<IUserRepository>()).Object,
             new Mock<IDirectMessageRealtimePublisher>().Object,
             new Mock<INotificationService>().Object,
-            visibilityMock.Object);
+            visibilityMock.Object,
+            new Mock<IResourceAuthorizationService>().Object);
     }
 }

@@ -17,4 +17,7 @@ public sealed class MessageResponseDto
     public bool IsDeleted { get; set; }
 
     public IReadOnlyList<MediaAttachmentResponseDto> Attachments { get; set; } = Array.Empty<MediaAttachmentResponseDto>();
+
+    /// <summary>Preview do post partilhado, quando aplicável.</summary>
+    public SharedPostPreviewDto? SharedPost { get; set; }
 }

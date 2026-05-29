@@ -6,7 +6,7 @@ namespace Woody.Application.Mapping;
 
 public static class MessageDtoMapper
 {
-    public static MessageResponseDto ToResponse(Message message)
+    public static MessageResponseDto ToResponse(Message message, SharedPostPreviewDto? sharedPost = null)
     {
         var deleted = message.DeletedAt != null;
         return new MessageResponseDto
@@ -32,10 +32,19 @@ public static class MessageDtoMapper
                     .OrderBy(a => a.DisplayOrder)
                     .ThenBy(a => a.Id)
                     .Select(MediaAttachmentDtoMapper.ToResponseDto)
-                    .ToList()
+                    .ToList(),
+            SharedPost = deleted ? null : sharedPost
         };
     }
 
-    public static IReadOnlyList<MessageResponseDto> ToResponseList(IEnumerable<Message> messages) =>
-        messages.Select(ToResponse).ToList();
+    public static IReadOnlyList<MessageResponseDto> ToResponseList(
+        IEnumerable<Message> messages,
+        IReadOnlyDictionary<int, SharedPostPreviewDto?>? sharedPostsByMessageId = null) =>
+        messages.Select(m =>
+        {
+            SharedPostPreviewDto? preview = null;
+            if (sharedPostsByMessageId != null && sharedPostsByMessageId.TryGetValue(m.Id, out var p))
+                preview = p;
+            return ToResponse(m, preview);
+        }).ToList();
 }
