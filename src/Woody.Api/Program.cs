@@ -149,6 +149,9 @@ builder.Services.AddRateLimiter(options =>
         FixedWindowByIp(httpContext, permitLimit: 3, window: TimeSpan.FromMinutes(10)));
     options.AddPolicy(RateLimitPolicyNames.AuthEmailSend, AuthEmailRateLimitPolicies.PartitionAuthEmailSend);
     options.AddPolicy(RateLimitPolicyNames.AuthEmailVerify, AuthEmailRateLimitPolicies.PartitionAuthEmailVerify);
+    options.AddPolicy(RateLimitPolicyNames.AuthPasswordResetSend, AuthEmailRateLimitPolicies.PartitionAuthEmailSend);
+    options.AddPolicy(RateLimitPolicyNames.AuthPasswordResetVerify, AuthEmailRateLimitPolicies.PartitionAuthEmailVerify);
+    options.AddPolicy(RateLimitPolicyNames.AuthPasswordResetConfirm, AuthEmailRateLimitPolicies.PartitionAuthPasswordResetConfirm);
     options.AddPolicy(RateLimitPolicyNames.AuthRefresh, httpContext =>
         FixedWindowByIp(httpContext, permitLimit: 20, window: TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimitPolicyNames.Upload, httpContext =>

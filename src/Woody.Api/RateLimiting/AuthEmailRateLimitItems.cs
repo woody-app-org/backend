@@ -6,4 +6,5 @@ namespace Woody.Api.RateLimiting;
 public static class AuthEmailRateLimitItems
 {
     public const string NormalizedEmail = "woody:auth:rate_limit:normalized_email";
+    public const string ResetTokenRateLimitKey = "woody:auth:rate_limit:reset_token_key";
 }

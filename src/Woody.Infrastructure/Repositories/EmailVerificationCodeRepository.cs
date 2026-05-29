@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Woody.Application.Interfaces;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 using Woody.Infrastructure.Persistence.Context;
 
 namespace Woody.Infrastructure.Repositories;
@@ -17,16 +18,24 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
     public async Task AddAsync(EmailVerificationCode code, CancellationToken cancellationToken = default) =>
         await _context.EmailVerificationCodes.AddAsync(code, cancellationToken);
 
-    public async Task<EmailVerificationCode?> GetLatestByEmailAsync(string email, CancellationToken cancellationToken = default) =>
+    public async Task<EmailVerificationCode?> GetLatestByEmailAndPurposeAsync(
+        string email,
+        VerificationCodePurpose purpose,
+        CancellationToken cancellationToken = default) =>
         await _context.EmailVerificationCodes
-            .Where(x => x.Email == email)
+            .Where(x => x.Email == email && x.Purpose == purpose)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task InvalidateActiveByEmailAsync(string email, DateTime utcNow, CancellationToken cancellationToken = default)
+    public async Task InvalidateActiveByEmailAndPurposeAsync(
+        string email,
+        VerificationCodePurpose purpose,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
     {
         var activeCodes = await _context.EmailVerificationCodes
             .Where(x => x.Email == email
+                        && x.Purpose == purpose
                         && x.ConsumedAt == null
                         && x.InvalidatedAt == null
                         && x.ExpiresAt > utcNow)
@@ -39,9 +48,14 @@ public class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
         }
     }
 
-    public async Task<bool> HasConsumedCodeForEmailAsync(string email, CancellationToken cancellationToken = default) =>
+    public async Task<bool> HasConsumedCodeForEmailAndPurposeAsync(
+        string email,
+        VerificationCodePurpose purpose,
+        CancellationToken cancellationToken = default) =>
         await _context.EmailVerificationCodes
-            .AnyAsync(x => x.Email == email && x.ConsumedAt != null, cancellationToken);
+            .AnyAsync(
+                x => x.Email == email && x.Purpose == purpose && x.ConsumedAt != null,
+                cancellationToken);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _context.SaveChangesAsync(cancellationToken);

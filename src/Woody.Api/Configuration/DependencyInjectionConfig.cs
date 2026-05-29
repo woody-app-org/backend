@@ -49,6 +49,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<CreateCustomerPortalSessionHandler>();
         builder.Services.AddScoped<IUserEntitlementService, UserEntitlementService>();
         builder.Services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
+        builder.Services.AddScoped<IPasswordResetSessionRepository, PasswordResetSessionRepository>();
         builder.Services.AddScoped<IRefreshTokenSessionRepository, RefreshTokenSessionRepository>();
         builder.Services.AddScoped<ILoginLockoutRepository, LoginLockoutRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
@@ -159,6 +160,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+        builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
         builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>(client =>
         {
             client.BaseAddress = new Uri("https://api.resend.com/");

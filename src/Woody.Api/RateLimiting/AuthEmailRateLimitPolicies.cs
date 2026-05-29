@@ -54,6 +54,25 @@ public static class AuthEmailRateLimitPolicies
             _ => CreateFixedWindowOptions(10, TimeSpan.FromMinutes(10)));
     }
 
+    /// <summary>
+    /// Confirmar nova senha: 10 tentativas / 10 min por token; fallback por IP.
+    /// </summary>
+    public static RateLimitPartition<string> PartitionAuthPasswordResetConfirm(HttpContext httpContext)
+    {
+        var ip = RateLimitClientIp.Get(httpContext);
+        var tokenKey = httpContext.Items[AuthEmailRateLimitItems.ResetTokenRateLimitKey] as string;
+        if (string.IsNullOrEmpty(tokenKey))
+        {
+            return RateLimitPartition.GetFixedWindowLimiter(
+                $"reset-confirm-invalid:{ip}",
+                _ => CreateFixedWindowOptions(20, TimeSpan.FromMinutes(10)));
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"reset-confirm:{tokenKey}",
+            _ => CreateFixedWindowOptions(10, TimeSpan.FromMinutes(10)));
+    }
+
     private static FixedWindowRateLimiterOptions CreateFixedWindowOptions(int permitLimit, TimeSpan window) => new()
     {
         PermitLimit = permitLimit,

@@ -110,6 +110,42 @@ public class PostSharingServiceTests
             svc.ShareToConversationAsync(1, 12, new SharePostToConversationRequestDto { RecipientUserId = 2 }));
     }
 
+    [Fact]
+    public async Task ShareToConversationAsync_Throws_WhenBlockedWithPostAuthor()
+    {
+        var post = SampleProfilePost(13, authorId: 3);
+        var posts = new Mock<IPostRepository>();
+        posts.Setup(x => x.GetByIdNonDeletedWithNavAsync(13, It.IsAny<CancellationToken>())).ReturnsAsync(post);
+
+        var auth = new Mock<IResourceAuthorizationService>();
+        auth.Setup(x => x.CanReadPostAsync(post, 1, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        auth.Setup(x => x.CanReadPostAsync(post, 2, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var visibility = new Mock<IUserRelationshipVisibilityService>();
+        visibility.Setup(v => v.AreUsersBlockedEitherWayAsync(1, 2, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        visibility.Setup(v => v.AreUsersBlockedEitherWayAsync(1, 3, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var dm = new Mock<IDirectMessagingService>();
+        dm.Setup(x => x.StartOrGetConversationAsync(1, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConversationResponseDto { Id = 99 });
+
+        var svc = new PostSharingService(
+            posts.Object,
+            auth.Object,
+            visibility.Object,
+            new Mock<IConversationRepository>().Object,
+            dm.Object,
+            new Mock<INotificationService>().Object);
+
+        var ex = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            svc.ShareToConversationAsync(1, 13, new SharePostToConversationRequestDto { RecipientUserId = 2 }));
+
+        Assert.Equal(GenericError, ex.Message);
+        dm.Verify(
+            x => x.SendSharedPostMessageAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static Post SampleProfilePost(int id, int authorId) =>
         new()
         {

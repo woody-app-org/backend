@@ -33,6 +33,9 @@ public static class AuthEmailRateLimitOnRejected
         {
             RateLimitPolicyNames.AuthEmailSend => 60,
             RateLimitPolicyNames.AuthEmailVerify => 60,
+            RateLimitPolicyNames.AuthPasswordResetSend => 60,
+            RateLimitPolicyNames.AuthPasswordResetVerify => 60,
+            RateLimitPolicyNames.AuthPasswordResetConfirm => 60,
             RateLimitPolicyNames.PreLaunchSignup => 3600,
             _ => 30
         };
@@ -49,15 +52,22 @@ public static class AuthEmailRateLimitOnRejected
 
         string message;
         string code;
-        if (policyName == RateLimitPolicyNames.AuthEmailSend)
+        if (policyName == RateLimitPolicyNames.AuthEmailSend
+            || policyName == RateLimitPolicyNames.AuthPasswordResetSend)
         {
             message = "Aguarde alguns segundos antes de pedir um novo código.";
             code = "EMAIL_RATE_LIMITED";
         }
-        else if (policyName == RateLimitPolicyNames.AuthEmailVerify)
+        else if (policyName == RateLimitPolicyNames.AuthEmailVerify
+                 || policyName == RateLimitPolicyNames.AuthPasswordResetVerify)
         {
             message = "Muitas tentativas. Aguarde um pouco antes de tentar novamente.";
             code = "EMAIL_VERIFY_RATE_LIMITED";
+        }
+        else if (policyName == RateLimitPolicyNames.AuthPasswordResetConfirm)
+        {
+            message = "Muitas tentativas. Aguarde um pouco antes de tentar novamente.";
+            code = "PASSWORD_RESET_CONFIRM_RATE_LIMITED";
         }
         else if (policyName == RateLimitPolicyNames.PreLaunchSignup)
         {

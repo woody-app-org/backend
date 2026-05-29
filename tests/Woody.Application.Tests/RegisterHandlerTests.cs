@@ -8,6 +8,7 @@ using Woody.Application.Interfaces.Security;
 using Woody.Application.UseCases.Auth.Register;
 using Woody.Application.Validation;
 using Woody.Domain.Entities;
+using Woody.Domain.Entities.Enum;
 
 namespace Woody.Application.Tests;
 
@@ -72,7 +73,10 @@ public class RegisterHandlerTests
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         var codes = new Mock<IEmailVerificationCodeRepository>();
-        codes.Setup(x => x.HasConsumedCodeForEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        codes.Setup(x => x.HasConsumedCodeForEmailAndPurposeAsync(
+                It.IsAny<string>(),
+                It.IsAny<VerificationCodePurpose>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var beta = new Mock<IBetaInviteRepository>();
@@ -123,7 +127,10 @@ public class RegisterHandlerTests
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         var codes = new Mock<IEmailVerificationCodeRepository>();
-        codes.Setup(x => x.HasConsumedCodeForEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        codes.Setup(x => x.HasConsumedCodeForEmailAndPurposeAsync(
+                It.IsAny<string>(),
+                It.IsAny<VerificationCodePurpose>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var beta = new Mock<IBetaInviteRepository>();
@@ -247,7 +254,10 @@ public class RegisterHandlerTests
         users.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
 
         var codes = new Mock<IEmailVerificationCodeRepository>();
-        codes.Setup(x => x.HasConsumedCodeForEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        codes.Setup(x => x.HasConsumedCodeForEmailAndPurposeAsync(
+                It.IsAny<string>(),
+                It.IsAny<VerificationCodePurpose>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         User? capturedUser = null;
@@ -292,7 +302,10 @@ public class RegisterHandlerTests
     private static Mock<IEmailVerificationCodeRepository> CreateDefaultEmailCodesMock()
     {
         var codes = new Mock<IEmailVerificationCodeRepository>();
-        codes.Setup(x => x.HasConsumedCodeForEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        codes.Setup(x => x.HasConsumedCodeForEmailAndPurposeAsync(
+                It.IsAny<string>(),
+                It.IsAny<VerificationCodePurpose>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         return codes;
     }

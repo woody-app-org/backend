@@ -9,6 +9,8 @@ using Woody.Application.Validation;
 using Woody.Domain.Entities;
 using Woody.Domain.Entities.Enum;
 
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Application.UseCases.Auth.Register;
 
 public class RegisterHandler
@@ -101,7 +103,10 @@ public class RegisterHandler
         if (!DateOnly.TryParse(request.BirthDate, out var birthDate))
             throw new ArgumentException("Data de nascimento inválida.");
 
-        var isEmailVerified = await _emailVerificationCodes.HasConsumedCodeForEmailAsync(email, cancellationToken);
+        var isEmailVerified = await _emailVerificationCodes.HasConsumedCodeForEmailAndPurposeAsync(
+            email,
+            VerificationCodePurpose.EmailConfirmation,
+            cancellationToken);
         if (!isEmailVerified)
             throw new InvalidOperationException("Confirme o e-mail antes de concluir o cadastro.");
 

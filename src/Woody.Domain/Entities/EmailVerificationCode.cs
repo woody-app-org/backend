@@ -1,8 +1,11 @@
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Domain.Entities
 {
     public class EmailVerificationCode
     {
         public int Id { get; set; }
+        public VerificationCodePurpose Purpose { get; set; } = VerificationCodePurpose.EmailConfirmation;
         public string Email { get; set; } = null!;
         public int? UserId { get; set; }
         public User? User { get; set; }

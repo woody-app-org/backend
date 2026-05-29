@@ -4,7 +4,7 @@ using Woody.Api.RateLimiting;
 namespace Woody.Api.Middlewares;
 
 /// <summary>
-/// Lê o corpo JSON (com buffer) antes do rate limiter para expor o e-mail normalizado em <see cref="AuthEmailRateLimitItems.NormalizedEmail"/>.
+/// Lê o corpo JSON (com buffer) antes do rate limiter para expor e-mail normalizado ou chave de reset token.
 /// </summary>
 public sealed class AuthEmailRateLimitPreparationMiddleware(RequestDelegate next)
 {
@@ -20,16 +20,22 @@ public sealed class AuthEmailRateLimitPreparationMiddleware(RequestDelegate next
 
         context.Request.EnableBuffering();
 
-        string? normalized = null;
+        string? normalizedEmail = null;
+        string? resetTokenKey = null;
         try
         {
             context.Request.Body.Position = 0;
             var json = await ReadBodyCappedAsync(context.Request.Body, context.RequestAborted).ConfigureAwait(false);
             context.Request.Body.Position = 0;
 
-            var raw = AuthEmailRateLimitBodyParser.TryExtractNormalizedEmail(json);
-            if (!string.IsNullOrEmpty(raw) && AuthEmailRateLimitBodyParser.IsPlausibleRateLimitEmail(raw))
-                normalized = raw;
+            var rawEmail = AuthEmailRateLimitBodyParser.TryExtractNormalizedEmail(json);
+            if (!string.IsNullOrEmpty(rawEmail) && AuthEmailRateLimitBodyParser.IsPlausibleRateLimitEmail(rawEmail))
+                normalizedEmail = rawEmail;
+
+            var resetToken = AuthEmailRateLimitBodyParser.TryExtractResetToken(json);
+            resetTokenKey = string.IsNullOrEmpty(resetToken)
+                ? null
+                : AuthEmailRateLimitBodyParser.BuildResetTokenRateLimitKey(resetToken);
         }
         catch
         {
@@ -43,7 +49,8 @@ public sealed class AuthEmailRateLimitPreparationMiddleware(RequestDelegate next
             }
         }
 
-        context.Items[AuthEmailRateLimitItems.NormalizedEmail] = normalized;
+        context.Items[AuthEmailRateLimitItems.NormalizedEmail] = normalizedEmail;
+        context.Items[AuthEmailRateLimitItems.ResetTokenRateLimitKey] = resetTokenKey;
         await next(context).ConfigureAwait(false);
     }
 
@@ -55,7 +62,10 @@ public sealed class AuthEmailRateLimitPreparationMiddleware(RequestDelegate next
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
         return path.EndsWith("/api/auth/send-verification", StringComparison.Ordinal)
                || path.EndsWith("/api/auth/resend-verification", StringComparison.Ordinal)
-               || path.EndsWith("/api/auth/verify-email", StringComparison.Ordinal);
+               || path.EndsWith("/api/auth/verify-email", StringComparison.Ordinal)
+               || path.EndsWith("/api/auth/password-reset/request", StringComparison.Ordinal)
+               || path.EndsWith("/api/auth/password-reset/verify-code", StringComparison.Ordinal)
+               || path.EndsWith("/api/auth/password-reset/confirm", StringComparison.Ordinal);
     }
 
     private static async Task<string> ReadBodyCappedAsync(Stream body, CancellationToken cancellationToken)

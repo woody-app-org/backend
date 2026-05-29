@@ -55,6 +55,7 @@ namespace Woody.Domain.Entities
         public ICollection<ContentReport> ContentReports { get; set; } = new List<ContentReport>();
         public ICollection<EmailVerificationCode> EmailVerificationCodes { get; set; } = new List<EmailVerificationCode>();
         public ICollection<RefreshTokenSession> RefreshTokenSessions { get; set; } = new List<RefreshTokenSession>();
+        public ICollection<PasswordResetSession> PasswordResetSessions { get; set; } = new List<PasswordResetSession>();
 
         public ICollection<Conversation> ConversationsAsUserLow { get; set; } = new List<Conversation>();
         public ICollection<Conversation> ConversationsAsUserHigh { get; set; } = new List<Conversation>();

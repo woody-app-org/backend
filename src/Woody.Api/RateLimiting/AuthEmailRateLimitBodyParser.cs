@@ -67,4 +67,38 @@ public static class AuthEmailRateLimitBodyParser
             return normalizedEmail.GetHashCode(StringComparison.Ordinal);
         }
     }
+
+    /// <summary>
+    /// Extrai resetToken do corpo JSON (POST password-reset/confirm).
+    /// </summary>
+    public static string? TryExtractResetToken(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("resetToken", out var el))
+                return null;
+
+            var raw = el.GetString();
+            return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Chave estável para rate limit de confirm sem armazenar token em claro.</summary>
+    public static string? BuildResetTokenRateLimitKey(string resetToken)
+    {
+        if (string.IsNullOrWhiteSpace(resetToken))
+            return null;
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(resetToken);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
+    }
 }

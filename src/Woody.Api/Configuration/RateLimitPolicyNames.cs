@@ -9,6 +9,9 @@ public static class RateLimitPolicyNames
 
     /// <summary>Confirmação do código (tentativas por e-mail, separado do envio).</summary>
     public const string AuthEmailVerify = "auth-email-verify";
+    public const string AuthPasswordResetSend = "auth-password-reset-send";
+    public const string AuthPasswordResetVerify = "auth-password-reset-verify";
+    public const string AuthPasswordResetConfirm = "auth-password-reset-confirm";
     public const string AuthRefresh = "auth-refresh";
     public const string Upload = "upload";
     public const string ContentCreate = "content-create";

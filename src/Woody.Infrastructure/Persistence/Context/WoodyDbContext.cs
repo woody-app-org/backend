@@ -33,6 +33,7 @@ namespace Woody.Infrastructure.Persistence.Context
         public virtual DbSet<BillingWebhookReceipt> BillingWebhookReceipts { get; set; }
         public virtual DbSet<BillingCheckoutAttempt> BillingCheckoutAttempts { get; set; }
         public virtual DbSet<RefreshTokenSession> RefreshTokenSessions { get; set; }
+        public virtual DbSet<PasswordResetSession> PasswordResetSessions { get; set; }
         public virtual DbSet<LoginLockout> LoginLockouts { get; set; }
         public virtual DbSet<Conversation> Conversations { get; set; }
         public virtual DbSet<ConversationParticipant> ConversationParticipants { get; set; }
@@ -153,11 +154,21 @@ namespace Woody.Infrastructure.Persistence.Context
 
             modelBuilder.Entity<EmailVerificationCode>(e =>
             {
-                e.HasIndex(x => new { x.Email, x.CreatedAt });
+                e.HasIndex(x => new { x.Email, x.Purpose, x.CreatedAt });
                 e.HasOne(x => x.User)
                     .WithMany(u => u.EmailVerificationCodes)
                     .HasForeignKey(x => x.UserId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<PasswordResetSession>(e =>
+            {
+                e.HasIndex(x => x.TokenHash).IsUnique();
+                e.HasIndex(x => new { x.UserId, x.ExpiresAt });
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.PasswordResetSessions)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<RefreshTokenSession>(e =>

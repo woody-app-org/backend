@@ -8,6 +8,8 @@ using Woody.Application.Interfaces.Email;
 using Woody.Application.Interfaces.Security;
 using Woody.Domain.Entities;
 
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Application.Services;
 
 public class EmailVerificationService : IEmailVerificationService
@@ -55,7 +57,10 @@ public class EmailVerificationService : IEmailVerificationService
             throw new ArgumentException("Código inválido.");
 
         var now = DateTime.UtcNow;
-        var latestCode = await _codes.GetLatestByEmailAsync(email, cancellationToken);
+        var latestCode = await _codes.GetLatestByEmailAndPurposeAsync(
+            email,
+            VerificationCodePurpose.EmailConfirmation,
+            cancellationToken);
         if (latestCode is null)
             throw new ArgumentException("Código inválido.");
 
@@ -112,13 +117,18 @@ public class EmailVerificationService : IEmailVerificationService
             return BuildGenericSendResponse();
 
         var now = DateTime.UtcNow;
-        await _codes.InvalidateActiveByEmailAsync(email, now, cancellationToken);
+        await _codes.InvalidateActiveByEmailAndPurposeAsync(
+            email,
+            VerificationCodePurpose.EmailConfirmation,
+            now,
+            cancellationToken);
 
         var plainCode = GenerateSixDigitCode();
         var expiresAt = now.AddMinutes(_options.ExpirationMinutes);
 
         var entity = new EmailVerificationCode
         {
+            Purpose = VerificationCodePurpose.EmailConfirmation,
             Email = email,
             UserId = user?.Id,
             CodeHash = _passwordHasher.HashPassword(plainCode),

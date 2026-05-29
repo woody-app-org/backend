@@ -18,6 +18,7 @@ public class AuthController : ControllerBase
     private readonly RegisterHandler _registerHandler;
     private readonly CheckRegistrationAvailabilityHandler _checkAvailabilityHandler;
     private readonly IEmailVerificationService _emailVerificationService;
+    private readonly IPasswordResetService _passwordResetService;
     private readonly IAuthSessionService _authSessions;
     private readonly ILogger<AuthController> _logger;
 
@@ -26,6 +27,7 @@ public class AuthController : ControllerBase
         RegisterHandler registerHandler,
         CheckRegistrationAvailabilityHandler checkAvailabilityHandler,
         IEmailVerificationService emailVerificationService,
+        IPasswordResetService passwordResetService,
         IAuthSessionService authSessions,
         ILogger<AuthController> logger)
     {
@@ -33,6 +35,7 @@ public class AuthController : ControllerBase
         _registerHandler = registerHandler;
         _checkAvailabilityHandler = checkAvailabilityHandler;
         _emailVerificationService = emailVerificationService;
+        _passwordResetService = passwordResetService;
         _authSessions = authSessions;
         _logger = logger;
     }
@@ -114,6 +117,36 @@ public class AuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _emailVerificationService.ConfirmCodeAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("password-reset/request")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthPasswordResetSend)]
+    public async Task<IActionResult> RequestPasswordReset(
+        [FromBody] RequestPasswordResetRequestDTO request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _passwordResetService.RequestAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("password-reset/verify-code")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthPasswordResetVerify)]
+    public async Task<IActionResult> VerifyPasswordResetCode(
+        [FromBody] VerifyPasswordResetCodeRequestDTO request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _passwordResetService.VerifyCodeAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("password-reset/confirm")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthPasswordResetConfirm)]
+    public async Task<IActionResult> ConfirmPasswordReset(
+        [FromBody] ConfirmPasswordResetRequestDTO request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _passwordResetService.ConfirmAsync(request, cancellationToken);
         return Ok(result);
     }
 
