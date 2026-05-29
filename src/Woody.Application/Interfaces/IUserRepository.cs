@@ -15,7 +15,11 @@ public interface IUserRepository
     Task<List<UserInterest>> GetInterestsTrackedByUserIdAsync(int userId, CancellationToken cancellationToken = default);
     void RemoveUserInterests(IEnumerable<UserInterest> interests);
     void AddUserInterest(UserInterest interest);
-    Task<List<User>> SearchUsersNoTrackingAsync(string loweredQuery, int take, CancellationToken cancellationToken = default);
+    Task<List<User>> SearchUsersNoTrackingAsync(
+        string loweredQuery,
+        int take,
+        IReadOnlyCollection<int>? excludeUserIds = null,
+        CancellationToken cancellationToken = default);
     Task<List<User>> ListUsersForSuggestionsAsync(IReadOnlyCollection<int> excludeUserIds, int take, CancellationToken cancellationToken = default);
     Task<bool> ExistsUsernameAsync(string username);
     Task<bool> ExistsEmailAsync(string email);

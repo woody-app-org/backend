@@ -60,7 +60,7 @@ public class PrivateReadAuthorizationTests
     {
         var users = new Mock<IUserRepository>();
         users
-            .Setup(x => x.SearchUsersNoTrackingAsync("woody", 50, It.IsAny<CancellationToken>()))
+            .Setup(x => x.SearchUsersNoTrackingAsync("woody", 50, It.IsAny<IReadOnlyCollection<int>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<User> { CreateUser(7, "woody") });
 
         var communities = new Mock<ICommunityRepository>();
@@ -71,7 +71,12 @@ public class PrivateReadAuthorizationTests
         var posts = new Mock<IPostRepository>();
         var enrichment = new Mock<IPostEnrichmentService>();
         var authorization = new Mock<IResourceAuthorizationService>(MockBehavior.Strict);
-        var controller = new SearchController(users.Object, communities.Object, posts.Object, enrichment.Object, authorization.Object);
+        var visibility = new Mock<IUserRelationshipVisibilityService>();
+        visibility
+            .Setup(x => x.GetHiddenUserIdsForViewerAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<int>());
+
+        var controller = new SearchController(users.Object, communities.Object, posts.Object, enrichment.Object, authorization.Object, visibility.Object);
         SetUser(controller, userId: null);
 
         var people = await controller.Search("woody", "people", CancellationToken.None);
@@ -229,7 +234,12 @@ public class PrivateReadAuthorizationTests
             .Setup(x => x.CanReadPostAsync(It.IsAny<Post>(), viewerUserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Post post, int? _, CancellationToken _) => allowedPostIds.Contains(post.Id));
 
-        var controller = new SearchController(users.Object, communities.Object, posts.Object, enrichment.Object, authorization.Object);
+        var visibility = new Mock<IUserRelationshipVisibilityService>();
+        visibility
+            .Setup(x => x.GetHiddenUserIdsForViewerAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<int>());
+
+        var controller = new SearchController(users.Object, communities.Object, posts.Object, enrichment.Object, authorization.Object, visibility.Object);
         SetUser(controller, viewerUserId);
         return controller;
     }

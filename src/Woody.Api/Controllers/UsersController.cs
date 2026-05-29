@@ -132,6 +132,10 @@ public class UsersController : ControllerBase
         var exclude = followedIds.ToHashSet();
         exclude.Add(me.Value);
 
+        var hiddenIds = await _relationshipVisibility.GetHiddenUserIdsForViewerAsync(me.Value, cancellationToken);
+        foreach (var hiddenId in hiddenIds)
+            exclude.Add(hiddenId);
+
         var users = await _users.ListUsersForSuggestionsAsync(exclude, take, cancellationToken);
         var storyFlags = await _stories.GetUserIdsWithActiveStoriesAsync(
             users.Select(u => u.Id),
@@ -394,6 +398,14 @@ public class UsersController : ControllerBase
         pageSize = Math.Clamp(pageSize, 1, 50);
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
 
+        if (await _users.GetByIdNoTrackingAsync(uid, cancellationToken) == null)
+            return NotFound();
+
+        if (viewerId.HasValue
+            && viewerId.Value != uid
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, uid, cancellationToken))
+            return NotFound();
+
         var (pinned, posts, unpinnedTotal, allVisible) =
             await _posts.GetProfilePostsPageAsync(uid, viewerId, page, pageSize, cancellationToken);
 
@@ -427,6 +439,11 @@ public class UsersController : ControllerBase
             return NotFound();
 
         var viewerId = User.Identity?.IsAuthenticated == true ? User.GetUserId() : null;
+        if (viewerId.HasValue
+            && viewerId.Value != targetId
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, targetId, cancellationToken))
+            return NotFound();
+
         bool? isFollowing = null;
         if (viewerId.HasValue && viewerId.Value != targetId)
             isFollowing = await _follows.ExistsAsync(viewerId.Value, targetId, cancellationToken);
@@ -533,6 +550,9 @@ public class UsersController : ControllerBase
             return BadRequest(new { error = "Não podes seguir a ti própria." });
 
         if (await _users.GetByIdNoTrackingAsync(targetId, cancellationToken) == null)
+            return NotFound();
+
+        if (await _relationshipVisibility.AreUsersBlockedEitherWayAsync(me.Value, targetId, cancellationToken))
             return NotFound();
 
         if (!await _follows.ExistsAsync(me.Value, targetId, cancellationToken))
@@ -652,6 +672,11 @@ public class UsersController : ControllerBase
     {
         var u = await _users.GetByIdWithSocialLinksAndInterestsNoTrackingAsync(userId, cancellationToken);
         if (u == null)
+            return null;
+
+        if (viewerId.HasValue
+            && viewerId.Value != userId
+            && await _relationshipVisibility.AreUsersBlockedEitherWayAsync(viewerId.Value, userId, cancellationToken))
             return null;
 
         bool? following = null;

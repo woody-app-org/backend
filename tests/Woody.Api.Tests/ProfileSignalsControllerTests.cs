@@ -51,7 +51,31 @@ public class ProfileSignalsControllerTests
         var result = await service.SendAsync(10, 20, "te_notei", null, CancellationToken.None);
 
         Assert.Equal(ProfileSignalOperationOutcome.InteractionBlocked, result.Outcome);
+        Assert.Equal("Não foi possível enviar este sinal.", result.Error);
         signals.Verify(x => x.Add(It.IsAny<ProfileSignal>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_RejectsWhenUsersBlockedEitherWay_UsesGenericRestrictionCodeInStatus()
+    {
+        var users = new Mock<IUserRepository>();
+        users
+            .Setup(x => x.GetByIdNoTrackingAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Id = 20, Username = "bia", Email = "bia@example.com", Role = "User" });
+
+        var gate = new Mock<IProfileSignalSocialGate>();
+        gate
+            .Setup(x => x.AreUsersBlockedEitherWayAsync(10, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var service = CreateService(new Mock<IProfileSignalRepository>(), users, gate: gate);
+
+        var status = await service.GetSendStatusAsync(10, 20, "te_notei", CancellationToken.None);
+
+        Assert.False(status.CanSend);
+        Assert.Equal("receiver_unavailable", status.EligibilityRestrictionCode);
+        Assert.Equal("receiver_unavailable", status.RestrictionCode);
+        Assert.DoesNotContain("blocked", status.EligibilityRestrictionCode, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

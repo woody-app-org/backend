@@ -19,19 +19,22 @@ public class SearchController : ControllerBase
     private readonly IPostRepository _posts;
     private readonly IPostEnrichmentService _postEnrichment;
     private readonly IResourceAuthorizationService _authorization;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public SearchController(
         IUserRepository users,
         ICommunityRepository communities,
         IPostRepository posts,
         IPostEnrichmentService postEnrichment,
-        IResourceAuthorizationService authorization)
+        IResourceAuthorizationService authorization,
+        IUserRelationshipVisibilityService visibility)
     {
         _users = users;
         _communities = communities;
         _posts = posts;
         _postEnrichment = postEnrichment;
         _authorization = authorization;
+        _visibility = visibility;
     }
 
     [AllowAnonymous]
@@ -58,7 +61,12 @@ public class SearchController : ControllerBase
 
         if (string.Equals(mode, "people", StringComparison.OrdinalIgnoreCase))
         {
-            var users = await _users.SearchUsersNoTrackingAsync(n, 50, cancellationToken);
+            HashSet<int>? hiddenIds = null;
+            if (viewerId.HasValue)
+                hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(viewerId.Value, cancellationToken);
+
+            var exclude = hiddenIds is { Count: > 0 } ? hiddenIds : null;
+            var users = await _users.SearchUsersNoTrackingAsync(n, 50, exclude, cancellationToken);
             return Ok(new { people = users.Select(u => EntityMappers.ToUserPublicDto(u)).ToList() });
         }
 
@@ -75,9 +83,20 @@ public class SearchController : ControllerBase
         }
 
         var posts = await _posts.SearchNonDeletedWithNavAsync(n, 200, cancellationToken);
+        HashSet<int>? hiddenAuthorIds = null;
+        if (viewerId.HasValue)
+        {
+            var hidden = await _visibility.GetHiddenUserIdsForViewerAsync(viewerId.Value, cancellationToken);
+            if (hidden.Count > 0)
+                hiddenAuthorIds = hidden;
+        }
+
         var visiblePosts = new List<Post>();
         foreach (var post in posts)
         {
+            if (hiddenAuthorIds != null && hiddenAuthorIds.Contains(post.UserId))
+                continue;
+
             if (await _authorization.CanReadPostAsync(post, viewerId, cancellationToken))
                 visiblePosts.Add(post);
             if (visiblePosts.Count >= 80)

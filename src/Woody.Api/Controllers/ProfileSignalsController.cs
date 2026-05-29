@@ -168,7 +168,7 @@ public class ProfileSignalsController : ControllerBase
                 code = "cooldown",
                 nextAllowedAt = result.NextAllowedAt.HasValue ? EntityMappers.Iso(result.NextAllowedAt.Value) : null
             }),
-            ProfileSignalOperationOutcome.InteractionBlocked => StatusCode(403, new { error = result.Error, code = "blocked" }),
+            ProfileSignalOperationOutcome.InteractionBlocked => StatusCode(403, new { error = result.Error, code = "receiver_unavailable" }),
             ProfileSignalOperationOutcome.ReceiverDeclinesSignals => StatusCode(403, new { error = result.Error, code = "receiver_unavailable" }),
             ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules => StatusCode(403, new { error = result.Error, code = "social_mismatch" }),
             ProfileSignalOperationOutcome.NotFound => NotFound(new { error = result.Error }),

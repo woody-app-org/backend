@@ -23,9 +23,13 @@ public interface INotificationRepository
         int recipientUserId,
         int page,
         int pageSize,
+        IReadOnlyCollection<int>? excludeActorUserIds = null,
         CancellationToken cancellationToken = default);
 
-    Task<int> CountUnreadForRecipientAsync(int recipientUserId, CancellationToken cancellationToken = default);
+    Task<int> CountUnreadForRecipientAsync(
+        int recipientUserId,
+        IReadOnlyCollection<int>? excludeActorUserIds = null,
+        CancellationToken cancellationToken = default);
 
     Task<Notification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default);
 

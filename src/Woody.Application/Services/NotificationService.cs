@@ -16,17 +16,20 @@ public sealed class NotificationService : INotificationService
     private readonly INotificationRealtimePublisher _realtime;
     private readonly IUserRepository _users;
     private readonly IPostRepository _posts;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public NotificationService(
         INotificationRepository notifications,
         INotificationRealtimePublisher realtime,
         IUserRepository users,
-        IPostRepository posts)
+        IPostRepository posts,
+        IUserRelationshipVisibilityService visibility)
     {
         _notifications = notifications;
         _realtime = realtime;
         _users = users;
         _posts = posts;
+        _visibility = visibility;
     }
 
     public async Task<NotificationListResponseDto> ListMineAsync(
@@ -35,7 +38,15 @@ public sealed class NotificationService : INotificationService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var (items, total) = await _notifications.ListForRecipientPagedAsync(recipientUserId, page, pageSize, cancellationToken);
+        var hiddenActorIds = await _visibility.GetHiddenUserIdsForViewerAsync(recipientUserId, cancellationToken);
+        var excludeActors = hiddenActorIds.Count > 0 ? hiddenActorIds : null;
+
+        var (items, total) = await _notifications.ListForRecipientPagedAsync(
+            recipientUserId,
+            page,
+            pageSize,
+            excludeActors,
+            cancellationToken);
         var dtos = items.Select(n =>
         {
             var metaEl = ParseMetadata(n.MetadataJson);
@@ -65,8 +76,12 @@ public sealed class NotificationService : INotificationService
         };
     }
 
-    public Task<int> GetUnreadCountAsync(int recipientUserId, CancellationToken cancellationToken = default) =>
-        _notifications.CountUnreadForRecipientAsync(recipientUserId, cancellationToken);
+    public async Task<int> GetUnreadCountAsync(int recipientUserId, CancellationToken cancellationToken = default)
+    {
+        var hiddenActorIds = await _visibility.GetHiddenUserIdsForViewerAsync(recipientUserId, cancellationToken);
+        var excludeActors = hiddenActorIds.Count > 0 ? hiddenActorIds : null;
+        return await _notifications.CountUnreadForRecipientAsync(recipientUserId, excludeActors, cancellationToken);
+    }
 
     public async Task<bool> TryMarkReadAsync(int recipientUserId, int notificationId, CancellationToken cancellationToken = default)
     {
@@ -95,6 +110,9 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == postOwnerUserId)
             return;
 
+        if (await ShouldSuppressBetweenUsersAsync(actorUserId, postOwnerUserId, cancellationToken))
+            return;
+
         var now = DateTime.UtcNow;
         if (await _notifications.HasRecentPostLikeToRecipientAsync(
                 postOwnerUserId,
@@ -119,6 +137,9 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == postOwnerUserId)
             return;
 
+        if (await ShouldSuppressBetweenUsersAsync(actorUserId, postOwnerUserId, cancellationToken))
+            return;
+
         _notifications.Add(NotificationComposer.PostCommented(
             postOwnerUserId,
             actorUserId,
@@ -141,6 +162,9 @@ public sealed class NotificationService : INotificationService
         if (actorUserId == parentCommentAuthorUserId)
             return;
 
+        if (await ShouldSuppressBetweenUsersAsync(actorUserId, parentCommentAuthorUserId, cancellationToken))
+            return;
+
         _notifications.Add(NotificationComposer.CommentReplied(
             parentCommentAuthorUserId,
             actorUserId,
@@ -156,6 +180,9 @@ public sealed class NotificationService : INotificationService
     public async Task NotifyNewFollowerAsync(int actorUserId, int followedUserId, CancellationToken cancellationToken = default)
     {
         if (actorUserId == followedUserId)
+            return;
+
+        if (await ShouldSuppressBetweenUsersAsync(actorUserId, followedUserId, cancellationToken))
             return;
 
         _notifications.Add(NotificationComposer.NewFollower(
@@ -177,6 +204,9 @@ public sealed class NotificationService : INotificationService
         if (senderUserId == receiverUserId)
             return;
 
+        if (await ShouldSuppressBetweenUsersAsync(senderUserId, receiverUserId, cancellationToken))
+            return;
+
         _notifications.Add(NotificationComposer.ProfileSignalReceived(
             receiverUserId,
             senderUserId,
@@ -191,6 +221,9 @@ public sealed class NotificationService : INotificationService
     public async Task NotifyMessageRequestAsync(int initiatorUserId, int recipientUserId, int conversationId, CancellationToken cancellationToken = default)
     {
         if (initiatorUserId == recipientUserId)
+            return;
+
+        if (await ShouldSuppressBetweenUsersAsync(initiatorUserId, recipientUserId, cancellationToken))
             return;
 
         _notifications.Add(NotificationComposer.MessageRequest(
@@ -255,6 +288,12 @@ public sealed class NotificationService : INotificationService
         await _notifications.SaveChangesAsync(cancellationToken);
         await _realtime.PublishInboxChangedAsync(applicantUserId, cancellationToken);
     }
+
+    private async Task<bool> ShouldSuppressBetweenUsersAsync(
+        int actorUserId,
+        int recipientUserId,
+        CancellationToken cancellationToken) =>
+        await _visibility.AreUsersBlockedEitherWayAsync(actorUserId, recipientUserId, cancellationToken);
 
     private async Task<string?> ResolvePostPublicIdAsync(int postId, CancellationToken cancellationToken)
     {

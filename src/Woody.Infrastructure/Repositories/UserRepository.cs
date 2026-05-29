@@ -68,14 +68,23 @@ public class UserRepository : IUserRepository
     public void AddUserInterest(UserInterest interest) =>
         _context.UserInterests.Add(interest);
 
-    public async Task<List<User>> SearchUsersNoTrackingAsync(string loweredQuery, int take, CancellationToken cancellationToken = default) =>
-        await _context.Users.AsNoTracking()
+    public async Task<List<User>> SearchUsersNoTrackingAsync(
+        string loweredQuery,
+        int take,
+        IReadOnlyCollection<int>? excludeUserIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var q = _context.Users.AsNoTracking()
             .Include(u => u.Subscription)
             .Where(u => u.Username.ToLower().Contains(loweredQuery)
                         || (u.DisplayName != null && u.DisplayName.ToLower().Contains(loweredQuery))
-                        || u.Email.ToLower().Contains(loweredQuery))
-            .Take(take)
-            .ToListAsync(cancellationToken);
+                        || u.Email.ToLower().Contains(loweredQuery));
+
+        if (excludeUserIds is { Count: > 0 })
+            q = q.Where(u => !excludeUserIds.Contains(u.Id));
+
+        return await q.Take(take).ToListAsync(cancellationToken);
+    }
 
     public async Task<List<User>> ListUsersForSuggestionsAsync(IReadOnlyCollection<int> excludeUserIds, int take, CancellationToken cancellationToken = default) =>
         await _context.Users.AsNoTracking()

@@ -13,7 +13,7 @@ public class ProfileSignalService : IProfileSignalService
 
     private const string MsgCooldown = "Você já enviou esse sinal recentemente.";
     private const string MsgReceiverUnavailable = "Essa pessoa não está recebendo sinais no momento.";
-    private const string MsgInteractionBlocked = "Não foi possível enviar agora. Tente novamente mais tarde.";
+    private const string MsgInteractionBlocked = "Não foi possível enviar este sinal.";
 
     private readonly IProfileSignalRepository _signals;
     private readonly IUserRepository _users;
@@ -272,7 +272,7 @@ public class ProfileSignalService : IProfileSignalService
     private static string? MapGateOutcomeToRestrictionCode(ProfileSignalOperationOutcome outcome) =>
         outcome switch
         {
-            ProfileSignalOperationOutcome.InteractionBlocked => "blocked",
+            ProfileSignalOperationOutcome.InteractionBlocked => "receiver_unavailable",
             ProfileSignalOperationOutcome.ReceiverDeclinesSignals => "receiver_unavailable",
             ProfileSignalOperationOutcome.SenderNotEligibleBySocialRules => "social_mismatch",
             _ => null

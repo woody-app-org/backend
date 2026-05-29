@@ -38,14 +38,22 @@ public class NotificationRepository : INotificationRepository
         int recipientUserId,
         int page,
         int pageSize,
+        IReadOnlyCollection<int>? excludeActorUserIds = null,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
         var q = _db.Notifications.AsNoTracking()
-            .Where(n => n.RecipientUserId == recipientUserId)
-            .Include(n => n.ActorUser)
+            .Where(n => n.RecipientUserId == recipientUserId);
+
+        if (excludeActorUserIds is { Count: > 0 })
+        {
+            q = q.Where(n =>
+                n.ActorUserId == null || !excludeActorUserIds.Contains(n.ActorUserId.Value));
+        }
+
+        q = q.Include(n => n.ActorUser)
             .ThenInclude(u => u!.Subscription)
             .OrderByDescending(n => n.CreatedAt);
 
@@ -57,10 +65,20 @@ public class NotificationRepository : INotificationRepository
         return (items, total);
     }
 
-    public Task<int> CountUnreadForRecipientAsync(int recipientUserId, CancellationToken cancellationToken = default) =>
-        _db.Notifications.CountAsync(
-            n => n.RecipientUserId == recipientUserId && n.ReadAt == null,
-            cancellationToken);
+    public Task<int> CountUnreadForRecipientAsync(
+        int recipientUserId,
+        IReadOnlyCollection<int>? excludeActorUserIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var q = _db.Notifications.Where(n => n.RecipientUserId == recipientUserId && n.ReadAt == null);
+        if (excludeActorUserIds is { Count: > 0 })
+        {
+            q = q.Where(n =>
+                n.ActorUserId == null || !excludeActorUserIds.Contains(n.ActorUserId.Value));
+        }
+
+        return q.CountAsync(cancellationToken);
+    }
 
     public Task<Notification?> GetTrackedForRecipientAsync(int id, int recipientUserId, CancellationToken cancellationToken = default) =>
         _db.Notifications.FirstOrDefaultAsync(

@@ -14,6 +14,7 @@ public class FeedService : IFeedService
     private readonly ICommentRepository _comments;
     private readonly IPostEnrichmentService _enrichment;
     private readonly ICommunityPostBoostRepository _communityPostBoosts;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public FeedService(
         IPostRepository posts,
@@ -22,7 +23,8 @@ public class FeedService : IFeedService
         ILikeRepository likes,
         ICommentRepository comments,
         IPostEnrichmentService enrichment,
-        ICommunityPostBoostRepository communityPostBoosts)
+        ICommunityPostBoostRepository communityPostBoosts,
+        IUserRelationshipVisibilityService visibility)
     {
         _posts = posts;
         _follows = follows;
@@ -31,6 +33,7 @@ public class FeedService : IFeedService
         _comments = comments;
         _enrichment = enrichment;
         _communityPostBoosts = communityPostBoosts;
+        _visibility = visibility;
     }
 
     public async Task<PaginatedResponseDto<PostResponseDto>> GetFeedAsync(
@@ -46,6 +49,16 @@ public class FeedService : IFeedService
         var mode = NormalizeFeedFilter(filter);
 
         var candidates = await _posts.ListNonDeletedVisibleFeedCandidatesAsync(viewerUserId, cancellationToken);
+        if (candidates.Count == 0)
+            return EmptyPage(page, pageSize);
+
+        if (viewerUserId.HasValue)
+        {
+            var hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(viewerUserId.Value, cancellationToken);
+            if (hiddenIds.Count > 0)
+                candidates = candidates.Where(c => !hiddenIds.Contains(c.UserId)).ToList();
+        }
+
         if (candidates.Count == 0)
             return EmptyPage(page, pageSize);
 

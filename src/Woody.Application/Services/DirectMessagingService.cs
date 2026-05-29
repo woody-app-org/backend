@@ -24,6 +24,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
     private readonly IUserRepository _users;
     private readonly IDirectMessageRealtimePublisher _realtime;
     private readonly INotificationService _notificationService;
+    private readonly IUserRelationshipVisibilityService _visibility;
 
     public DirectMessagingService(
         IConversationRepository conversations,
@@ -31,7 +32,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
         IFollowRepository follows,
         IUserRepository users,
         IDirectMessageRealtimePublisher realtime,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IUserRelationshipVisibilityService visibility)
     {
         _conversations = conversations;
         _messages = messages;
@@ -39,6 +41,7 @@ public sealed class DirectMessagingService : IDirectMessagingService
         _users = users;
         _realtime = realtime;
         _notificationService = notificationService;
+        _visibility = visibility;
     }
 
     public async Task<ConversationResponseDto> StartOrGetConversationAsync(
@@ -52,6 +55,9 @@ public sealed class DirectMessagingService : IDirectMessagingService
         var (low, high) = DirectMessageConversationPolicy.OrderParticipantPair(actorUserId, otherUserId);
 
         if (await _users.GetByIdNoTrackingAsync(otherUserId, cancellationToken) == null)
+            throw new KeyNotFoundException("Utilizadora não encontrada.");
+
+        if (await _visibility.AreUsersBlockedEitherWayAsync(actorUserId, otherUserId, cancellationToken))
             throw new KeyNotFoundException("Utilizadora não encontrada.");
 
         var mutual = await _follows.AreMutualFollowersAsync(actorUserId, otherUserId, cancellationToken);
@@ -137,6 +143,14 @@ public sealed class DirectMessagingService : IDirectMessagingService
         CancellationToken cancellationToken = default)
     {
         var list = await _conversations.ListMineNoTrackingAsync(actorUserId, cancellationToken);
+        var hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(actorUserId, cancellationToken);
+        if (hiddenIds.Count > 0)
+        {
+            list = list
+                .Where(c => !hiddenIds.Contains(OtherParticipantId(c, actorUserId)))
+                .ToList();
+        }
+
         var dtos = ConversationDtoMapper.ToResponseList(list, actorUserId).ToList();
         await EnrichConversationPreviewsAsync(dtos, cancellationToken);
         return dtos;
@@ -147,6 +161,14 @@ public sealed class DirectMessagingService : IDirectMessagingService
         CancellationToken cancellationToken = default)
     {
         var list = await _conversations.ListPendingInboundNoTrackingAsync(actorUserId, cancellationToken);
+        var hiddenIds = await _visibility.GetHiddenUserIdsForViewerAsync(actorUserId, cancellationToken);
+        if (hiddenIds.Count > 0)
+        {
+            list = list
+                .Where(c => !hiddenIds.Contains(OtherParticipantId(c, actorUserId)))
+                .ToList();
+        }
+
         var dtos = ConversationDtoMapper.ToResponseList(list, actorUserId).ToList();
         await EnrichConversationPreviewsAsync(dtos, cancellationToken);
         return dtos;
@@ -160,6 +182,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
         var c = await _conversations.GetTrackedByIdForParticipantAsync(conversationId, actorUserId, cancellationToken);
         if (c == null)
             throw new KeyNotFoundException("Conversa não encontrada.");
+
+        await EnsureConversationNotBlockedAsync(c, actorUserId, cancellationToken);
 
         var dto = ConversationDtoMapper.ToResponse(c, actorUserId);
         await EnrichConversationPreviewsAsync(new[] { dto }, cancellationToken);
@@ -180,6 +204,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         if (!DirectMessageConversationPolicy.MayAcceptOrRejectRequest(c, actorUserId))
             throw new ForbiddenException("Só a utilizadora que recebeu o pedido pode aceitar esta conversa.");
+
+        await EnsureConversationNotBlockedAsync(c, actorUserId, cancellationToken);
 
         c.Status = ConversationStatus.Accepted;
         c.InitiatorUserId = null;
@@ -212,6 +238,8 @@ public sealed class DirectMessagingService : IDirectMessagingService
         if (!DirectMessageConversationPolicy.MayAcceptOrRejectRequest(c, actorUserId))
             throw new ForbiddenException("Só a utilizadora que recebeu o pedido pode recusar esta conversa.");
 
+        await EnsureConversationNotBlockedAsync(c, actorUserId, cancellationToken);
+
         c.Status = ConversationStatus.Rejected;
         c.RespondedAt = DateTime.UtcNow;
         c.UpdatedAt = DateTime.UtcNow;
@@ -241,6 +269,15 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         if (!await _conversations.IsParticipantAsync(conversationId, actorUserId, cancellationToken))
             throw new KeyNotFoundException("Conversa não encontrada.");
+
+        var conversation = await _conversations.GetTrackedByIdForParticipantAsync(
+            conversationId,
+            actorUserId,
+            cancellationToken);
+        if (conversation == null)
+            throw new KeyNotFoundException("Conversa não encontrada.");
+
+        await EnsureConversationNotBlockedAsync(conversation, actorUserId, cancellationToken);
 
         var (items, total) = await _messages.ListByConversationPagedAsync(
             conversationId,
@@ -272,6 +309,12 @@ public sealed class DirectMessagingService : IDirectMessagingService
 
         if (!DirectMessageConversationPolicy.MaySendMessage(conversation, actorUserId))
             throw new ForbiddenException("Não podes enviar mensagens nesta conversa.");
+
+        if (await _visibility.AreUsersBlockedEitherWayAsync(
+                actorUserId,
+                OtherParticipantId(conversation, actorUserId),
+                cancellationToken))
+            throw new ForbiddenException("Não foi possível enviar a mensagem.");
 
         var text = string.IsNullOrWhiteSpace(body.Body) ? null : body.Body.Trim();
         var attachmentPlans = NormalizeIncomingAttachments(body);
@@ -450,6 +493,21 @@ public sealed class DirectMessagingService : IDirectMessagingService
                     cancellationToken);
             }
         }
+    }
+
+    private static int OtherParticipantId(Conversation conversation, int actorUserId) =>
+        conversation.UserLowId == actorUserId ? conversation.UserHighId : conversation.UserLowId;
+
+    private async Task EnsureConversationNotBlockedAsync(
+        Conversation conversation,
+        int actorUserId,
+        CancellationToken cancellationToken)
+    {
+        if (await _visibility.AreUsersBlockedEitherWayAsync(
+                actorUserId,
+                OtherParticipantId(conversation, actorUserId),
+                cancellationToken))
+            throw new KeyNotFoundException("Conversa não encontrada.");
     }
 
     private static int? RecipientUserIdForPendingConversation(Conversation c)
