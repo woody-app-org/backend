@@ -10,4 +10,7 @@ public class PostCommunityPreviewDto
 
     /// <summary>Plano efetivo da comunidade (<c>free</c> | <c>premium</c>) para gates no feed sem chamada extra.</summary>
     public string CommunityPlan { get; set; } = "free";
+
+    /// <summary><c>public</c> ou <c>private</c> — partilha externa e preview público.</summary>
+    public string Visibility { get; set; } = "public";
 }

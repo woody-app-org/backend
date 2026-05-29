@@ -119,7 +119,8 @@ public static class EntityMappers
             Name = c.Name,
             AvatarUrl = c.AvatarUrl,
             Category = c.Category,
-            CommunityPlan = CommunityBillingMapper.ToEffectiveApiPlan(c.Subscription, utcNow)
+            CommunityPlan = CommunityBillingMapper.ToEffectiveApiPlan(c.Subscription, utcNow),
+            Visibility = string.Equals(c.Visibility, "private", StringComparison.OrdinalIgnoreCase) ? "private" : "public"
         };
     }
 
