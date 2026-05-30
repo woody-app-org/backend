@@ -1,3 +1,5 @@
+using Woody.Domain.Entities.Enum;
+
 namespace Woody.Domain.Entities;
 
 public class ContentReport
@@ -14,4 +16,13 @@ public class ContentReport
     public string ReasonCode { get; set; } = null!;
     public string? Details { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // ── Campos de revisão administrativa ──────────────────────────────────────
+    public ReportStatus Status { get; set; } = ReportStatus.Pending;
+    public int? ReviewedByUserId { get; set; }
+    public User? ReviewedBy { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? InternalNote { get; set; }
+    public string? ResolutionCode { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

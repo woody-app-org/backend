@@ -312,6 +312,7 @@ public static class EntityMappers
         Location = u.Location,
         Profession = u.Profession,
         VerificationStatus = includePrivateFields ? u.VerificationStatus.ToString() : null,
+        Role = includePrivateFields ? u.Role : null,
         SocialLinks = links ?? new List<SocialLinkDto>(),
         Interests = interests ?? new List<InterestItemResponseDto>(),
         Suggestions = new List<object>(),

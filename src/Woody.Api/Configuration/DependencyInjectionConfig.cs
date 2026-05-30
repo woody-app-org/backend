@@ -169,6 +169,7 @@ public static class DependencyInjectionConfig
         builder.Services.AddScoped<IIdentityVerificationRepository, IdentityVerificationRepository>();
         builder.Services.AddScoped<IVerificationService, VerificationService>();
         builder.Services.AddScoped<IAdminVerificationService, AdminVerificationService>();
+        builder.Services.AddScoped<IAdminReportsService, AdminReportsService>();
         builder.Services.AddScoped<LoginHandler>();
         builder.Services.AddScoped<RegisterHandler>();
         builder.Services.AddScoped<CheckRegistrationAvailabilityHandler>();

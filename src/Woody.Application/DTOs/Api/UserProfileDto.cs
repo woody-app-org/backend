@@ -23,6 +23,9 @@ public class UserProfileDto
     /// <summary>Presente apenas em <c>GET /users/me</c>. Não expor em perfis públicos.</summary>
     public string? VerificationStatus { get; set; }
 
+    /// <summary>Papel global da utilizadora. Presente apenas em <c>GET /users/me</c>.</summary>
+    public string? Role { get; set; }
+
     public List<SocialLinkDto> SocialLinks { get; set; } = new();
     public List<InterestItemResponseDto> Interests { get; set; } = new();
     public List<object> Suggestions { get; set; } = new();

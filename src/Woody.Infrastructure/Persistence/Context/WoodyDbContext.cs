@@ -371,6 +371,10 @@ namespace Woody.Infrastructure.Persistence.Context
                     .WithMany()
                     .HasForeignKey(r => r.CommentId)
                     .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(r => r.ReviewedBy)
+                    .WithMany()
+                    .HasForeignKey(r => r.ReviewedByUserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Conversation>(e =>
